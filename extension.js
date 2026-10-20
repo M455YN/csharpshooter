@@ -2,7 +2,12 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { LanguageClient, State } = require('vscode-languageclient/node');
+
+// VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
+// writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
+const toServerUri = (uri) => (uri.scheme === 'file' ? pathToFileURL(uri.fsPath).href : uri.toString());
 
 let client;
 let output;
@@ -57,6 +62,7 @@ async function startServer(context) {
         { scheme: 'file', language: 'aspnetcorerazor' },
       ],
       outputChannel: output,
+      uriConverters: { code2Protocol: toServerUri, protocol2Code: (value) => vscode.Uri.parse(value) },
       middleware: {
         // Roslyn asks for its options by section; null leaves each at the server's default.
         workspace: { configuration: (params) => params.items.map(() => null) },
@@ -77,10 +83,10 @@ async function startServer(context) {
   const solution = await findSolution();
   if (solution) {
     output.appendLine(`Opening ${solution}`);
-    await client.sendNotification('solution/open', { solution: vscode.Uri.file(solution).toString() });
+    await client.sendNotification('solution/open', { solution: toServerUri(vscode.Uri.file(solution)) });
   } else {
     const projects = await vscode.workspace.findFiles('**/*.csproj', '**/{node_modules,bin,obj}/**');
-    await client.sendNotification('project/open', { projects: projects.map((p) => p.toString()) });
+    await client.sendNotification('project/open', { projects: projects.map(toServerUri) });
   }
 }
 
