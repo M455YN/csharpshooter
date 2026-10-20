@@ -10,6 +10,16 @@ let output;
 let readyResolve;
 let ready = new Promise((r) => (readyResolve = r));
 
+// Server -> client requests Razor makes about the HTML in a .cshtml/.razor. Without an HTML server of our own they
+// answer empty, so Razor goes on with its own part (C#, tag helpers, components).
+const emptyListRequests = [
+  'textDocument/formatting', 'textDocument/rangeFormatting', 'textDocument/onTypeFormatting', 'textDocument/codeAction',
+  'textDocument/documentHighlight', 'textDocument/references', 'textDocument/foldingRange', 'textDocument/documentColor',
+  'textDocument/colorPresentation', 'textDocument/implementation', 'textDocument/definition', 'textDocument/documentSymbol',
+];
+const nullRequests = ['textDocument/hover', 'textDocument/signatureHelp', 'textDocument/linkedEditingRange', 'textDocument/rename',
+  'textDocument/willSaveWaitUntil', 'completionItem/resolve', 'codeAction/resolve'];
+
 function setting(name) {
   return vscode.workspace.getConfiguration('csharpShooter').get(name);
 }
@@ -58,6 +68,10 @@ async function startServer(context) {
     readyResolve();
   });
   client.onNotification('window/_roslyn_showToast', (toast) => output.appendLine(`[toast] ${toast.message}`));
+  client.onRequest('razor/updateHtml', () => null);
+  client.onRequest('textDocument/completion', () => ({ isIncomplete: false, items: [] }));
+  for (const method of emptyListRequests) client.onRequest(method, () => []);
+  for (const method of nullRequests) client.onRequest(method, () => null);
 
   await client.start();
   const solution = await findSolution();
