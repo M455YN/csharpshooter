@@ -1,0 +1,51 @@
+{
+  "name": "csharpshooter",
+  "displayName": "CSharpShooter",
+  "description": "C# and Razor (.cshtml/.razor) for VSCodium from Microsoft's roslyn-language-server.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "workspaceContains:**/*.sln",
+    "workspaceContains:**/*.slnx",
+    "workspaceContains:**/*.csproj",
+    "onLanguage:csharp",
+    "onLanguage:razor",
+    "onLanguage:aspnetcorerazor"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "CSharpShooter",
+      "properties": {
+        "csharpShooter.solution": {
+          "type": "string",
+          "default": "",
+          "description": "Solution (.sln/.slnx) to load. Empty: the first one found in the workspace."
+        },
+        "csharpShooter.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Microsoft.CodeAnalysis.LanguageServer.dll. Empty: the one under the extension's server/ folder."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "csharpShooter.restartServer",
+        "title": "Restart C# Language Server",
+        "category": "CSharpShooter"
+      }
+    ]
+  },
+  "scripts": {},
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}
