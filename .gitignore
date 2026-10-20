@@ -1,1 +1,3 @@
 node_modules/
+# Fetched and built, not sources: npm run fetch-server, scripts/build-debugger.ps1
+server/

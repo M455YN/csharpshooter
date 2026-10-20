@@ -44,7 +44,9 @@
       }
     ]
   },
-  "scripts": {},
+  "scripts": {
+    "fetch-server": "node scripts/fetch-server.js"
+  },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
   }
