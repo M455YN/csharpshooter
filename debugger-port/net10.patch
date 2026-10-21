@@ -1,0 +1,347 @@
+diff --git a/Directory.Build.props b/Directory.Build.props
+index ef9fef0..4eec602 100644
+--- a/Directory.Build.props
++++ b/Directory.Build.props
+@@ -1,7 +1,7 @@
+ <Project>
+   <!-- What every project shares. A project's own file sets only what is its own. -->
+   <PropertyGroup>
+-    <TargetFramework>net11.0</TargetFramework>
++    <TargetFramework>net10.0</TargetFramework>
+     <!-- What a package says it is (tools/package-mac.sh) until a vX.Y.Z tag on the commit names the version. -->
+     <Version>0.1.0</Version>
+     <Nullable>enable</Nullable>
+diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
+index 769a134..687ed98 100644
+--- a/src/Passenger.Core/ChildProcesses.cs
++++ b/src/Passenger.Core/ChildProcesses.cs
+@@ -369,10 +369,7 @@ public static class ChildProcesses
+         start.RedirectStandardInput = true;
+         start.RedirectStandardOutput = true;
+         start.RedirectStandardError = true;
+-        if (!OperatingSystem.IsWindows())
+-        {
+-            start.StartDetached = true;
+-        }
++        // shortcut: .NET 10 has no StartDetached, so off Windows it stays in our session; the debug adapter never calls this.
+         using Process process = Process.Start(start) ?? throw new InvalidOperationException($"{start.FileName} did not start");
+         Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory));
+         // What it writes is nobody's: its pipes closed here, its writes to them fail, which .NET's console passes over.
+diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
+index e7489b6..c9b129e 100644
+--- a/src/Passenger.Core/Lifeline.cs
++++ b/src/Passenger.Core/Lifeline.cs
+@@ -51,18 +51,26 @@ internal static partial class Lifeline
+     {
+         if (OperatingSystem.IsWindows())
+         {
+-            start.KillOnParentExit = true;
++            // .NET 10 has no KillOnParentExit: the child joins a kill-on-close job of our own once it starts (Adopt).
+             return;
+         }
+-        start.StartDetached = true;
++        // shortcut: .NET 10 has no StartDetached, so a child stays in our session and group; port setsid if Unix matters.
+         lock (Gate)
+         {
+             Watchdog();
+         }
+     }
+ 
+-    /// <summary>Puts a child that has started, and so its group, on the watchdog's list.</summary>
+-    public static void Adopt(Process process) => AdoptGroup(process.Id);
++    /// <summary>Puts a child that has started, and so its group, on the watchdog's list (on Windows, in the job).</summary>
++    public static void Adopt(Process process)
++    {
++        if (OperatingSystem.IsWindows())
++        {
++            Job.Add(process);
++            return;
++        }
++        AdoptGroup(process.Id);
++    }
+ 
+     /// <summary>Puts a process group that leads itself on the watchdog's list: a child's, or a program the terminal started
+     /// in its pseudo-terminal, which leads a session and group of its own as a child here does.</summary>
+@@ -174,7 +182,6 @@ internal static partial class Lifeline
+                 UseShellExecute = false,
+                 CreateNoWindow = true,
+                 RedirectStandardInput = true,
+-                StartDetached = true,
+             };
+             Process started = Process.Start(start) ?? throw new InvalidOperationException("The watchdog did not start");
+             foreach (int group in Groups)
+@@ -197,4 +204,71 @@ internal static partial class Lifeline
+ 
+     [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
+     private static partial int Signal(int process, int signal);
++
++    /// <summary>The Windows job every child joins: the system kills them all once our handle to it closes, as it does
++    /// however our process ends. What .NET 11's KillOnParentExit does for a ProcessStartInfo.</summary>
++    private static partial class Job
++    {
++        private const int ExtendedLimitInformation = 9;
++        private const uint KillOnJobClose = 0x2000;
++        private static nint handle;
++
++        public static void Add(Process process)
++        {
++            lock (Gate)
++            {
++                if (handle == 0)
++                {
++                    nint created = CreateJobObjectW(0, null);
++                    ExtendedLimits limits = new() { Basic = new BasicLimits { LimitFlags = KillOnJobClose } };
++                    if (created == 0 || !SetInformationJobObject(created, ExtendedLimitInformation, ref limits, (uint)Marshal.SizeOf<ExtendedLimits>()))
++                    {
++                        return;
++                    }
++                    handle = created;
++                }
++                try
++                {
++                    // A child that ended already has nothing to kill.
++                    AssignProcessToJobObject(handle, process.Handle);
++                }
++                catch (InvalidOperationException)
++                {
++                }
++            }
++        }
++
++        [StructLayout(LayoutKind.Sequential)]
++        private struct BasicLimits
++        {
++            public long PerProcessUserTimeLimit;
++            public long PerJobUserTimeLimit;
++            public uint LimitFlags;
++            public nuint MinimumWorkingSetSize;
++            public nuint MaximumWorkingSetSize;
++            public uint ActiveProcessLimit;
++            public nuint Affinity;
++            public uint PriorityClass;
++            public uint SchedulingClass;
++        }
++
++        [StructLayout(LayoutKind.Sequential)]
++        private struct ExtendedLimits
++        {
++            public BasicLimits Basic;
++            public ulong ReadOperationCount, WriteOperationCount, OtherOperationCount, ReadTransferCount, WriteTransferCount, OtherTransferCount;
++            public nuint ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed;
++        }
++
++        [LibraryImport("kernel32", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
++        private static partial nint CreateJobObjectW(nint attributes, string? name);
++
++        [LibraryImport("kernel32", SetLastError = true)]
++        [return: MarshalAs(UnmanagedType.Bool)]
++        private static partial bool SetInformationJobObject(nint job, int infoClass, ref ExtendedLimits info, uint length);
++
++        [LibraryImport("kernel32", SetLastError = true)]
++        [return: MarshalAs(UnmanagedType.Bool)]
++        private static partial bool AssignProcessToJobObject(nint job, nint process);
++    }
+ }
+diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
+index 5211875..8f4b33e 100644
+--- a/src/Passenger.Debugger/SuspendedLaunch.cs
++++ b/src/Passenger.Debugger/SuspendedLaunch.cs
+@@ -144,53 +144,97 @@ public sealed partial class SuspendedLaunch : IDisposable
+         }
+     }
+ 
++    /// <summary>What .NET 11's ProcessStartInfo.StartSuspended does, for .NET 10: CreateProcess with CREATE_SUSPENDED and
++    /// the program's standard streams on pipes, its main thread held until <see cref="Resume"/>.</summary>
+     [SupportedOSPlatform("windows")]
+     private static SuspendedLaunch StartOnWindows(string program, IReadOnlyList<string> arguments, string? folder, IReadOnlyDictionary<string, string> variables)
+     {
+-        ProcessStartInfo start = new(program, arguments)
++        Dictionary<string, string> environment = new(StringComparer.OrdinalIgnoreCase);
++        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+         {
+-            WorkingDirectory = folder ?? Environment.CurrentDirectory,
+-            UseShellExecute = false,
+-            CreateNoWindow = true,
+-            RedirectStandardInput = true,
+-            RedirectStandardOutput = true,
+-            RedirectStandardError = true,
+-            StartSuspended = true,
+-        };
++            environment[(string)entry.Key] = (string?)entry.Value ?? string.Empty;
++        }
+         foreach ((string key, string value) in variables)
+         {
+-            start.Environment[key] = value;
++            environment[key] = value;
+         }
+-        Process held = Process.Start(start) ?? throw new InvalidOperationException($"{program} did not start");
+-        return new SuspendedLaunch(held.Id, 0, held, held.StandardInput.BaseStream, held.StandardOutput.BaseStream, held.StandardError.BaseStream)
++        StringBuilder block = new();
++        foreach ((string key, string value) in environment.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+         {
+-            InitialThreadId = OnlyThread(held),
+-        };
+-    }
++            block.Append(key).Append('=').Append(value).Append('\0');
++        }
++        block.Append('\0');
+ 
+-    /// <summary>The one thread a process started suspended has, which its Main will run on; null when the system will not
+-    /// say (the process gone already).</summary>
+-    [SupportedOSPlatform("windows")]
+-    private static int? OnlyThread(Process held)
+-    {
++        // shortcut: the child's pipe ends are inheritable until CreateProcess returns, so a process another thread starts
++        // meanwhile inherits them too (.NET's own start serializes this with a lock of its own we cannot take).
++        (SafeFileHandle childIn, SafeFileHandle parentIn) = WindowsPipe(childReads: true);
++        (SafeFileHandle childOut, SafeFileHandle parentOut) = WindowsPipe(childReads: false);
++        (SafeFileHandle childErr, SafeFileHandle parentErr) = WindowsPipe(childReads: false);
+         try
+         {
+-            return held.Threads.Cast<ProcessThread>().MinBy(thread => thread.StartTime)?.Id;
++            StartupInfo startup = new()
++            {
++                Size = Marshal.SizeOf<StartupInfo>(),
++                Flags = UseStdHandles,
++                StdInput = childIn.DangerousGetHandle(),
++                StdOutput = childOut.DangerousGetHandle(),
++                StdError = childErr.DangerousGetHandle(),
++            };
++            char[] commandLine = (CommandLine(program, arguments) + '\0').ToCharArray();
++            if (!CreateProcessW(null, commandLine, 0, 0, true, CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment,
++                block.ToString(), folder ?? Environment.CurrentDirectory, ref startup, out ProcessInformation started))
++            {
++                throw new Win32Exception(Marshal.GetLastPInvokeError(), $"{program} did not start");
++            }
++            CloseHandle(started.Process);
++            Process held = Process.GetProcessById(started.ProcessId);
++            return new SuspendedLaunch(started.ProcessId, started.Thread, held,
++                new FileStream(parentIn, FileAccess.Write, 1), new FileStream(parentOut, FileAccess.Read, 1), new FileStream(parentErr, FileAccess.Read, 1))
++            {
++                InitialThreadId = started.ThreadId,
++            };
+         }
+-        catch (Exception error) when (error is InvalidOperationException or Win32Exception or NotSupportedException)
++        catch
+         {
+-            return null;
++            parentIn.Dispose();
++            parentOut.Dispose();
++            parentErr.Dispose();
++            throw;
++        }
++        finally
++        {
++            childIn.Dispose();
++            childOut.Dispose();
++            childErr.Dispose();
+         }
+     }
+ 
++    /// <summary>A pipe whose child end the program inherits and whose parent end it does not.</summary>
++    [SupportedOSPlatform("windows")]
++    private static (SafeFileHandle Child, SafeFileHandle Parent) WindowsPipe(bool childReads)
++    {
++        SecurityAttributes inherit = new() { Length = Marshal.SizeOf<SecurityAttributes>(), InheritHandle = 1 };
++        if (!CreatePipe(out SafeFileHandle read, out SafeFileHandle write, ref inherit, 0))
++        {
++            throw new Win32Exception(Marshal.GetLastPInvokeError(), "CreatePipe failed");
++        }
++        SafeFileHandle parent = childReads ? write : read;
++        _ = SetHandleInformation(parent.DangerousGetHandle(), HandleFlagInherit, 0);
++        return childReads ? (read, write) : (write, read);
++    }
++
+     /// <summary>Lets the program run its first instruction.</summary>
+     public void Resume()
+     {
+         if (process is not null)
+         {
++            // On Windows resumeHandle is the main thread's handle, held suspended since CreateProcess.
+             if (!resumed && OperatingSystem.IsWindows())
+             {
+-                process.SafeHandle.Resume();
++                if (ResumeThread(resumeHandle) == uint.MaxValue)
++                {
++                    throw new Win32Exception(Marshal.GetLastPInvokeError(), "ResumeThread failed");
++                }
+                 resumed = true;
+             }
+             return;
+@@ -254,6 +298,11 @@ public sealed partial class SuspendedLaunch : IDisposable
+     public void Dispose()
+     {
+         process?.Dispose();
++        if (process is not null && resumeHandle != 0)
++        {
++            CloseHandle(resumeHandle);
++            resumeHandle = 0;
++        }
+         if (resumeHandle != 0)
+         {
+             DbgShim.CloseResumeHandle(resumeHandle);
+@@ -347,4 +396,50 @@ public sealed partial class SuspendedLaunch : IDisposable
+     [LibraryImport("kernel32", EntryPoint = "SetHandleInformation", SetLastError = true)]
+     [return: MarshalAs(UnmanagedType.Bool)]
+     private static partial bool SetHandleInformation(nint handle, uint mask, uint flags);
++
++    private const int UseStdHandles = 0x100;
++    private const uint CreateSuspended = 0x4;
++    private const uint CreateNoWindow = 0x08000000;
++    private const uint CreateUnicodeEnvironment = 0x400;
++
++    [StructLayout(LayoutKind.Sequential)]
++    private struct SecurityAttributes
++    {
++        public int Length;
++        public nint SecurityDescriptor;
++        public int InheritHandle;
++    }
++
++    [StructLayout(LayoutKind.Sequential)]
++    private struct StartupInfo
++    {
++        public int Size;
++        public nint Reserved, Desktop, Title;
++        public int X, Y, XSize, YSize, XCountChars, YCountChars, FillAttribute, Flags;
++        public short ShowWindow, Reserved2;
++        public nint Reserved3, StdInput, StdOutput, StdError;
++    }
++
++    [StructLayout(LayoutKind.Sequential)]
++    private struct ProcessInformation
++    {
++        public nint Process, Thread;
++        public int ProcessId, ThreadId;
++    }
++
++    [LibraryImport("kernel32", SetLastError = true)]
++    [return: MarshalAs(UnmanagedType.Bool)]
++    private static partial bool CreatePipe(out SafeFileHandle read, out SafeFileHandle write, ref SecurityAttributes attributes, int size);
++
++    [LibraryImport("kernel32", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
++    [return: MarshalAs(UnmanagedType.Bool)]
++    private static partial bool CreateProcessW(string? application, [In, Out] char[] commandLine, nint processAttributes, nint threadAttributes,
++        [MarshalAs(UnmanagedType.Bool)] bool inheritHandles, uint flags, string environment, string directory, ref StartupInfo startup, out ProcessInformation started);
++
++    [LibraryImport("kernel32", SetLastError = true)]
++    private static partial uint ResumeThread(nint thread);
++
++    [LibraryImport("kernel32", SetLastError = true)]
++    [return: MarshalAs(UnmanagedType.Bool)]
++    private static partial bool CloseHandle(nint handle);
+ }
+diff --git a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
+index aaec179..ef545fe 100644
+--- a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
++++ b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
+@@ -17,7 +17,8 @@ namespace Passenger.Debugger.Interop;
+ [GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
+ [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+ [Guid("BADB5F70-58DA-43A9-A1C6-D74819F19B15")]
+-public partial interface IMetaDataTables2 : IMetaDataTables
++// unsafe: .NET 10's COM generator re-declares the base interface's pointer methods here without it.
++public unsafe partial interface IMetaDataTables2 : IMetaDataTables
+ {
+     /// <summary>
+     /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
