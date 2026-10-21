@@ -64,13 +64,16 @@ async function debugCheck(d) {
   if (!fs.existsSync(program)) return { ok: false, got: [`not built: ${program}`] };
   const { doc, pos } = await position(d.breakpoint.file, d.breakpoint.needle, 0);
   vscode.debug.addBreakpoints([new vscode.SourceBreakpoint(new vscode.Location(doc.uri, pos))]);
-  let stopped;
+  let stopped, printed;
   const stoppedEvent = new Promise((r) => (stopped = r));
+  const printedEvent = new Promise((r) => (printed = r));
   const tracker = vscode.debug.registerDebugAdapterTrackerFactory('csharpshooter', {
     // This test's session only: one an earlier check stopped may still be ending.
     createDebugAdapterTracker: (session) => session.name !== 'test' ? undefined : ({
       onDidSendMessage: (m) => {
         if (m.type === 'event' && m.event === 'stopped') stopped({ ...m.body, session });
+        // The program's own output, which reaches the adapter through the pipes it was started with.
+        if (m.type === 'event' && m.event === 'output' && ['stdout', 'stderr'].includes(m.body.category) && m.body.output.trim()) printed(m.body);
       },
     }),
   });
@@ -86,10 +89,14 @@ async function debugCheck(d) {
     const top = stack.stackFrames[0];
     if (!top) return { ok: false, got: [`stopped (${body.reason}) on thread ${body.threadId} with no frames`] };
     const value = await session.customRequest('evaluate', { expression: d.evaluate, frameId: top.id, context: 'watch' });
+    await session.customRequest('continue', { threadId: body.threadId });
+    // Only a program that prints (expectOutput) is waited for: WebApp writes nothing to its console for minutes.
+    const output = d.expectOutput ? await Promise.race([printedEvent, sleep(60000).then(() => null)]) : undefined;
     await vscode.debug.stopDebugging(session);
     const at = `${path.basename(top.source?.path || '?')}:${top.line}`;
-    const ok = path.basename(top.source?.path || '') === path.basename(d.breakpoint.file) && top.line === pos.line + 1;
-    return { ok, got: [`stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`] };
+    const ok = path.basename(top.source?.path || '') === path.basename(d.breakpoint.file) && top.line === pos.line + 1 && (!d.expectOutput || output !== null);
+    return { ok, got: [`stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`,
+      output ? `program ${output.category}: ${output.output.trim().slice(0, 80)}` : output === null ? 'no program output within 60 s' : 'output not checked'] };
   } finally {
     tracker.dispose();
     vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
