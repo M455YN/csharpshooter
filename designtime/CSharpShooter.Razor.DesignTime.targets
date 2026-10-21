@@ -1,0 +1,8 @@
+<!-- Imported only into the language server's design-time builds (its - -csharpDesignTimePath), after the project's own
+     properties. A project that sets RazorCompileOnBuild=false (to build faster) leaves its .cshtml out of the Razor
+     source generator, and the server's Razor then has no C# for them: no completion, go to definition or tag helpers. -->
+<Project>
+  <PropertyGroup>
+    <RazorCompileOnBuild>true</RazorCompileOnBuild>
+  </PropertyGroup>
+</Project>

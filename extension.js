@@ -52,6 +52,10 @@ async function startServer(context) {
   fs.mkdirSync(logDir, { recursive: true });
   const args = [serverDll, '--stdio', '--logLevel', 'Information', '--telemetryLevel', 'off',
     '--extensionLogDirectory', logDir, '--clientProcessId', String(process.pid)];
+  // A project with RazorCompileOnBuild=false hides its .cshtml from the Razor generator, which the server's Razor needs.
+  if (setting('razorViewsInDesignTime')) {
+    args.push('--csharpDesignTimePath', context.asAbsolutePath(path.join('designtime', 'CSharpShooter.Razor.DesignTime.targets')));
+  }
 
   client = new LanguageClient('csharpShooter', 'C# (Roslyn)',
     { command: 'dotnet', args },

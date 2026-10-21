@@ -33,6 +33,11 @@
           "type": "string",
           "default": "",
           "description": "Path to Microsoft.CodeAnalysis.LanguageServer.dll. Empty: the one under the extension's server/ folder."
+        },
+        "csharpShooter.razorViewsInDesignTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Give the language server's Razor every .cshtml even when a project sets RazorCompileOnBuild=false (only the server's design-time builds change; your builds don't)."
         }
       }
     },
