@@ -1,4 +1,4 @@
-// C# and Razor through Microsoft's roslyn-language-server.
+// C# and Razor through Microsoft's roslyn-language-server, debugging through Passenger's debug adapter.
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
@@ -100,9 +100,19 @@ async function stopServer() {
   ready = new Promise((r) => (readyResolve = r));
 }
 
+class DebugAdapterFactory {
+  constructor(context) { this.context = context; }
+  createDebugAdapterDescriptor() {
+    const exe = bundled(this.context, setting('debuggerPath'), 'debugger', process.platform === 'win32' ? 'Passenger.DebugAdapter.exe' : 'Passenger.DebugAdapter');
+    if (!fs.existsSync(exe)) throw new Error(`Debug adapter not found: ${exe}`);
+    return new vscode.DebugAdapterExecutable(exe, ['--interpreter=vscode']);
+  }
+}
+
 async function activate(context) {
   output = vscode.window.createOutputChannel('CSharpShooter');
   context.subscriptions.push(output);
+  context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('csharpshooter', new DebugAdapterFactory(context)));
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.restartServer', async () => {
     await stopServer();
     await startServer(context);

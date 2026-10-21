@@ -9,7 +9,8 @@
     "vscode": "^1.90.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Debuggers"
   ],
   "main": "./extension.js",
   "activationEvents": [
@@ -18,7 +19,8 @@
     "workspaceContains:**/*.csproj",
     "onLanguage:csharp",
     "onLanguage:razor",
-    "onLanguage:aspnetcorerazor"
+    "onLanguage:aspnetcorerazor",
+    "onDebugResolve:csharpshooter"
   ],
   "contributes": {
     "configuration": {
@@ -34,6 +36,11 @@
           "default": "",
           "description": "Path to Microsoft.CodeAnalysis.LanguageServer.dll. Empty: the one under the extension's server/ folder."
         },
+        "csharpShooter.debuggerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the debug adapter (Passenger.DebugAdapter(.exe)). Empty: the one under the extension's debugger/ folder."
+        },
         "csharpShooter.razorViewsInDesignTime": {
           "type": "boolean",
           "default": true,
@@ -46,6 +53,107 @@
         "command": "csharpShooter.restartServer",
         "title": "Restart C# Language Server",
         "category": "CSharpShooter"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "csharp"
+      },
+      {
+        "language": "razor"
+      },
+      {
+        "language": "aspnetcorerazor"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "csharpshooter",
+        "label": ".NET (CSharpShooter)",
+        "languages": [
+          "csharp",
+          "razor",
+          "aspnetcorerazor"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The app's .dll or apphost .exe."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              },
+              "cwd": {
+                "type": "string",
+                "default": "${workspaceFolder}"
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {}
+              },
+              "stopAtEntry": {
+                "type": "boolean",
+                "default": false
+              },
+              "justMyCode": {
+                "type": "boolean",
+                "default": true
+              },
+              "console": {
+                "enum": [
+                  "internalConsole",
+                  "integratedTerminal",
+                  "externalTerminal"
+                ],
+                "default": "internalConsole"
+              },
+              "hotReload": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          },
+          "attach": {
+            "required": [
+              "processId"
+            ],
+            "properties": {
+              "processId": {
+                "type": [
+                  "integer",
+                  "string"
+                ],
+                "default": "${command:pickProcess}"
+              },
+              "justMyCode": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "name": "Launch (CSharpShooter)",
+            "type": "csharpshooter",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net10.0/App.dll",
+            "cwd": "${workspaceFolder}"
+          }
+        ]
       }
     ]
   },
