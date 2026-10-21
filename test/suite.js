@@ -20,6 +20,12 @@ const defaultChecks = [
   { name: 'tag helpers: hover on asp-action', file: 'WebApp/Views/Pass/Login.cshtml', needle: 'asp-action', off: 4, kind: 'hover', expect: 'FormTagHelper' },
 ];
 
+const defaultDebug = {
+  program: 'WebApp/bin/Debug/net10.0/WebApp.dll', cwd: 'WebApp',
+  breakpoint: { file: 'WebApp/Program.cs', needle: 'CreateHostBuilder(args).Build().Run();' },
+  evaluate: 'args.Length',
+};
+
 async function position(file, needle, off) {
   const doc = await vscode.workspace.openTextDocument(path.resolve(root(), file));
   const line = doc.getText().split(/\r?\n/).findIndex((l) => l.includes(needle));
@@ -53,19 +59,61 @@ async function check(c, deadline) {
   return { ok: false, got };
 }
 
+async function debugCheck(d) {
+  const program = path.resolve(root(), d.program);
+  if (!fs.existsSync(program)) return { ok: false, got: [`not built: ${program}`] };
+  const { doc, pos } = await position(d.breakpoint.file, d.breakpoint.needle, 0);
+  vscode.debug.addBreakpoints([new vscode.SourceBreakpoint(new vscode.Location(doc.uri, pos))]);
+  let stopped;
+  const stoppedEvent = new Promise((r) => (stopped = r));
+  const tracker = vscode.debug.registerDebugAdapterTrackerFactory('csharpshooter', {
+    // This test's session only: one an earlier check stopped may still be ending.
+    createDebugAdapterTracker: (session) => session.name !== 'test' ? undefined : ({
+      onDidSendMessage: (m) => {
+        if (m.type === 'event' && m.event === 'stopped') stopped({ ...m.body, session });
+      },
+    }),
+  });
+  try {
+    const started = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], {
+      type: 'csharpshooter', request: 'launch', name: 'test', program, cwd: path.resolve(root(), d.cwd), env: d.env, justMyCode: true,
+    });
+    if (!started) return { ok: false, got: ['startDebugging returned false'] };
+    const body = await Promise.race([stoppedEvent, sleep(120000).then(() => null)]);
+    if (!body) return { ok: false, got: ['no stop within 120 s'] };
+    const { session } = body; // not activeDebugSession, which may still be an earlier check's ending session
+    const stack = await session.customRequest('stackTrace', { threadId: body.threadId, startFrame: 0, levels: 1 });
+    const top = stack.stackFrames[0];
+    if (!top) return { ok: false, got: [`stopped (${body.reason}) on thread ${body.threadId} with no frames`] };
+    const value = await session.customRequest('evaluate', { expression: d.evaluate, frameId: top.id, context: 'watch' });
+    await vscode.debug.stopDebugging(session);
+    const at = `${path.basename(top.source?.path || '?')}:${top.line}`;
+    const ok = path.basename(top.source?.path || '') === path.basename(d.breakpoint.file) && top.line === pos.line + 1;
+    return { ok, got: [`stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`] };
+  } finally {
+    tracker.dispose();
+    vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
+  }
+}
+
 async function run() {
   const ext = vscode.extensions.getExtension('local.csharpshooter');
   const api = await ext.activate();
   const t0 = Date.now();
   await Promise.race([api.whenReady(), sleep(300000)]);
   const lines = [`projects loaded after ${((Date.now() - t0) / 1000).toFixed(1)} s`];
-  const checks = process.env.CHECKS_FILE ? JSON.parse(fs.readFileSync(process.env.CHECKS_FILE, 'utf8')) : { checks: defaultChecks };
+  const checks = process.env.CHECKS_FILE ? JSON.parse(fs.readFileSync(process.env.CHECKS_FILE, 'utf8')) : { checks: defaultChecks, debug: defaultDebug };
   let failed = 0;
   const deadline = Date.now() + 180000;
   for (const c of checks.checks) {
     const r = await check(c, deadline);
     failed += r.ok ? 0 : 1;
     lines.push(`${r.ok ? 'PASS' : 'FAIL'}  ${c.name}: ${r.got.slice(0, 8).join(', ').slice(0, 200) || '(nothing)'}`);
+  }
+  if (checks.debug && process.env.SKIP_DEBUG !== '1') {
+    const r = await debugCheck(checks.debug);
+    failed += r.ok ? 0 : 1;
+    lines.push(`${r.ok ? 'PASS' : 'FAIL'}  debug: ${r.got.join('; ')}`);
   }
   const report = lines.join('\n');
   console.log(report);

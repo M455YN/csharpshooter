@@ -14,6 +14,7 @@ const { runTests } = require('@vscode/test-electron');
   fs.mkdirSync(path.join(profile, 'data', 'User'), { recursive: true });
   fs.writeFileSync(path.join(profile, 'data', 'User', 'settings.json'), JSON.stringify({
     'task.allowAutomaticTasks': 'off',
+    ...(process.env.DEBUGGER_PATH ? { 'csharpShooter.debuggerPath': process.env.DEBUGGER_PATH } : {}),
   }));
   try {
     await runTests({
