@@ -149,24 +149,47 @@ class LaunchProfiles {
   }
 }
 
-/** Opens the browser when the app's console says "Now listening on:", once per session. */
+/** Whether something accepts connections at a URL's host and port. */
+function accepts(url) {
+  return new Promise((resolve) => {
+    const u = new URL(url);
+    const socket = require('net').connect({ host: u.hostname === 'localhost' ? '127.0.0.1' : u.hostname, port: +u.port || (u.protocol === 'https:' ? 443 : 80) });
+    socket.setTimeout(800);
+    socket.once('connect', () => { socket.destroy(); resolve(true); });
+    socket.once('timeout', () => { socket.destroy(); resolve(false); });
+    socket.once('error', () => resolve(false));
+  });
+}
+
+/** Opens the browser once the app listens, once per session: when its port accepts a connection (an app may log nothing
+ *  to its console, as the sample app does) or its console says "Now listening on:", whichever comes first. */
 function browserOpener(state) {
   return {
     createDebugAdapterTracker(session) {
       const browser = session.configuration.__browser;
       if (!browser) return undefined;
       let opened = false;
+      let polling;
+      const open = (base) => {
+        if (opened) return;
+        opened = true;
+        clearInterval(polling);
+        const url = `${base.replace(/\/$/, '')}/${browser.path.replace(/^\//, '')}`;
+        state.browserUrl = url;
+        if (!process.env.CSHARPSHOOTER_NO_BROWSER) vscode.env.openExternal(vscode.Uri.parse(url));
+      };
+      const stop = () => clearInterval(polling);
       return {
-        onDidSendMessage(m) {
-          if (opened || m.type !== 'event' || m.event !== 'output') return;
-          const listening = /Now listening on:\s*(\S+)/.exec(m.body.output || '');
-          if (!listening) return;
-          opened = true;
-          const base = browser.base || listening[1];
-          const url = `${base.replace(/\/$/, '')}/${browser.path.replace(/^\//, '')}`;
-          state.browserUrl = url;
-          if (!process.env.CSHARPSHOOTER_NO_BROWSER) vscode.env.openExternal(vscode.Uri.parse(url));
+        onWillStartSession() {
+          if (browser.base) polling = setInterval(async () => (await accepts(browser.base)) && open(browser.base), 1000);
         },
+        onDidSendMessage(m) {
+          if (m.type !== 'event' || m.event !== 'output') return;
+          const listening = /Now listening on:\s*(\S+)/.exec(m.body.output || '');
+          if (listening) open(browser.base || listening[1]);
+        },
+        onWillStopSession: stop,
+        onExit: stop,
       };
     },
   };
