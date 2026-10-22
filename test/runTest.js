@@ -26,6 +26,11 @@ const { runTests } = require('@vscode/test-electron');
       extensionTestsEnv: { ...process.env },
     });
   } finally {
-    fs.rmSync(profile, { recursive: true, force: true });
+    // The editor can hold its profile's files a moment after it exits; a leftover temp folder is no test failure.
+    try {
+      fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+    } catch (e) {
+      console.warn(`Could not remove ${profile}: ${e.message}`);
+    }
   }
 })().catch((e) => { console.error(e.message || e); process.exit(1); });

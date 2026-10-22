@@ -140,7 +140,38 @@ async function solutionChecks(view) {
   expect('sync with active document', selected && selected.resourceUri?.fsPath.toLowerCase() === coach.fsPath.toLowerCase(),
     selected ? `selected ${label(selected)} (visible: ${view.view.visible})` : 'nothing selected');
 
-  if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT);
+  // Add → New Folder, Controller, View, in a folder of its own that is removed afterwards.
+  const folder = await vscode.commands.executeCommand('csharpShooter.solution.addFolder', web, 'ShooterAddTest');
+  try {
+    const folderItem = await view.findItem(folder);
+    expect('add folder', folderItem && fs.existsSync(folder), folderItem ? `tree shows ${label(folderItem)}` : 'not in tree');
+    const controller = await vscode.commands.executeCommand('csharpShooter.solution.addController', folderItem, 'Probe', { baseClass: 'BaseController' });
+    const code = controller ? fs.readFileSync(controller, 'utf8') : '';
+    expect('add controller: file and template', /namespace WebApp\.ShooterAddTest\r?\n\{/.test(code) && code.includes('using Contoso.Core.Controllers;')
+      && code.includes('public class ProbeController : BaseController') && code.includes('\r\n'), code.replace(/\r?\n/g, ' | ').slice(0, 200));
+    // The language server takes the new file in: its base class resolves through the using it got.
+    const { pos } = await position(controller, 'BaseController', 2);
+    let hover = [];
+    for (let i = 0; i < 20 && !hover.join().includes('Contoso.Core.Controllers'); i++) {
+      hover = ((await vscode.commands.executeCommand('vscode.executeHoverProvider', vscode.Uri.file(controller), pos)) || [])
+        .flatMap((h) => h.contents.map((c) => (typeof c === 'string' ? c : c.value)));
+      await sleep(3000);
+    }
+    expect('add controller: language server resolves its base class', hover.join().includes('Contoso.Core.Controllers'), hover.join(' ').replace(/\s+/g, ' ').slice(0, 120));
+    const viewFile = await vscode.commands.executeCommand('csharpShooter.solution.addView', folderItem, 'Probe');
+    const markup = viewFile ? fs.readFileSync(viewFile, 'utf8') : '';
+    expect('add view (.cshtml)', viewFile?.endsWith('Probe.cshtml') && markup.includes('ViewData["Title"] = "Probe";'), markup.replace(/\r?\n/g, ' | '));
+    await vscode.commands.executeCommand('workbench.view.extension.csharpShooter');
+    await vscode.window.showTextDocument(vscode.Uri.file(controller));
+    await vscode.commands.executeCommand('csharpShooter.solution.syncWithActive');
+    await sleep(3000); // past the file watcher's refresh, which must not undo the reveal
+    const shown = view.view.selection[0];
+    expect('new file stays selected in the tree', shown?.resourceUri?.fsPath.toLowerCase() === controller.toLowerCase(), shown ? label(shown) : 'nothing selected');
+    if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT);
+  } finally {
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
   return results;
 }
 
