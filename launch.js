@@ -137,6 +137,10 @@ class LaunchProfiles {
     const env = { ...(profile.environmentVariables || {}), ...(config.env || {}) };
     if (urls.length && !env.ASPNETCORE_URLS) env.ASPNETCORE_URLS = urls.join(';');
     const args = config.args ?? (profile.commandLineArgs ? profile.commandLineArgs.split(' ').filter(Boolean) : []);
+    // Another process on the profile's port (an earlier run left going) keeps the app from listening there, and would
+    // pass for it to the browser's wait below.
+    const portBusy = urls[0] && (await accepts(urls[0]));
+    if (portBusy) vscode.window.showWarningMessage(`${urls[0]} is already in use by another process; ${path.basename(project, '.csproj')} may not start there.`);
     return {
       ...config,
       program: config.program || props.TargetPath,
@@ -144,7 +148,7 @@ class LaunchProfiles {
       args,
       env,
       // The browser, as VS opens it: once the app says it listens, at the profile's launchUrl.
-      __browser: profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: profile.launchUrl || '' } : undefined,
+      __browser: profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: profile.launchUrl || '', portBusy } : undefined,
     };
   }
 }
@@ -181,7 +185,7 @@ function browserOpener(state) {
       const stop = () => clearInterval(polling);
       return {
         onWillStartSession() {
-          if (browser.base) polling = setInterval(async () => (await accepts(browser.base)) && open(browser.base), 1000);
+          if (browser.base && !browser.portBusy) polling = setInterval(async () => (await accepts(browser.base)) && open(browser.base), 1000);
         },
         onDidSendMessage(m) {
           if (m.type !== 'event' || m.event !== 'output') return;
