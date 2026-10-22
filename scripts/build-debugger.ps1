@@ -20,6 +20,9 @@ try {
     if (Test-Path $out) { Remove-Item -Recurse -Force $out }
     dotnet publish (Join-Path $work 'src\Passenger.DebugAdapter\Passenger.DebugAdapter.csproj') -c Release -r $Runtime --self-contained false -o $out
     if ($LASTEXITCODE) { throw "dotnet publish failed" }
+    # Passenger's MIT licence and its notices (SharpDbg, ICorDebugSharp, ILSpy, ClrDebug...) go with its debugger.
+    Copy-Item (Join-Path $work 'LICENSE') (Join-Path $out 'LICENSE.Passenger.txt')
+    Copy-Item (Join-Path $work 'THIRD_PARTY_NOTICES.md') (Join-Path $out 'THIRD_PARTY_NOTICES.Passenger.md')
     Write-Host "Debugger for .NET 10 ($Runtime) in $out"
 }
 finally {

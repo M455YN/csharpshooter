@@ -34,6 +34,8 @@ function download(from, to) {
   const to = path.join(__dirname, '..', 'server');
   fs.rmSync(to, { recursive: true, force: true });
   fs.cpSync(from, to, { recursive: true });
+  // The package's notices for what it carries, which go wherever the server does.
+  fs.copyFileSync(path.join(work, 'ThirdPartyNotices.rtf'), path.join(to, 'ThirdPartyNotices.rtf'));
   fs.rmSync(work, { recursive: true, force: true });
   console.log(`Server ${version} (${rid}, ${tfm}) in ${to}`);
 })().catch((e) => { console.error(e.message); process.exit(1); });
