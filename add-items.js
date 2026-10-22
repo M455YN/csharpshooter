@@ -56,12 +56,15 @@ function projectStyle(project) {
   };
 }
 
-/** The namespace a type is declared in, from the language server; null when it does not know it. */
+/** The namespace a type is declared in: the language server finds the type, its file names the namespace (Roslyn's
+ *  containerName is the project, not the namespace). Null when it is not found. */
 async function namespaceOfType(name) {
   try {
     const symbols = (await vscode.commands.executeCommand('vscode.executeWorkspaceSymbolProvider', name)) || [];
-    const hit = symbols.find((s) => s.name === name && s.kind === vscode.SymbolKind.Class);
-    return hit?.containerName || null;
+    const hit = symbols.find((s) => s.name === name && s.kind === vscode.SymbolKind.Class && s.location.uri.scheme === 'file');
+    if (!hit) return null;
+    // shortcut: the file's first namespace; a file declaring several would need the one around the class.
+    return /^\s*namespace\s+([\w.]+)/m.exec(fs.readFileSync(hit.location.uri.fsPath, 'utf8'))?.[1] || null;
   } catch {
     return null;
   }
