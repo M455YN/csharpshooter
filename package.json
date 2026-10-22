@@ -48,12 +48,21 @@
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "csharpShooter",
+          "title": "Solution Explorer",
+          "icon": "media/solution-explorer.svg"
+        }
+      ]
+    },
     "views": {
-      "explorer": [
+      "csharpShooter": [
         {
           "id": "csharpShooter.solution",
-          "name": "Solution",
-          "icon": "$(project)"
+          "name": "Solution Explorer",
+          "icon": "media/solution-explorer.svg"
         }
       ]
     },

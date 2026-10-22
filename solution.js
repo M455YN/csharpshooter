@@ -92,6 +92,13 @@ class Item extends vscode.TreeItem {
   }
 }
 
+// Codicons in Visual Studio's colours: purple solution, green C# project, blue web project and packages, yellow folders.
+const icon = (name, color) => new vscode.ThemeIcon(name, color ? new vscode.ThemeColor(color) : undefined);
+// A folder gets an SVG of its own: the 'folder' codicon is the file icon theme's folder, which Seti draws as nothing.
+const YELLOW_FOLDER = vscode.Uri.file(path.join(__dirname, 'media', 'folder.svg'));
+const FOLDER_ICONS = { properties: icon('tools', 'charts.blue'), wwwroot: icon('globe', 'charts.blue') };
+const folderIcon = (name) => FOLDER_ICONS[name.toLowerCase()] || YELLOW_FOLDER;
+
 const NONE = vscode.TreeItemCollapsibleState.None;
 const COLLAPSED = vscode.TreeItemCollapsibleState.Collapsed;
 const EXPANDED = vscode.TreeItemCollapsibleState.Expanded;
@@ -132,7 +139,7 @@ class SolutionProvider {
       const count = countProjects(this.solution);
       return this.remember(undefined, [new Item('solution', `Solution '${this.solution.name}'`, EXPANDED, {
         id: `sln:${file}`, description: `${count} project${count === 1 ? '' : 's'}`, node: this.solution, file,
-        iconPath: new vscode.ThemeIcon('symbol-namespace'), contextValue: 'solution', tooltip: file,
+        iconPath: icon('symbol-namespace', 'charts.purple'), contextValue: 'solution', tooltip: file,
       })]);
     }
     return this.remember(item, this.childrenOf(item));
@@ -144,14 +151,14 @@ class SolutionProvider {
       case 'solutionFolder':
         return [
           ...item.node.folders.sort((a, b) => a.name.localeCompare(b.name)).map((f) => new Item('solutionFolder', f.name, COLLAPSED, {
-            id: `${item.id}/${f.name}`, node: f, iconPath: new vscode.ThemeIcon('folder-library'), contextValue: 'solutionFolder',
+            id: `${item.id}/${f.name}`, node: f, iconPath: YELLOW_FOLDER, contextValue: 'solutionFolder',
           })),
           ...item.node.projects.sort((a, b) => path.basename(a).localeCompare(path.basename(b))).map((p) => this.projectItem(p)),
         ];
       case 'project': {
         const dir = path.dirname(item.file);
         return [
-          new Item('dependencies', 'Dependencies', COLLAPSED, { id: `${item.id}#deps`, file: item.file, iconPath: new vscode.ThemeIcon('references') }),
+          new Item('dependencies', 'Dependencies', COLLAPSED, { id: `${item.id}#deps`, file: item.file, iconPath: icon('references', 'charts.purple') }),
           ...this.folderChildren(dir, item.id, item.file),
         ];
       }
@@ -163,15 +170,15 @@ class SolutionProvider {
           return [];
         }
         const groups = [
-          ['Frameworks', project.frameworks.map((f) => ({ label: f, icon: 'library' }))],
-          ['Projects', project.projects.map((p) => ({ label: path.basename(p, path.extname(p)), icon: 'project', file: p }))],
-          ['Packages', project.packages.map((p) => ({ label: p.id, description: p.version, icon: 'package' }))],
+          ['Frameworks', project.frameworks.map((f) => ({ label: f, icon: icon('library', 'charts.purple') }))],
+          ['Projects', project.projects.map((p) => ({ label: path.basename(p, path.extname(p)), icon: icon('project', 'charts.green'), file: p }))],
+          ['Packages', project.packages.map((p) => ({ label: p.id, description: p.version, icon: icon('package', 'charts.blue') }))],
         ].filter(([, list]) => list.length);
-        return groups.map(([name, list]) => new Item('depGroup', name, COLLAPSED, { id: `${item.id}/${name}`, list, iconPath: new vscode.ThemeIcon('folder') }));
+        return groups.map(([name, list]) => new Item('depGroup', name, COLLAPSED, { id: `${item.id}/${name}`, list, iconPath: YELLOW_FOLDER }));
       }
       case 'depGroup':
         return item.list.map((d) => new Item('dependency', d.label, NONE, {
-          id: `${item.id}/${d.label}`, description: d.description, iconPath: new vscode.ThemeIcon(d.icon),
+          id: `${item.id}/${d.label}`, description: d.description, iconPath: d.icon,
           ...(d.file ? { command: { command: 'csharpShooter.solution.revealProject', title: 'Show project', arguments: [d.file] } } : {}),
         }));
       case 'folder':
@@ -194,7 +201,7 @@ class SolutionProvider {
     return new Item('project', name, COLLAPSED, {
       id: `proj:${file}`, file, resourceUri: vscode.Uri.file(file), contextValue: 'project', tooltip: file,
       description: sdk.endsWith('.Web') ? 'web' : undefined,
-      iconPath: new vscode.ThemeIcon(sdk.endsWith('.Web') ? 'globe' : 'project'),
+      iconPath: sdk.endsWith('.Web') ? icon('globe', 'charts.blue') : icon('project', 'charts.green'),
     });
   }
 
@@ -213,7 +220,7 @@ class SolutionProvider {
     const nestedUnder = (name) => files.filter((f) => parents.get(f) === name).map((f) => ({ name: f, nested: nestedUnder(f) }));
     return [
       ...folders.map((f) => new Item('folder', f, COLLAPSED, {
-        id: `${parentId}/${f}`, resourceUri: vscode.Uri.file(path.join(dir, f)), contextValue: 'folder', project,
+        id: `${parentId}/${f}`, resourceUri: vscode.Uri.file(path.join(dir, f)), contextValue: 'folder', project, iconPath: folderIcon(f),
       })),
       ...top.map((f) => this.fileItem({ name: f, nested: nestedUnder(f) }, parentId, dir)),
     ];
