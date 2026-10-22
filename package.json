@@ -48,13 +48,150 @@
         }
       }
     },
+    "views": {
+      "explorer": [
+        {
+          "id": "csharpShooter.solution",
+          "name": "Solution",
+          "icon": "$(project)"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "csharpShooter.restartServer",
         "title": "Restart C# Language Server",
         "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.solution.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.syncWithActive",
+        "title": "Sync with Active Document",
+        "icon": "$(target)",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.build",
+        "title": "Build",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.rebuild",
+        "title": "Rebuild",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.clean",
+        "title": "Clean",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.editProject",
+        "title": "Edit Project File",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.revealInOS",
+        "title": "Open Folder in File Explorer",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.copyPath",
+        "title": "Copy Full Path",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.openInTerminal",
+        "title": "Open in Terminal",
+        "category": "Solution"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "csharpShooter.solution.syncWithActive",
+          "when": "view == csharpShooter.solution",
+          "group": "navigation@1"
+        },
+        {
+          "command": "csharpShooter.solution.refresh",
+          "when": "view == csharpShooter.solution",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "csharpShooter.solution.build",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)$/",
+          "group": "1_build@1"
+        },
+        {
+          "command": "csharpShooter.solution.rebuild",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)$/",
+          "group": "1_build@2"
+        },
+        {
+          "command": "csharpShooter.solution.clean",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)$/",
+          "group": "1_build@3"
+        },
+        {
+          "command": "csharpShooter.solution.editProject",
+          "when": "view == csharpShooter.solution && viewItem == project",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "csharpShooter.solution.openInTerminal",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)$/",
+          "group": "3_open@1"
+        },
+        {
+          "command": "csharpShooter.solution.revealInOS",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)$/",
+          "group": "3_open@2"
+        },
+        {
+          "command": "csharpShooter.solution.copyPath",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)$/",
+          "group": "4_copy@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "csharpShooter.solution.build",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.rebuild",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.clean",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.editProject",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.revealInOS",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.openInTerminal",
+          "when": "false"
+        }
+      ]
+    },
     "breakpoints": [
       {
         "language": "csharp"

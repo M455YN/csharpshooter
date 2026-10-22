@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { LanguageClient, State } = require('vscode-languageclient/node');
+const { registerSolutionView } = require('./solution');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
@@ -117,8 +118,9 @@ async function activate(context) {
     await stopServer();
     await startServer(context);
   }));
+  const solutionView = registerSolutionView(context, findSolution);
   await startServer(context);
-  return { whenReady: () => ready };
+  return { whenReady: () => ready, solutionView };
 }
 
 async function deactivate() {
