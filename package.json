@@ -1,7 +1,7 @@
 {
   "name": "csharpshooter",
   "displayName": "CSharpShooter",
-  "description": "C# and Razor (.cshtml/.razor) for VSCodium from Microsoft's roslyn-language-server.",
+  "description": "C# and Razor (.cshtml/.razor) for VSCodium: IntelliSense, go to definition and tag helpers from Microsoft's roslyn-language-server, a Solution Explorer, F5 on launch profiles, and a bundled MIT-licensed .NET debugger.",
   "version": "0.0.1",
   "publisher": "local",
   "license": "MIT",
@@ -407,7 +407,8 @@
   },
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",
-    "test": "node test/runTest.js"
+    "test": "node test/runTest.js",
+    "package": "npx -y @vscode/vsce package --allow-missing-repository --skip-license --target win32-x64"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

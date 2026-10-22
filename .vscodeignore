@@ -1,0 +1,9 @@
+# What the .vsix leaves out; server/, debugger/ and node_modules/ go in.
+test/**
+scripts/**
+debugger-port/**
+.gitignore
+.vscode-test/**
+*.vsix
+**/*.pdb
+node_modules/@vscode/test-electron/**

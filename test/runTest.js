@@ -19,7 +19,8 @@ const { runTests } = require('@vscode/test-electron');
   try {
     await runTests({
       vscodeExecutablePath: exe,
-      extensionDevelopmentPath: path.resolve(__dirname, '..'),
+      // EXTENSION_PATH: an installed copy (a .vsix unpacked), to test what the package holds.
+      extensionDevelopmentPath: process.env.EXTENSION_PATH || path.resolve(__dirname, '..'),
       extensionTestsPath: path.resolve(__dirname, 'suite.js'),
       // A profile and extensions folder of its own: only this extension runs.
       launchArgs: [workspace, '--user-data-dir', path.join(profile, 'data'), '--extensions-dir', path.join(profile, 'ext'), '--disable-workspace-trust'],
