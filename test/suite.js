@@ -103,6 +103,67 @@ async function debugCheck(d) {
   }
 }
 
+// The Solution view's tree, read through the provider the view shows, and Sync with Active Document.
+async function solutionChecks(view) {
+  const { provider } = view;
+  const label = (i) => (typeof i.label === 'string' ? i.label : i.label.label);
+  const children = async (item) => provider.getChildren(item);
+  const child = async (item, name) => (await children(item)).find((i) => label(i) === name);
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+
+  const [sln] = await children();
+  expect('solution node', sln && label(sln) === "Solution 'WebApp'" && sln.description === '5 projects', `${label(sln)} (${sln.description})`);
+  const projects = await children(sln);
+  expect('projects', projects.map(label).join(',') === 'Contoso.Excel,Contoso.Core,Contoso.Lobby,WebApp,Tests', projects.map((p) => `${label(p)}${p.description ? ` [${p.description}]` : ''}`).join(', '));
+  const web = projects.find((p) => label(p) === 'WebApp');
+  const top = (await children(web)).map(label);
+  expect('project tree like VS (no bin/obj/node_modules/.user)', top[0] === 'Dependencies' && top.includes('Views') && !top.some((n) => /^(bin|obj|node_modules)$|\.user$/.test(n)), top.join(', '));
+  const deps = await child(web, 'Dependencies');
+  const depGroups = await children(deps);
+  const projRefs = (await children(depGroups.find((g) => label(g) === 'Projects'))).map(label);
+  const packages = await children(depGroups.find((g) => label(g) === 'Packages'));
+  const pkgNames = packages.map(label);
+  expect('dependencies: project references', projRefs.includes('Contoso.Core'), projRefs.join(', '));
+  expect('dependencies: packages, commented ones left out', pkgNames.includes('Newtonsoft.Json') && !pkgNames.includes('NuGet.Common'),
+    packages.slice(0, 6).map((p) => `${label(p)} ${p.description}`).join(', '));
+  const core = projects.find((p) => label(p) === 'Contoso.Core');
+  const resx = await child(await child(core, 'Properties'), 'Resources.resx');
+  const nested = resx ? (await children(resx)).map(label) : [];
+  expect('file nesting (Resources.Designer.cs under .resx)', nested.includes('Resources.Designer.cs'), `Resources.resx > ${nested.join(', ')}`);
+
+  const coach = vscode.Uri.file(path.resolve(root(), 'WebApp/Views/Employee/Coach.cshtml'));
+  await vscode.window.showTextDocument(coach);
+  await vscode.commands.executeCommand('csharpShooter.solution.syncWithActive');
+  await sleep(1500);
+  const selected = view.view.selection[0];
+  expect('sync with active document', selected && selected.resourceUri?.fsPath.toLowerCase() === coach.fsPath.toLowerCase(),
+    selected ? `selected ${label(selected)} (visible: ${view.view.visible})` : 'nothing selected');
+
+  if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT);
+  return results;
+}
+
+// The editor's own window only (PrintWindow), never the rest of the screen.
+async function screenshot(file) {
+  await sleep(1500);
+  const script = `
+Add-Type -AssemblyName System.Drawing
+Add-Type @'
+using System; using System.Runtime.InteropServices;
+public static class W { [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint f);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  public struct RECT { public int L, T, R, B; } }
+'@
+$p = Get-Process VSCodium | Where-Object { $_.MainWindowTitle } | Select-Object -First 1
+$r = New-Object W+RECT; [W]::GetWindowRect($p.MainWindowHandle, [ref]$r) | Out-Null
+$b = New-Object System.Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
+$g = [System.Drawing.Graphics]::FromImage($b); $dc = $g.GetHdc()
+[W]::PrintWindow($p.MainWindowHandle, $dc, 2) | Out-Null; $g.ReleaseHdc($dc)
+$b.Save('${file.replace(/'/g, "''")}')`;
+  require('child_process').execFileSync('powershell', ['-NoProfile', '-Command', script]);
+}
+
 async function run() {
   const ext = vscode.extensions.getExtension('local.csharpshooter');
   const api = await ext.activate();
@@ -116,6 +177,12 @@ async function run() {
     const r = await check(c, deadline);
     failed += r.ok ? 0 : 1;
     lines.push(`${r.ok ? 'PASS' : 'FAIL'}  ${c.name}: ${r.got.slice(0, 8).join(', ').slice(0, 200) || '(nothing)'}`);
+  }
+  if (checks.solution !== false && (!process.env.CHECKS_FILE || checks.solution)) {
+    for (const r of await solutionChecks(api.solutionView)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  solution view: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
   }
   if (checks.debug && process.env.SKIP_DEBUG !== '1') {
     const r = await debugCheck(checks.debug);
