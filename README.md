@@ -28,6 +28,39 @@ The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspen
 Windows job), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator. Off Windows, `StartDetached` is dropped,
 so children stay in the adapter's session; only Windows is tested.
 
+## Package and install
+
+With `server/` and `debugger/` in place (above):
+
+```bash
+npm run package
+```
+
+This gives `csharpshooter-win32-x64-<version>.vsix` (about 70 MB: the server, the debugger and the extension's
+`node_modules`; `.vscodeignore` leaves out the tests, scripts, the port and `.pdb` files). It is a `win32-x64` package,
+since the server and the debugger in it are built for Windows x64; for another system, run
+`node scripts/fetch-server.js 5.11.0 <rid>` and `scripts/build-debugger.ps1 -Runtime <rid>`, and change `--target` in
+`package.json`'s `package` script.
+
+Install it in VSCodium:
+
+```bash
+codium --install-extension csharpshooter-win32-x64-0.0.1.vsix
+```
+
+or in VS Code:
+
+```bash
+code --install-extension csharpshooter-win32-x64-0.0.1.vsix
+```
+
+or from the editor: Extensions → `…` → **Install from VSIX...**. Then reload the window.
+
+Before you use it, disable the other C# extensions **for the workspace**, since two C# language servers on the same
+files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# Dev Kit, and C# Dev Tools
+(`jakubkozera.csharp-dev-tools`). An installed copy is tested like the sources:
+`EXTENSION_PATH=<its folder under the extensions folder> npm test`.
+
 ## Use
 
 - The first `.sln`/`.slnx` in the workspace loads (or set `csharpShooter.solution`).
