@@ -20,7 +20,9 @@
     "onLanguage:csharp",
     "onLanguage:razor",
     "onLanguage:aspnetcorerazor",
-    "onDebugResolve:csharpshooter"
+    "onDebugResolve:csharpshooter",
+    "onDebugDynamicConfigurations:csharpshooter",
+    "onDebugInitialConfigurations"
   ],
   "contributes": {
     "configuration": {
@@ -140,6 +142,12 @@
         "command": "csharpShooter.solution.addController",
         "title": "Controller (C#)...",
         "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.debugProject",
+        "title": "Start Debugging...",
+        "icon": "$(debug-alt)",
+        "category": "Solution"
       }
     ],
     "menus": {
@@ -160,6 +168,11 @@
           "submenu": "csharpShooter.solution.add",
           "when": "view == csharpShooter.solution && viewItem =~ /^(project|folder)$/",
           "group": "0_add@1"
+        },
+        {
+          "command": "csharpShooter.solution.debugProject",
+          "when": "view == csharpShooter.solution && viewItem == project",
+          "group": "0_debug@1"
         },
         {
           "command": "csharpShooter.solution.build",
@@ -251,6 +264,10 @@
         {
           "command": "csharpShooter.solution.openInTerminal",
           "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.debugProject",
+          "when": "false"
         }
       ]
     },
@@ -276,13 +293,11 @@
         ],
         "configurationAttributes": {
           "launch": {
-            "required": [
-              "program"
-            ],
+            "required": [],
             "properties": {
               "program": {
                 "type": "string",
-                "description": "The app's .dll or apphost .exe."
+                "description": "The app's .dll or apphost .exe; leave it out when 'project' is given."
               },
               "args": {
                 "type": "array",
@@ -321,6 +336,29 @@
               "hotReload": {
                 "type": "boolean",
                 "default": false
+              },
+              "project": {
+                "type": "string",
+                "description": "A .csproj to build and run: its program comes from MSBuild (TargetPath), as VS's F5."
+              },
+              "launchProfile": {
+                "type": "string",
+                "description": "A profile of the project's Properties/launchSettings.json: its environment, URLs (ASPNETCORE_URLS), arguments and browser. IISExpress profiles run on Kestrel at the IIS Express URLs."
+              },
+              "configuration": {
+                "type": "string",
+                "default": "Debug",
+                "description": "Build configuration."
+              },
+              "build": {
+                "type": "boolean",
+                "default": true,
+                "description": "Build the project before it starts."
+              },
+              "launchBrowser": {
+                "type": "boolean",
+                "default": true,
+                "description": "Open the browser when a profile asks for it, once the app listens."
               }
             }
           },
@@ -345,12 +383,23 @@
         },
         "initialConfigurations": [
           {
-            "name": "Launch (CSharpShooter)",
+            "name": "Launch project (CSharpShooter)",
             "type": "csharpshooter",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net10.0/App.dll",
-            "cwd": "${workspaceFolder}"
+            "project": "${workspaceFolder}/App/App.csproj",
+            "launchProfile": "App"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": ".NET: launch a project's profile (CSharpShooter)",
+            "body": {
+              "name": "${1:Project}: ${2:Profile}",
+              "type": "csharpshooter",
+              "request": "launch",
+              "project": "^\"\\${workspaceFolder}/${1:Project}/${1:Project}.csproj\"",
+              "launchProfile": "${2:Profile}"
+            }
           }
         ]
       }

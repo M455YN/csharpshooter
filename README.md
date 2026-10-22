@@ -37,6 +37,26 @@ so children stay in the adapter's session; only Windows is tested.
   sets `RazorCompileOnBuild=false`; without it such views get no C# help at all. Only the server's design-time builds
   change.
 
+## F5 (launch profiles)
+
+Each runnable project's `Properties/launchSettings.json` profiles are in Run and Debug's list (".NET (CSharpShooter)"),
+named `Project: Profile`; Solution Explorer → right-click a project → **Start Debugging...** picks one too, and F5 with
+no `launch.json` runs the active file's project. As in Visual Studio, the project builds first (`dotnet build`, in a
+task, with its errors in Problems), runs from MSBuild's `TargetPath` with the profile's environment variables,
+`commandLineArgs` and `applicationUrl` (as `ASPNETCORE_URLS`), and when the profile has `launchBrowser` the browser opens
+at `launchUrl` once the app listens: its port accepts a connection, or its console says "Now listening on". An
+`IISExpress` profile runs on Kestrel at the IIS Express URLs (`iisSettings`), since IIS Express runs only under Visual
+Studio. If the profile's port is taken before the start, a warning says so.
+
+In `launch.json`:
+
+```json
+{ "name": "WebApp Development", "type": "csharpshooter", "request": "launch",
+  "project": "${workspaceFolder}/WebApp/WebApp.csproj", "launchProfile": "WebApp Development" }
+```
+
+(`configuration`, `build: false`, `launchBrowser: false`, `env` and `args` override the profile.)
+
 ## Solution Explorer
 
 A tab of its own in the activity bar, after Visual Studio's Solution Explorer, in its colours (purple solution, green
