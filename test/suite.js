@@ -195,6 +195,55 @@ $b.Save('${file.replace(/'/g, "''")}')`;
   require('child_process').execFileSync('powershell', ['-NoProfile', '-Command', script]);
 }
 
+// F5 on a launch profile, as VS runs it: listed, built, started with the profile's environment and URLs, listening.
+async function launchChecks(api, profileName) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const configs = await api.launch.provider.provideDebugConfigurations();
+  const wanted = `WebApp: ${profileName}`;
+  expect('profiles listed in Run and Debug', configs.some((c) => c.name === wanted), configs.map((c) => c.name).join(', '));
+
+  const { doc, pos } = await position('WebApp/Program.cs', 'CreateHostBuilder(args).Build().Run();', 0);
+  vscode.debug.addBreakpoints([new vscode.SourceBreakpoint(new vscode.Location(doc.uri, pos))]);
+  let stopped;
+  const stoppedEvent = new Promise((r) => (stopped = r));
+  const tracker = vscode.debug.registerDebugAdapterTrackerFactory('csharpshooter', {
+    createDebugAdapterTracker: (session) => session.name !== wanted ? undefined
+      : ({ onDidSendMessage: (m) => m.type === 'event' && m.event === 'stopped' && stopped({ ...m.body, session }) }),
+  });
+  try {
+    const [sln] = await api.solutionView.provider.getChildren();
+    const web = (await api.solutionView.provider.getChildren(sln)).find((p) => p.label === 'WebApp');
+    const t0 = Date.now();
+    const started = await vscode.commands.executeCommand('csharpShooter.solution.debugProject', web, profileName);
+    const build = api.launch.state.lastBuild;
+    expect('build before launch', started && build?.ok, `${build ? (build.ok ? 'build succeeded' : 'build FAILED') : 'no build'} in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+    if (!started) return results;
+    const body = await Promise.race([stoppedEvent, sleep(180000).then(() => null)]);
+    const session = body?.session;
+    expect('stops at breakpoint in Program.Main', body, body ? `stopped (${body.reason})` : 'no stop');
+    if (!body) return results;
+    const frame = (await session.customRequest('stackTrace', { threadId: body.threadId, levels: 1 })).stackFrames[0];
+    const read = async (name) => (await session.customRequest('evaluate', { expression: `System.Environment.GetEnvironmentVariable("${name}")`, frameId: frame.id, context: 'watch' })).result;
+    const environment = await read('ASPNETCORE_ENVIRONMENT');
+    const urls = await read('ASPNETCORE_URLS');
+    expect('profile environment applied', environment === '"Development"' && urls.includes('https://localhost:44308'), `ASPNETCORE_ENVIRONMENT=${environment}, ASPNETCORE_URLS=${urls}`);
+    await session.customRequest('continue', { threadId: body.threadId });
+    let ended = false;
+    const end = vscode.debug.onDidTerminateDebugSession((s) => s.id === session.id && (ended = true));
+    for (let i = 0; i < 120 && !api.launch.state.browserUrl && !ended; i++) await sleep(1000);
+    expect('app listens, browser opened at', api.launch.state.browserUrl, api.launch.state.browserUrl || (ended ? 'app ended' : 'not listening within 120 s'));
+    if (!ended) await vscode.debug.stopDebugging(session);
+    // Ended before the next check starts one of its own.
+    for (let i = 0; i < 30 && !ended; i++) await sleep(1000);
+    end.dispose();
+  } finally {
+    tracker.dispose();
+    vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
+  }
+  return results;
+}
+
 async function run() {
   const ext = vscode.extensions.getExtension('local.csharpshooter');
   const api = await ext.activate();
@@ -213,6 +262,12 @@ async function run() {
     for (const r of await solutionChecks(api.solutionView)) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  solution view: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.launchProfile || (!process.env.CHECKS_FILE && process.env.SKIP_LAUNCH !== '1')) {
+    for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
     }
   }
   if (checks.debug && process.env.SKIP_DEBUG !== '1') {
