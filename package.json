@@ -66,6 +66,12 @@
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "csharpShooter.solution.add",
+        "label": "Add"
+      }
+    ],
     "commands": [
       {
         "command": "csharpShooter.restartServer",
@@ -118,6 +124,22 @@
         "command": "csharpShooter.solution.openInTerminal",
         "title": "Open in Terminal",
         "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.addFolder",
+        "title": "New Folder...",
+        "icon": "$(new-folder)",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.addView",
+        "title": "View (.cshtml)...",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.addController",
+        "title": "Controller (C#)...",
+        "category": "Solution"
       }
     ],
     "menus": {
@@ -134,6 +156,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "submenu": "csharpShooter.solution.add",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(project|folder)$/",
+          "group": "0_add@1"
+        },
         {
           "command": "csharpShooter.solution.build",
           "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)$/",
@@ -170,7 +197,33 @@
           "group": "4_copy@1"
         }
       ],
+      "csharpShooter.solution.add": [
+        {
+          "command": "csharpShooter.solution.addFolder",
+          "group": "1_folder@1"
+        },
+        {
+          "command": "csharpShooter.solution.addView",
+          "group": "2_items@1"
+        },
+        {
+          "command": "csharpShooter.solution.addController",
+          "group": "2_items@2"
+        }
+      ],
       "commandPalette": [
+        {
+          "command": "csharpShooter.solution.addFolder",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.addView",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.addController",
+          "when": "false"
+        },
         {
           "command": "csharpShooter.solution.build",
           "when": "false"

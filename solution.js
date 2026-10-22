@@ -319,6 +319,16 @@ function registerSolutionView(context, findSolution) {
     const item = await walk(level);
     if (item) await view.reveal(item, { select: true, focus: true, expand: true });
   });
+  // Shows what Add made: the tree read afresh, walked down to it.
+  const revealPath = async (fsPath) => {
+    provider.refresh();
+    const item = await findItem(provider, fsPath);
+    if (item) await view.reveal(item, { select: true, focus: false, expand: true });
+  };
+  const add = require('./add-items'); // late: add-items reads projects through this module
+  register('csharpShooter.solution.addFolder', (item, name) => add.addFolder(item, name, revealPath));
+  register('csharpShooter.solution.addView', (item, name) => add.addView(item, name, revealPath));
+  register('csharpShooter.solution.addController', (item, name, options) => add.addController(item, name, revealPath, options));
   register('csharpShooter.solution.syncWithActive', async () => {
     const uri = vscode.window.activeTextEditor?.document.uri;
     if (!uri || uri.scheme !== 'file') return;

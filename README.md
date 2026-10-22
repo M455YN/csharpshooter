@@ -37,6 +37,31 @@ so children stay in the adapter's session; only Windows is tested.
   sets `RazorCompileOnBuild=false`; without it such views get no C# help at all. Only the server's design-time builds
   change.
 
+## Solution Explorer
+
+A tab of its own in the activity bar, after Visual Studio's Solution Explorer, in its colours (purple solution, green
+C# projects, blue web projects and packages, yellow folders): the solution (`.sln` or `.slnx`) with its solution
+folders and projects; each project with **Dependencies** (frameworks, project references, packages, read from the
+project file with its commented-out references left out) and its files as VS shows them: `bin`, `obj`, `node_modules`
+and `*.user` hidden, related files nested (`Foo.cshtml.cs` under `Foo.cshtml`, `appsettings.Development.json` under
+`appsettings.json`, `x.min.js` under `x.js`, `Resources.Designer.cs` under `Resources.resx`). Click opens a file;
+the title bar has **Sync with Active Document** and **Refresh**; a project's or the solution's context menu has
+Build, Rebuild, Clean (`dotnet build/clean` in a task), Edit Project File, Open in Terminal, Open Folder in File
+Explorer and Copy Full Path. It follows files created and deleted on disk.
+
+Right-click a project or folder → **Add**:
+- **New Folder...**
+- **View (.cshtml)...**: `Name.cshtml` with `ViewData["Title"]`, in the folder (a project's `Views` when the project
+  itself was clicked).
+- **Controller (C#)...**: `NameController.cs` (the suffix added when missing), in the folder (a project's `Controllers`
+  when the project was clicked). The base class is picked from those the project's controllers already use, most used
+  first (`BaseController` in the sample app), or `Controller` / `ControllerBase` (an `[ApiController]`); its `using` comes from
+  where the language server finds it. Namespace = `RootNamespace` + folders; file-scoped or block namespace and line
+  endings follow the project's own files.
+
+Not like VS (yet): files a project includes from outside its folder or removes with `<Compile Remove>` show as on disk;
+no drag and drop, rename, other item templates, NuGet manager or startup project.
+
 ## Test
 
 Runs the checks in `test/suite.js` in a real editor against a real solution (written for a sample ASP.NET Core MVC solution):
