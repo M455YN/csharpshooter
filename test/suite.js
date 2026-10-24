@@ -791,10 +791,18 @@ async function run() {
   const ext = vscode.extensions.getExtension('local.csharpshooter');
   const api = await ext.activate();
   const t0 = Date.now();
+  if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-loading.png'));
   await Promise.race([api.whenReady(), sleep(300000)]);
   const lines = [`projects loaded after ${((Date.now() - t0) / 1000).toFixed(1)} s`];
+  // What the bottom right said while the server started and loaded the solution, and that it closed once loaded.
+  for (let i = 0; i < 20 && !api.loading()?.done; i++) await sleep(250);
+  const said = api.loading()?.lines || [];
+  const loadingOk = api.loading()?.done && said.some((l) => l.startsWith('Uruchamianie serwera C#')) && said.some((l) => /^Wczytywanie rozwiązania WebApp \(5 projektów\)… \d+ s$/.test(l))
+    && /^Rozwiązanie WebApp wczytane w \d+ s/.test(said[said.length - 1]);
+  lines.push(`${loadingOk ? 'PASS' : 'FAIL'}  loading: the bottom right says it until the projects are loaded: ${[...new Set(said.map((l) => l.replace(/\d+ s$/, 'N s')))].join(' | ')}`);
+  let failedLoading = loadingOk ? 0 : 1;
   const checks = process.env.CHECKS_FILE ? JSON.parse(fs.readFileSync(process.env.CHECKS_FILE, 'utf8')) : { checks: defaultChecks, debug: defaultDebug };
-  let failed = 0;
+  let failed = failedLoading;
   const deadline = Date.now() + 180000;
   for (const c of checks.checks) {
     const r = await check(c, deadline);
