@@ -307,6 +307,17 @@
         "title": "Search Solution Explorer",
         "icon": "$(search)",
         "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.searchEverywhere",
+        "title": "Wyszukaj (kod, pliki, typy, elementy członkowskie, tekst, funkcje)",
+        "icon": "$(search)",
+        "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.findInFiles",
+        "title": "Znajdź w plikach",
+        "category": "CSharpShooter"
       }
     ],
     "menus": {
@@ -721,6 +732,16 @@
         "command": "csharpShooter.solution.search",
         "key": "ctrl+;",
         "mac": "cmd+;"
+      },
+      {
+        "command": "csharpShooter.searchEverywhere",
+        "key": "ctrl+t",
+        "mac": "cmd+t"
+      },
+      {
+        "command": "csharpShooter.findInFiles",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f"
       }
     ]
   },

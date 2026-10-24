@@ -133,19 +133,27 @@ function ripgrepPath() {
   ].find((p) => fs.existsSync(p));
 }
 
-/** Lines of the projects' files that hold the query (literal; case as VS: only when it has a capital), at most `max`. */
-function grep(rg, query, dirs, cwd, max) {
-  const args = ['--no-config', '--no-ignore', '--fixed-strings', '--smart-case', '--line-number', '--no-heading', '--color', 'never',
+/** Lines of the files under `paths` that hold the query, at most `max`. By default literal, case as VS's Solution Explorer
+ *  (only when it has a capital); options as Find in Files: regex, matchCase, wholeWord, globs (file types), onHit (each
+ *  line as it comes). Resolves with the hits, whether `max` cut them, and how many files ripgrep searched. */
+function grep(rg, query, paths, cwd, max, options = {}) {
+  const args = ['--no-config', '--no-ignore', options.regex ? '' : '--fixed-strings',
+    options.matchCase === undefined ? '--smart-case' : options.matchCase ? '--case-sensitive' : '--ignore-case', options.wholeWord ? '--word-regexp' : '',
+    // --with-filename: a single file given (Bieżący dokument) is otherwise printed without its name.
+    '--with-filename', '--line-number', '--no-heading', '--color', 'never', '--stats',
     '--max-columns', '300', '--max-columns-preview', '--max-filesize', '2M',
+    ...(options.globs || []).flatMap((g) => ['--glob', g]),
     ...['bin', 'obj', 'node_modules', '.vs', '.git'].flatMap((d) => ['--glob', `!**/${d}/**`]),
     '--glob', '!*.user', '--glob', '!*.*proj',
     // Files with no text to find: not opened at all (on Windows opening a file costs more than reading it).
-    '--glob', `!*.{${BINARY.join(',')}}`, '--regexp', query, '--', ...dirs];
-  const child = childProcess.spawn(rg, args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+    '--glob', `!*.{${BINARY.join(',')}}`, '--regexp', query, '--', ...paths].filter(Boolean);
+  const child = childProcess.spawn(rg, args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   const done = new Promise((resolve) => {
     const hits = [];
     let rest = '';
     let full = false;
+    let searched;
+    let error = '';
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
       const lines = (rest + chunk).split(/\r?\n/);
@@ -153,17 +161,24 @@ function grep(rg, query, dirs, cwd, max) {
       for (const l of lines) {
         // path:line:text; the path may start with a drive (D:) when a project is on another drive than the solution.
         const m = /^((?:[A-Za-z]:)?[^:]*):(\d+):(.*)$/.exec(l);
-        if (!m) continue;
+        if (!m) {
+          const stat = /^(\d+) files searched$/.exec(l); // --stats, after the lines
+          if (stat) searched = Number(stat[1]);
+          continue;
+        }
         if (hits.length >= max) {
           full = true;
           child.kill();
           break;
         }
-        hits.push({ file: path.resolve(cwd, m[1]), line: Number(m[2]), text: m[3] });
+        const hit = { file: path.resolve(cwd, m[1]), line: Number(m[2]), text: m[3] };
+        hits.push(hit);
+        options.onHit?.(hit);
       }
     });
+    child.stderr.on('data', (chunk) => (error += chunk));
     child.on('error', () => resolve({ hits, full, failed: true }));
-    child.on('close', () => resolve({ hits, full }));
+    child.on('close', (code) => resolve({ hits, full, searched, error: code === 2 && !hits.length ? error.trim() : undefined }));
   });
   return { done, cancel: () => child.kill() };
 }
@@ -375,7 +390,7 @@ function registerSolutionSearch(context, findSolution, solutionView) {
     return undefined;
   }));
 
-  return { search, matcher, firstResult, boxShown: () => boxShown };
+  return { search, matcher, firstResult, boxShown: () => boxShown, getIndex };
 }
 
-module.exports = { registerSolutionSearch, matcher, terms };
+module.exports = { registerSolutionSearch, matcher, terms, grep, ripgrepPath };
