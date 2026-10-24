@@ -179,10 +179,10 @@ index aaec179..ef545fe 100644
      /// <summary>
      /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
-index 5211875..29d6432 100644
+index 4bdf5a7..dd30110 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
 +++ b/src/Passenger.Debugger/SuspendedLaunch.cs
-@@ -144,53 +144,99 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -154,53 +154,99 @@ public sealed partial class SuspendedLaunch : IDisposable
          }
      }
  
@@ -306,7 +306,7 @@ index 5211875..29d6432 100644
                  resumed = true;
              }
              return;
-@@ -254,6 +300,11 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -316,6 +362,11 @@ public sealed partial class SuspendedLaunch : IDisposable
      public void Dispose()
      {
          process?.Dispose();
@@ -318,7 +318,7 @@ index 5211875..29d6432 100644
          if (resumeHandle != 0)
          {
              DbgShim.CloseResumeHandle(resumeHandle);
-@@ -347,4 +398,50 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -438,4 +489,50 @@ public sealed partial class SuspendedLaunch : IDisposable
      [LibraryImport("kernel32", EntryPoint = "SetHandleInformation", SetLastError = true)]
      [return: MarshalAs(UnmanagedType.Bool)]
      private static partial bool SetHandleInformation(nint handle, uint mask, uint flags);

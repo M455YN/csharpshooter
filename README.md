@@ -16,8 +16,8 @@ npm install
 npm run fetch-server
 ```
 
-The debugger is Passenger's, from its `0.2.0` branch at commit `b4a6eb1` (a branch that moves on, so the script fetches
-that commit, not the branch), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
+The debugger is Passenger's, its 0.2.0 release (tag `v0.2.0`, commit `4265c9f`, which the script fetches), ported to
+.NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
 on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
 
 ```bash
