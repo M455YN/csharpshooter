@@ -2,7 +2,7 @@
   "name": "csharpshooter",
   "displayName": "CSharpShooter",
   "description": "C# and Razor (.cshtml/.razor) for VSCodium: IntelliSense, go to definition and tag helpers from Microsoft's roslyn-language-server, a Solution Explorer, F5 on launch profiles, and a bundled MIT-licensed .NET debugger.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -22,7 +22,9 @@
     "onLanguage:aspnetcorerazor",
     "onDebugResolve:csharpshooter",
     "onDebugDynamicConfigurations:csharpshooter",
-    "onDebugInitialConfigurations"
+    "onDebugInitialConfigurations",
+    "onDebugResolve:coreclr",
+    "onDebugResolve:dotnet"
   ],
   "contributes": {
     "configuration": {
@@ -47,6 +49,21 @@
           "type": "boolean",
           "default": true,
           "description": "Give the language server's Razor every .cshtml even when a project sets RazorCompileOnBuild=false (only the server's design-time builds change; your builds don't)."
+        },
+        "csharpShooter.runMicrosoftConfigurations": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "When the extension that owns the type (C# for coreclr, C# Dev Kit for dotnet) is not installed or is disabled.",
+            "Always, even with Microsoft's extensions installed.",
+            "Never: those configurations need Microsoft's debugger."
+          ],
+          "description": "Run launch.json configurations of type coreclr (Microsoft's C# extension) and dotnet (C# Dev Kit) on CSharpShooter's debugger."
         }
       }
     },
