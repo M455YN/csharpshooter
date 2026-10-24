@@ -17,6 +17,7 @@ const T = {
   ended: 'Zadanie zakończone',
   exited: (task, code) => `Zadanie ${task} zakończone z kodem zakończenia ${code}`,
   listFailed: (file) => `Nie można uruchomić elementu „${file}”...`,
+  leftToTasksJson: (task, label) => `Zadanie ${task} uruchamia już tasks.json przy otwarciu folderu („${label}”), więc powiązanie Otwarcie projektu je pomija.`,
 };
 const BINDINGS = [['BeforeBuild', 'Przed kompilacją'], ['AfterBuild', 'Po kompilacji'], ['Clean', 'Oczyszczanie'], ['ProjectOpened', 'Otwarcie projektu']];
 const BINDING_LINE = /^(\uFEFF?)\/\/\/\s*<binding\b([^>]*?)\/>[^\r\n]*(\r?\n|$)/;
@@ -58,6 +59,27 @@ function gulpTasks(file) {
       env: { ...process.env, ...toolsEnv(dir) } },
     (error, stdout, stderr) => resolve(error ? { error: (stderr || error.message).trim().split(/\r?\n/)[0] } : { tasks: stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) }));
   });
+}
+
+/** A task's command as one line: a shell command line, or its command (process) and arguments. */
+function commandText(exec) {
+  if (!exec) return '';
+  const word = (a) => (typeof a === 'string' ? a : a?.value ?? '');
+  return exec.commandLine ?? [word(exec.command ?? exec.process), ...(exec.args || []).map(word)].join(' ');
+}
+
+/** A task's folder: its cwd with ${workspaceFolder} put in, else the folder it belongs to. */
+function folderOf(cwd, scopeFolder) {
+  const base = scopeFolder || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+  return path.resolve(base, (cwd || '.').replace(/\$\{workspaceFolder(?::[^}]*)?\}/g, base)).toLowerCase();
+}
+
+/** Whether a command run in a folder is gulp running this task of this gulpfile (`npx gulp watchFiles_X` in its folder,
+ *  or with --gulpfile naming it): how a tasks.json task and a Task Runner task are known to be the same. */
+function runsGulpTask(command, folder, file, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return /\bgulp(\.js)?\b/.test(command) && new RegExp(`(^|\\s)${escaped}(\\s|$)`).test(command)
+    && (folder === path.dirname(file).toLowerCase() || command.toLowerCase().includes(file.toLowerCase()));
 }
 
 function npmScripts(file) {
@@ -170,8 +192,29 @@ class TaskRunner {
 
   /** A task's row. Its contextValue says what the menus offer: "trTask", "trScript" or "trBound", ".running" while it
    *  runs, " b:<Event>" per binding it is in (the Bindings menu's checks), " up"/" down" where a bound task can move. */
+  /** A run of a gulp task this panel did not start: tasks.json's (runOn: folderOpen, Run Task) or another extension's. */
+  otherRun(file, name) {
+    const ours = new Set(this.running.values());
+    return vscode.tasks.taskExecutions.find((e) => !ours.has(e) && runsGulpTask(commandText(e.task.execution),
+      folderOf(e.task.execution?.options?.cwd, e.task.scope?.uri?.fsPath), file, name));
+  }
+
+  /** tasks.json's tasks that VS Code starts as the folder opens and that run this gulp task, when it starts them at all
+   *  (task.allowAutomaticTasks not off): Project Open leaves those to it, so a watcher never runs twice. */
+  startedByTasksJson(file, name) {
+    if (vscode.workspace.getConfiguration('task').get('allowAutomaticTasks') === 'off') return undefined;
+    for (const folder of vscode.workspace.workspaceFolders || []) {
+      for (const t of vscode.workspace.getConfiguration('tasks', folder.uri).get('tasks') || []) {
+        if (t.runOptions?.runOn !== 'folderOpen') continue;
+        const command = [t.command, ...(t.args || []).map((a) => (typeof a === 'string' ? a : a.value))].join(' ');
+        if (runsGulpTask(command, folderOf(t.options?.cwd, folder.uri.fsPath), file, name)) return t.label || command;
+      }
+    }
+    return undefined;
+  }
+
   taskNode(kind, file, name, id, bound, place) {
-    const running = this.running.has(`${file}|${name}`);
+    const running = this.running.has(`${file}|${name}`) || !!this.otherRun(file, name);
     const flags = [
       ...Object.entries(bound || {}).filter(([, tasks]) => tasks.includes(name)).map(([event]) => `b:${event}`),
       ...(place && !place.first ? ['up'] : []), ...(place && !place.last ? ['down'] : []),
@@ -187,7 +230,7 @@ class TaskRunner {
   /** Runs a task in a terminal of its own; resolves once it ends (a watch task: when stopped), with its exit code. */
   async run(file, name, kind = 'task') {
     const key = `${file}|${name}`;
-    if (this.running.has(key)) return undefined;
+    if (this.running.has(key) || this.otherRun(file, name)) return undefined; // one run of a task at a time, whoever started it
     const dir = path.dirname(file);
     const local = path.join(dir, 'node_modules', 'gulp', 'bin', 'gulp.js');
     // As VS runs it: node_modules\.bin first on PATH, gulp with --color (its terminal shows the colours).
@@ -202,11 +245,14 @@ class TaskRunner {
     const execution = await vscode.tasks.executeTask(task);
     this.running.set(key, execution);
     this.refresh();
-    const status = vscode.window.setStatusBarMessage(`$(sync~spin) ${T.started(name)}`);
+    // While it starts, as VS says it: once its process runs (a watcher runs on for good), the message goes.
+    const status = vscode.window.setStatusBarMessage(`$(sync~spin) ${T.started(name)}`, 30000);
+    const started = vscode.tasks.onDidStartTaskProcess((e) => e.execution === execution && (started.dispose(), status.dispose()));
     return new Promise((resolve) => {
       const done = vscode.tasks.onDidEndTaskProcess((e) => {
         if (e.execution !== execution) return;
         done.dispose();
+        started.dispose();
         status.dispose();
         this.running.delete(key);
         this.refresh();
@@ -220,7 +266,7 @@ class TaskRunner {
   }
 
   stop(file, name) {
-    this.running.get(`${file}|${name}`)?.terminate();
+    (this.running.get(`${file}|${name}`) ?? this.otherRun(file, name))?.terminate();
   }
 
   /** Bound tasks of the gulpfiles in a folder (a project's) or everywhere: started, and for a build's bindings awaited,
@@ -229,6 +275,11 @@ class TaskRunner {
     const files = (await this.files()).filter((f) => f.kind === 'gulp' && (!folder || path.dirname(f.file).toLowerCase() === folder.toLowerCase()));
     for (const { file } of files) {
       for (const task of readBindings(fs.readFileSync(file, 'utf8'))[binding] || []) {
+        const byTasksJson = binding === 'ProjectOpened' && this.startedByTasksJson(file, task);
+        if (byTasksJson) {
+          this.output.appendLine(T.leftToTasksJson(`${task} (${path.basename(path.dirname(file))})`, byTasksJson));
+          continue;
+        }
         const ended = this.run(file, task);
         if (wait && (await ended) !== 0) return false;
       }
@@ -282,6 +333,8 @@ function registerTaskRunner(context, findSolution) {
   register('csharpShooter.taskRunner.moveDown', (node) => runner.moveBinding(node.file, node.binding, node.task, 1));
   register('csharpShooter.taskRunner.removeBinding', (node) => runner.moveBinding(node.file, node.binding, node.task, 0));
   context.subscriptions.push(runner.output);
+  // A run started elsewhere (tasks.json) shows as running here, and stops from here, so the tree follows every start and end.
+  context.subscriptions.push(vscode.tasks.onDidStartTask(() => runner.refresh()), vscode.tasks.onDidEndTask(() => runner.refresh()));
 
   // Project Open: the bound tasks start as the solution opens (the watchers, mostly), as VS starts them.
   if (setting('projectOpenBindings')) runner.runBindings('ProjectOpened', undefined, false);

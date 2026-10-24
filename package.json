@@ -69,7 +69,7 @@
         "csharpShooter.taskRunner.projectOpenBindings": {
           "type": "boolean",
           "default": true,
-          "description": "Start the tasks a gulpfile binds to Project Open (/// <binding ProjectOpened='...' />) as the workspace opens, as Visual Studio does. Turn it off if .vscode/tasks.json starts the same watchers (runOn: folderOpen)."
+          "description": "Start the tasks a gulpfile binds to Project Open (/// <binding ProjectOpened='...' />) as the workspace opens, as Visual Studio does. A task that .vscode/tasks.json already starts as the folder opens (runOn: folderOpen, the same gulp task in the same folder) is left to it, unless task.allowAutomaticTasks is off."
         },
         "csharpShooter.taskRunner.buildBindings": {
           "type": "boolean",
