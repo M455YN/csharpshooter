@@ -446,6 +446,106 @@ async function startupChecks(api) {
 }
 
 // The editor's own window only (PrintWindow), never the rest of the screen.
+// Solution Explorer's search, as VS's: names from the index (VS's matching rules), the tree filtered to the hits and
+// their folders, "Szukaj w zawartościach plików" through ripgrep with the lines under the files, the box (Ctrl+;).
+async function searchChecks(api, ext) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const label = (n) => (typeof n.label === 'string' ? n.label : n.label.label);
+  const { provider, view, search } = api.solutionView;
+  const { matcher } = search;
+  const m = (q, name) => JSON.stringify(matcher(q)(name));
+  expect("VS's matching: words anywhere, case only with a capital, HC for HomeController, \"phrases\"",
+    m('home', 'HomeController.cs') === '[[0,4]]' && m('Home', 'homepage.js') === 'null' && m('HC', 'HomeController.cs') === '[[0,1],[4,5]]'
+      && m('view login', 'LoginViewModel.cs') !== 'null' && m('"view login"', 'LoginViewModel.cs') === 'null',
+    ['home', 'Home', 'HC', 'view login', '"view login"'].map((q) => `${q} -> ${m(q, q === 'Home' ? 'homepage.js' : q === 'HC' ? 'HomeController.cs' : 'LoginViewModel.cs')}`).join(' | '));
+
+  // The tree as shown: every expanded row, indented.
+  const shown = async () => {
+    const out = [];
+    const walk = async (item, depth) => {
+      for (const c of await provider.getChildren(item)) {
+        out.push(`${'  '.repeat(depth)}${label(c)}`);
+        if (c.collapsibleState === vscode.TreeItemCollapsibleState.Expanded && depth < 12) await walk(c, depth + 1);
+      }
+    };
+    await walk(undefined, 0);
+    return out;
+  };
+
+  await vscode.commands.executeCommand('csharpShooter.solution.search', '');
+  const before = await shown();
+  let t = Date.now();
+  let r = await vscode.commands.executeCommand('csharpShooter.solution.search', 'LoginViewModel');
+  const cold = Date.now() - t;
+  t = Date.now();
+  await search.search('LoginViewModel');
+  const warm = Date.now() - t;
+  let rows = await shown();
+  const files = rows.filter((x) => x.trim() === 'LoginViewModel.cs');
+  expect('names: the tree filtered to the hits, their folders and projects open, other projects gone',
+    files.length === 2 && rows.some((x) => x.trim() === 'ViewModels') && !rows.some((x) => /Dependencies|Contoso\.Excel|Tests$/.test(x)) && !rows.some((x) => x.includes('WorktimeLog')),
+    rows.join(' / '));
+  expect('names: instant from the index (built once, then searched in memory)', warm < 150, `first ${cold} ms (index built), then ${warm} ms`);
+
+  // A file added and removed on disk: the index follows it, as VS's follows the items added and removed.
+  const probe = path.resolve(root(), 'WebApp', 'ViewModels', 'ShooterSearchProbe.cs');
+  let added;
+  let removed;
+  try {
+    fs.writeFileSync(probe, '// probe');
+    for (let i = 0; i < 20 && !(added = (await search.search('ShooterSearchProbe')).names); i++) await sleep(250);
+  } finally {
+    fs.rmSync(probe, { force: true });
+  }
+  for (let i = 0; i < 20 && (removed = (await search.search('ShooterSearchProbe')).names); i++) await sleep(250);
+  t = Date.now();
+  await search.search('LoginViewModel');
+  const afterChange = Date.now() - t;
+  expect('names: a file added and removed on disk comes and goes, the index kept (not built anew)', added === 1 && removed === 0 && afterChange < 150,
+    `added: ${added} hit, removed: ${removed}, then a search ${afterChange} ms`);
+
+  r = await vscode.commands.executeCommand('csharpShooter.solution.search', 'HC');
+  rows = await shown();
+  expect('names: HC finds HomeController.cs', rows.some((x) => x.trim() === 'HomeController.cs'), `${r.names} hits: ${rows.filter((x) => /HomeController/.test(x)).join(', ')}`);
+
+  await search.search('CheckRightsExpr', true);
+  t = Date.now();
+  r = await search.search('CheckRightsExpr', true);
+  const grepMs = Date.now() - t;
+  rows = await shown();
+  const at = rows.findIndex((x) => x.trim() === 'RightsChecker.cs');
+  expect('file contents (ripgrep): the files with the text, their lines under them',
+    r.lines > 0 && at >= 0 && rows[at + 1]?.includes('CheckRightsExpr') && rows.some((x) => x.trim() === 'AppUser.cs'),
+    `${r.lines} lines in ${r.files.length} files, ${grepMs} ms: ${rows.slice(Math.max(0, at - 2), at + 3).map((x) => x.trim()).join(' / ')}`);
+
+  r = await search.search('zzqqxxnothing');
+  expect("no hits: VS's message in the tree", view.message === 'Brak wyników.' && (await provider.getChildren((await provider.getChildren())[0])).length === 0, view.message);
+
+  await vscode.commands.executeCommand('csharpShooter.solution.search', '');
+  const after = await shown();
+  expect('cleared: the whole tree back', JSON.stringify(after) === JSON.stringify(before) && !view.message, `${before.length} rows before, ${after.length} after`);
+
+  const key = ext.packageJSON.contributes.keybindings.find((k) => k.command === 'csharpShooter.solution.search');
+  const box = ext.packageJSON.contributes.views.csharpShooter[0];
+  let focused = true;
+  try {
+    await vscode.commands.executeCommand('csharpShooter.solution.search');
+  } catch (e) {
+    focused = e.message;
+  }
+  for (let i = 0; i < 20 && !search.boxShown(); i++) await sleep(250);
+  expect('the box above the tree, Ctrl+; to it', key?.key === 'ctrl+;' && box.id === 'csharpShooter.search' && box.type === 'webview' && focused === true && search.boxShown(),
+    `${key?.key}, first view ${box.id} (${box.type}), focus: ${focused}, box drawn: ${search.boxShown()}`);
+  if (process.env.SCREENSHOT) {
+    await vscode.commands.executeCommand('csharpShooter.solution.search', 'Login');
+    await sleep(1500);
+    await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-search.png'));
+    await vscode.commands.executeCommand('csharpShooter.solution.search', '');
+  }
+  return results;
+}
+
 async function screenshot(file) {
   await sleep(1500);
   const script = `
@@ -456,7 +556,7 @@ public static class W { [DllImport("user32.dll")] public static extern bool Prin
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   public struct RECT { public int L, T, R, B; } }
 '@
-$p = Get-Process VSCodium | Where-Object { $_.MainWindowTitle } | Select-Object -First 1
+$p = Get-Process VSCodium, Code -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Extension Development Host*" } | Select-Object -First 1
 $r = New-Object W+RECT; [W]::GetWindowRect($p.MainWindowHandle, [ref]$r) | Out-Null
 $b = New-Object System.Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
 $g = [System.Drawing.Graphics]::FromImage($b); $dc = $g.GetHdc()
@@ -532,6 +632,12 @@ async function run() {
     for (const r of await solutionChecks(api.solutionView)) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  solution view: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.search || (!process.env.CHECKS_FILE && process.env.SKIP_SEARCH !== '1')) {
+    for (const r of await searchChecks(api, ext)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  search: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.launchProfile || (!process.env.CHECKS_FILE && process.env.SKIP_LAUNCH !== '1')) {
