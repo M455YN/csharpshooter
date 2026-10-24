@@ -54,6 +54,9 @@ function msbuildProperties(project, configuration) {
 
 /** Builds the project in a task the person sees, as VS builds on F5; resolves with whether it succeeded. */
 async function build(project, configuration) {
+  // Before Build bindings of the project's gulpfiles (csharpShooter.taskRunner.buildBindings), as VS runs them.
+  const { buildBindings } = require('./task-runner');
+  if (!(await buildBindings('BeforeBuild', path.dirname(project)))) return false;
   const task = new vscode.Task({ type: 'shell', task: `build ${path.basename(project)}` }, vscode.TaskScope.Workspace,
     `build ${path.basename(project, '.csproj')}`, 'CSharpShooter',
     new vscode.ShellExecution('dotnet', ['build', project, '-c', configuration], { cwd: path.dirname(project) }), '$msCompile');
@@ -63,7 +66,7 @@ async function build(project, configuration) {
     const done = vscode.tasks.onDidEndTaskProcess((e) => {
       if (e.execution !== execution) return;
       done.dispose();
-      resolve(e.exitCode === 0);
+      resolve(e.exitCode === 0 && buildBindings('AfterBuild', path.dirname(project)));
     });
   });
 }
