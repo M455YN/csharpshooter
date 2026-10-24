@@ -748,7 +748,51 @@
         "key": "ctrl+shift+f",
         "mac": "cmd+shift+f"
       }
-    ]
+    ],
+    "languages": [
+      {
+        "id": "aspnetcorerazor",
+        "aliases": [
+          "ASP.NET Razor",
+          "Razor"
+        ],
+        "extensions": [
+          ".cshtml",
+          ".razor"
+        ],
+        "configuration": "./syntaxes/aspnetcorerazor.language-configuration.json",
+        "icon": {
+          "light": "./media/razor.svg",
+          "dark": "./media/razor.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "aspnetcorerazor",
+        "scopeName": "text.aspnetcorerazor",
+        "path": "./syntaxes/aspnetcorerazor.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.cs": "csharp",
+          "text.html.basic": "html",
+          "source.css": "css",
+          "source.js": "javascript"
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "files.associations": {
+        "*.cshtml": "aspnetcorerazor",
+        "*.razor": "aspnetcorerazor"
+      },
+      "[aspnetcorerazor]": {
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "on"
+        }
+      }
+    }
   },
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",

@@ -72,6 +72,10 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
 - `csharpShooter.razorViewsInDesignTime` (on by default) gives the server's Razor every `.cshtml` even when a project
   sets `RazorCompileOnBuild=false`; without it such views get no C# help at all. Only the server's design-time builds
   change.
+- `.cshtml` and `.razor` open as `aspnetcorerazor` (Razor's grammar), as Visual Studio and Passenger open them, so Razor's
+  own completion answers there, not C#'s: `-` in `asp-for` or a tag helper's `icon-name` goes on typing the name instead
+  of taking the first item, `@`, `=`, `"` and a space in a tag open the list, and it also comes inside an attribute's
+  quotes (`asp-for="Lo…"`). `.cs` files keep Roslyn's.
 
 ## Startup project and active profile (as Visual Studio)
 

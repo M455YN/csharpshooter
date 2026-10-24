@@ -1,6 +1,6 @@
 # Third-party notices
 
-CSharpShooter bundles two programs it did not write.
+CSharpShooter bundles two programs it did not write, and one file.
 
 ## The .NET debugger (`debugger/`)
 
@@ -38,3 +38,10 @@ Microsoft's `roslyn-language-server` package from nuget.org, under MIT, with its
 (copied by `scripts/fetch-server.js`). It carries two assemblies that are not open source,
 `Microsoft.VisualStudio.Telemetry` and `Microsoft.VisualStudio.Utilities.Internal`, under Microsoft's Visual Studio
 licence terms; Razor's support loads them, and the server runs with `--telemetryLevel off`.
+
+## The Razor grammar (`syntaxes/aspnetcorerazor.tmLanguage.json`)
+
+Razor's own TextMate grammar, which embeds HTML's and C#'s, unchanged: a file of Razor's tooling in
+[dotnet/roslyn](https://github.com/dotnet/roslyn) (`src/Razor/src/Razor/src/Microsoft.VisualStudio.RazorExtension/EmbeddedGrammars/`,
+where Razor's tooling moved from dotnet/razor), as Passenger ships it. MIT License, Copyright (c) .NET Foundation and
+Contributors; the licence text is the MIT one above.
