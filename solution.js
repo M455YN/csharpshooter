@@ -332,11 +332,28 @@ function registerSolutionView(context, findSolution) {
   context.subscriptions.push(watcher);
 
   // A dotnet command in a task; resolves with its exit code once it ends.
-  const terminalTask = async (name, cmd, cwd) => {
+  const terminalTask = async (name, cmd, cwd, started = () => {}) => {
     const execution = await vscode.tasks.executeTask(new vscode.Task({ type: 'shell', task: name }, vscode.TaskScope.Workspace, name, 'CSharpShooter', new vscode.ShellExecution(cmd, { cwd })));
+    started(execution);
     return new Promise((resolve) => {
       const done = vscode.tasks.onDidEndTaskProcess((e) => e.execution === execution && (done.dispose(), resolve(e.exitCode)));
     });
+  };
+  // A build in a task, what it does said at the bottom right as F5's build says it, and its outcome in the status bar as VS's.
+  const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
+  const buildTask = async (name, cmd, cwd) => {
+    const progress = launchProgress(name);
+    const log = buildLog();
+    const following = followBuildLog(log.file, progress.report);
+    progress.report('Kompilacja rozpoczęta…');
+    try {
+      const code = await terminalTask(name, `${cmd} "${log.arg}"`, cwd, (execution) => progress.token.onCancellationRequested(() => execution.terminate()));
+      vscode.window.setStatusBarMessage(code === 0 ? 'Kompilacja zakończyła się powodzeniem' : 'Kompilacja nie powiodła się', 10000);
+      return code;
+    } finally {
+      following.stop();
+      progress.done();
+    }
   };
   // A build with the Task Runner's bindings around it (csharpShooter.taskRunner.buildBindings): a solution's are all of them.
   const { buildBindings } = require('./task-runner');
@@ -349,8 +366,8 @@ function registerSolutionView(context, findSolution) {
   const register = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   register('csharpShooter.solution.refresh', () => provider.refresh());
-  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', () => terminalTask(`build ${item.label}`, `dotnet build "${target(item)}"`, path.dirname(target(item))), 'AfterBuild'));
-  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', () => terminalTask(`rebuild ${item.label}`, `dotnet build --no-incremental "${target(item)}"`, path.dirname(target(item))), 'AfterBuild'));
+  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', () => buildTask(`build ${item.label}`, `dotnet build "${target(item)}"`, path.dirname(target(item))), 'AfterBuild'));
+  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', () => buildTask(`rebuild ${item.label}`, `dotnet build --no-incremental "${target(item)}"`, path.dirname(target(item))), 'AfterBuild'));
   register('csharpShooter.solution.clean', (item) => bound(item, 'Clean', () => terminalTask(`clean ${item.label}`, `dotnet clean "${target(item)}"`, path.dirname(target(item)))));
   register('csharpShooter.solution.editProject', (item) => vscode.window.showTextDocument(vscode.Uri.file(item.file)));
   register('csharpShooter.solution.revealInOS', (item) => vscode.commands.executeCommand('revealFileInOS', item.resourceUri || vscode.Uri.file(item.file)));

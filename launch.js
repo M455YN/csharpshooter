@@ -6,6 +6,7 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
+const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
 
 const TYPE = 'csharpshooter';
 
@@ -53,23 +54,29 @@ function msbuildProperties(project, configuration, framework) {
   });
 }
 
-/** Builds the project in a task the person sees, as VS builds on F5; resolves with whether it succeeded. */
-async function build(project, configuration, framework) {
+/** Builds the project in a task the person sees, as VS builds on F5, saying in `progress` what the build is doing;
+ *  resolves with whether it succeeded, and the errors it had. */
+async function build(project, configuration, framework, progress) {
   // Before Build bindings of the project's gulpfiles (csharpShooter.taskRunner.buildBindings), as VS runs them.
   const { buildBindings } = require('./task-runner');
-  if (!(await buildBindings('BeforeBuild', path.dirname(project)))) return false;
+  progress.report('Kompilacja rozpoczęta…');
+  if (!(await buildBindings('BeforeBuild', path.dirname(project)))) return { ok: false, errors: 0 };
+  const log = buildLog();
   const task = new vscode.Task({ type: 'shell', task: `build ${path.basename(project)}` }, vscode.TaskScope.Workspace,
     `build ${path.basename(project, '.csproj')}`, 'CSharpShooter',
-    new vscode.ShellExecution('dotnet', ['build', project, '-c', configuration, ...(framework ? ['-f', framework] : [])], { cwd: path.dirname(project) }), '$msCompile');
+    new vscode.ShellExecution('dotnet', ['build', project, '-c', configuration, ...(framework ? ['-f', framework] : []), { value: log.arg, quoting: vscode.ShellQuoting.Strong }], { cwd: path.dirname(project) }), '$msCompile');
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Silent, panel: vscode.TaskPanelKind.Dedicated, clear: true };
+  const following = followBuildLog(log.file, progress.report);
   const execution = await vscode.tasks.executeTask(task);
-  return new Promise((resolve) => {
-    const done = vscode.tasks.onDidEndTaskProcess((e) => {
-      if (e.execution !== execution) return;
-      done.dispose();
-      resolve(e.exitCode === 0 && buildBindings('AfterBuild', path.dirname(project)));
-    });
+  const cancel = progress.token.onCancellationRequested(() => execution.terminate());
+  const exitCode = await new Promise((resolve) => {
+    const done = vscode.tasks.onDidEndTaskProcess((e) => e.execution === execution && (done.dispose(), resolve(e.exitCode)));
   });
+  cancel.dispose();
+  following.stop();
+  const ok = exitCode === 0 && !progress.token.isCancellationRequested && (await buildBindings('AfterBuild', path.dirname(project)));
+  if (ok) progress.report(`Kompilacja zakończyła się powodzeniem${following.counts.warnings ? ` (ostrzeżenia: ${following.counts.warnings})` : ''}`);
+  return { ok, errors: following.counts.errors };
 }
 
 /** Runnable projects of the solution: Exe output or a web SDK, which is what has launch profiles to run. */
@@ -131,15 +138,30 @@ class LaunchProfiles {
     }
     if (config.request !== 'launch' || !config.project) return config;
     const project = path.resolve(folder?.uri.fsPath || '', config.project);
+    // What it is doing, at the bottom right, until the browser opens (or the start is done when there is none to wait for).
+    const progress = launchProgress(config.name || path.basename(project, '.csproj'));
+    this.state.lastProgress = progress;
+    let handedOver = false;
+    try {
+      return await this.launch(folder, config, project, progress, () => (handedOver = true));
+    } finally {
+      if (!handedOver) progress.done();
+    }
+  }
+
+  async launch(folder, config, project, progress, handOver) {
     const configuration = config.configuration || 'Debug';
     if (config.build !== false) {
-      const ok = await build(project, configuration, config.framework);
-      this.state.lastBuild = { project, ok };
-      if (!ok) {
-        vscode.window.showErrorMessage(`Build of ${path.basename(project)} failed; see the task's terminal and Problems.`);
+      const built = await build(project, configuration, config.framework, progress);
+      this.state.lastBuild = { project, ok: built.ok };
+      if (!built.ok) {
+        if (!progress.token.isCancellationRequested) {
+          vscode.window.showErrorMessage(`Build of ${path.basename(project)} failed${built.errors ? ` (${built.errors} errors)` : ''}; see the task's terminal and Problems.`);
+        }
         return undefined;
       }
     }
+    progress.report('Odczytywanie właściwości projektu…');
     const props = await msbuildProperties(project, configuration, config.framework);
     const entry = config.launchProfile ? runnableProfiles(project).find((p) => p.name === config.launchProfile) : undefined;
     if (config.launchProfile && !entry) {
@@ -166,8 +188,17 @@ class LaunchProfiles {
     };
     // Ctrl+F5, as VS's Start Without Debugging: the program in a terminal of its own, no debugger, the browser as F5's.
     if (config.noDebug) {
-      await runWithoutDebugging(resolved, this.state);
+      handOver();
+      await runWithoutDebugging(resolved, this.state, progress);
       return undefined;
+    }
+    progress.report('Uruchamianie z debugerem…');
+    // The debug session's tracker says the rest (the wait for the port, the browser) and closes it.
+    if (resolved.__browser?.base && !portBusy) {
+      handOver();
+      const id = String((this.state.progressIds = (this.state.progressIds || 0) + 1));
+      (this.state.progresses ||= new Map()).set(id, progress);
+      resolved.__progress = id;
     }
     return resolved;
   }
@@ -175,7 +206,16 @@ class LaunchProfiles {
 
 /** Runs a resolved launch without a debugger: a task running the program (dotnet <dll>, or its apphost), then the
  *  browser once the port answers. The debug session is not started; the task's terminal is the program's console. */
-async function runWithoutDebugging(config, state) {
+async function runWithoutDebugging(config, state, progress) {
+  try {
+    await startWithoutDebugging(config, state, progress);
+  } finally {
+    progress.done();
+  }
+}
+
+async function startWithoutDebugging(config, state, progress) {
+  progress.report('Uruchamianie bez debugowania…');
   const viaDotnet = /\.dll$/i.test(config.program);
   const exec = new vscode.ProcessExecution(viaDotnet ? 'dotnet' : config.program, [...(viaDotnet ? [config.program] : []), ...(config.args || [])],
     { cwd: config.cwd, env: config.env });
@@ -187,9 +227,11 @@ async function runWithoutDebugging(config, state) {
   state.lastRunWithoutDebugging = { name: label, execution };
   const browser = config.__browser;
   if (!browser?.base || browser.portBusy) return;
-  for (let i = 0; i < 300 && vscode.tasks.taskExecutions.includes(execution); i++) {
+  progress.report(listeningMessage(browser.base));
+  for (let i = 0; i < 300 && vscode.tasks.taskExecutions.includes(execution) && !progress.token.isCancellationRequested; i++) {
     if (await accepts(browser.base)) {
       const url = `${browser.base.replace(/\/$/, '')}/${browser.path.replace(/^\//, '')}`;
+      progress.report('Otwieranie przeglądarki…');
       state.browserUrl = url;
       if (!process.env.CSHARPSHOOTER_NO_BROWSER) vscode.env.openExternal(vscode.Uri.parse(url));
       return;
@@ -197,6 +239,8 @@ async function runWithoutDebugging(config, state) {
     await new Promise((r) => setTimeout(r, 1000));
   }
 }
+
+const listeningMessage = (url) => `Czekanie, aż aplikacja zacznie nasłuchiwać (${url})…`;
 
 /** Whether something accepts connections at a URL's host and port. */
 function accepts(url) {
@@ -217,6 +261,10 @@ function browserOpener(state) {
     createDebugAdapterTracker(session) {
       const browser = session.configuration.__browser;
       if (!browser) return undefined;
+      // The notification of this start, handed over by the resolver: the wait and the browser are said here.
+      const id = session.configuration.__progress;
+      const progress = state.progresses?.get(id);
+      state.progresses?.delete(id);
       let opened = false;
       let polling;
       const open = (base) => {
@@ -224,12 +272,18 @@ function browserOpener(state) {
         opened = true;
         clearInterval(polling);
         const url = `${base.replace(/\/$/, '')}/${browser.path.replace(/^\//, '')}`;
+        progress?.report('Otwieranie przeglądarki…');
+        progress?.done();
         state.browserUrl = url;
         if (!process.env.CSHARPSHOOTER_NO_BROWSER) vscode.env.openExternal(vscode.Uri.parse(url));
       };
-      const stop = () => clearInterval(polling);
+      const stop = () => {
+        clearInterval(polling);
+        progress?.done();
+      };
       return {
         onWillStartSession() {
+          progress?.report(listeningMessage(browser.base));
           if (browser.base && !browser.portBusy) polling = setInterval(async () => (await accepts(browser.base)) && open(browser.base), 1000);
         },
         onDidSendMessage(m) {
