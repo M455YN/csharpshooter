@@ -24,7 +24,8 @@
     "onDebugDynamicConfigurations:csharpshooter",
     "onDebugInitialConfigurations",
     "onDebugResolve:coreclr",
-    "onDebugResolve:dotnet"
+    "onDebugResolve:dotnet",
+    "workspaceContains:**/[gG]ulpfile.js"
   ],
   "contributes": {
     "configuration": {
@@ -64,6 +65,16 @@
             "Never: those configurations need Microsoft's debugger."
           ],
           "description": "Run launch.json configurations of type coreclr (Microsoft's C# extension) and dotnet (C# Dev Kit) on CSharpShooter's debugger."
+        },
+        "csharpShooter.taskRunner.projectOpenBindings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the tasks a gulpfile binds to Project Open (/// <binding ProjectOpened='...' />) as the workspace opens, as Visual Studio does. Turn it off if .vscode/tasks.json starts the same watchers (runOn: folderOpen)."
+        },
+        "csharpShooter.taskRunner.buildBindings": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run a gulpfile's Before Build, After Build and Clean bindings around CSharpShooter's builds (F5, Solution Explorer). Off by default: a project that runs gulp from its .csproj when built outside Visual Studio (BuildingInsideVisualStudio != true) would run it twice."
         }
       }
     },
@@ -82,6 +93,11 @@
           "id": "csharpShooter.solution",
           "name": "Solution Explorer",
           "icon": "media/solution-explorer.svg"
+        },
+        {
+          "id": "csharpShooter.taskRunner",
+          "name": "Eksplorator modułu uruchamiającego zadania",
+          "icon": "$(checklist)"
         }
       ]
     },
@@ -89,6 +105,10 @@
       {
         "id": "csharpShooter.solution.add",
         "label": "Add"
+      },
+      {
+        "id": "csharpShooter.taskRunner.bindings",
+        "label": "Powiązania"
       }
     ],
     "commands": [
@@ -165,6 +185,62 @@
         "title": "Start Debugging...",
         "icon": "$(debug-alt)",
         "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.taskRunner.refresh",
+        "title": "Odśwież zadania",
+        "category": "Eksplorator zadań",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "csharpShooter.taskRunner.run",
+        "title": "Uruchom",
+        "category": "Eksplorator zadań",
+        "icon": "$(play)"
+      },
+      {
+        "command": "csharpShooter.taskRunner.stop",
+        "title": "Zatrzymaj",
+        "category": "Eksplorator zadań",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "csharpShooter.taskRunner.bindBeforeBuild",
+        "title": "Przed kompilacją",
+        "category": "Eksplorator zadań"
+      },
+      {
+        "command": "csharpShooter.taskRunner.bindAfterBuild",
+        "title": "Po kompilacji",
+        "category": "Eksplorator zadań"
+      },
+      {
+        "command": "csharpShooter.taskRunner.bindClean",
+        "title": "Oczyszczanie",
+        "category": "Eksplorator zadań"
+      },
+      {
+        "command": "csharpShooter.taskRunner.bindProjectOpened",
+        "title": "Otwarcie projektu",
+        "category": "Eksplorator zadań"
+      },
+      {
+        "command": "csharpShooter.taskRunner.moveUp",
+        "title": "Przenieś w górę",
+        "icon": "$(arrow-up)",
+        "category": "Eksplorator zadań"
+      },
+      {
+        "command": "csharpShooter.taskRunner.moveDown",
+        "title": "Przenieś w dół",
+        "icon": "$(arrow-down)",
+        "category": "Eksplorator zadań"
+      },
+      {
+        "command": "csharpShooter.taskRunner.removeBinding",
+        "title": "Usuń",
+        "icon": "$(close)",
+        "category": "Eksplorator zadań"
       }
     ],
     "menus": {
@@ -178,6 +254,11 @@
           "command": "csharpShooter.solution.refresh",
           "when": "view == csharpShooter.solution",
           "group": "navigation@2"
+        },
+        {
+          "command": "csharpShooter.taskRunner.refresh",
+          "when": "view == csharpShooter.taskRunner",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -225,6 +306,61 @@
           "command": "csharpShooter.solution.copyPath",
           "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)$/",
           "group": "4_copy@1"
+        },
+        {
+          "command": "csharpShooter.taskRunner.run",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^tr(Task|Script|Bound)( |$)/",
+          "group": "inline@1"
+        },
+        {
+          "command": "csharpShooter.taskRunner.stop",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^tr(Task|Script|Bound)\\.running/",
+          "group": "inline@1"
+        },
+        {
+          "command": "csharpShooter.taskRunner.moveUp",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^trBound.* up( |$)/",
+          "group": "inline@2"
+        },
+        {
+          "command": "csharpShooter.taskRunner.moveDown",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^trBound.* down( |$)/",
+          "group": "inline@3"
+        },
+        {
+          "command": "csharpShooter.taskRunner.removeBinding",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^trBound/",
+          "group": "inline@4"
+        },
+        {
+          "command": "csharpShooter.taskRunner.run",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^tr(Task|Script|Bound)( |$)/",
+          "group": "1_run@1"
+        },
+        {
+          "command": "csharpShooter.taskRunner.stop",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^tr(Task|Script|Bound)\\.running/",
+          "group": "1_run@2"
+        },
+        {
+          "submenu": "csharpShooter.taskRunner.bindings",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^trTask/",
+          "group": "2_bind@1"
+        },
+        {
+          "command": "csharpShooter.taskRunner.moveUp",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^trBound.* up( |$)/",
+          "group": "2_bind@1"
+        },
+        {
+          "command": "csharpShooter.taskRunner.moveDown",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^trBound.* down( |$)/",
+          "group": "2_bind@2"
+        },
+        {
+          "command": "csharpShooter.taskRunner.removeBinding",
+          "when": "view == csharpShooter.taskRunner && viewItem =~ /^trBound/",
+          "group": "2_bind@3"
         }
       ],
       "csharpShooter.solution.add": [
@@ -285,6 +421,72 @@
         {
           "command": "csharpShooter.solution.debugProject",
           "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.run",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.stop",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.bindBeforeBuild",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.bindAfterBuild",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.bindClean",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.bindProjectOpened",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.moveUp",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.moveDown",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.taskRunner.removeBinding",
+          "when": "false"
+        }
+      ],
+      "csharpShooter.taskRunner.bindings": [
+        {
+          "command": "csharpShooter.taskRunner.bindBeforeBuild",
+          "group": "1@1",
+          "toggled": {
+            "condition": "viewItem =~ / b:BeforeBuild( |$)/"
+          }
+        },
+        {
+          "command": "csharpShooter.taskRunner.bindAfterBuild",
+          "group": "1@2",
+          "toggled": {
+            "condition": "viewItem =~ / b:AfterBuild( |$)/"
+          }
+        },
+        {
+          "command": "csharpShooter.taskRunner.bindClean",
+          "group": "1@3",
+          "toggled": {
+            "condition": "viewItem =~ / b:Clean( |$)/"
+          }
+        },
+        {
+          "command": "csharpShooter.taskRunner.bindProjectOpened",
+          "group": "1@4",
+          "toggled": {
+            "condition": "viewItem =~ / b:ProjectOpened( |$)/"
+          }
         }
       ]
     },
