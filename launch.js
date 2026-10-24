@@ -202,9 +202,61 @@ function browserOpener(state) {
   };
 }
 
+/** launch.json entries for the runnable projects' launch profiles that launch.json does not have yet, per folder.
+ *  VS Code lists only launch.json's configurations in the Run and Debug dropdown (an extension's dynamic ones wait behind
+ *  ".NET (CSharpShooter)..."), so this is how "WebApp: WebApp Development" gets there, as in VS's start button. */
+async function missingProfileEntries() {
+  const out = [];
+  for (const folder of vscode.workspace.workspaceFolders || []) {
+    const have = vscode.workspace.getConfiguration('launch', folder.uri).get('configurations') || [];
+    const known = new Set(have.filter((c) => c.type === TYPE && c.launchProfile).map((c) => `${String(c.project).replace(/\\/g, '/').toLowerCase()}|${c.launchProfile}`));
+    for (const project of await runnableProjects()) {
+      if (!project.toLowerCase().startsWith(folder.uri.fsPath.toLowerCase())) continue;
+      const rel = `\${workspaceFolder}/${path.relative(folder.uri.fsPath, project).replace(/\\/g, '/')}`;
+      for (const { name } of runnableProfiles(project)) {
+        if (!known.has(`${rel.toLowerCase()}|${name}`)) out.push({ folder, entry: { ...configurationFor(rel, name), name: `${path.basename(project, '.csproj')}: ${name}` } });
+      }
+    }
+  }
+  return out;
+}
+
+/** Adds them to each folder's launch.json (through VS Code's settings, which edit the file in place). */
+async function addProfileEntries(missing) {
+  for (const folder of new Set(missing.map((m) => m.folder))) {
+    const launch = vscode.workspace.getConfiguration('launch', folder.uri);
+    const entries = missing.filter((m) => m.folder === folder).map((m) => m.entry);
+    await launch.update('configurations', [...(launch.get('configurations') || []), ...entries], vscode.ConfigurationTarget.WorkspaceFolder);
+  }
+  return missing.map((m) => m.entry.name);
+}
+
+/** As a folder opens: asks once (csharpShooter.launchProfilesInLaunchJson: ask), adds silently (always) or leaves it (never). */
+async function offerProfileEntries(context) {
+  const mode = vscode.workspace.getConfiguration('csharpShooter').get('launchProfilesInLaunchJson');
+  if (mode === 'never' || context.workspaceState.get('csharpShooter.launchProfilesDeclined')) return;
+  const missing = await missingProfileEntries();
+  if (!missing.length) return;
+  if (mode !== 'always') {
+    const names = missing.map((m) => m.entry.name);
+    const answer = await vscode.window.showInformationMessage(
+      `Add the launch profiles of launchSettings.json to Run and Debug (.vscode/launch.json)? ${names.slice(0, 4).join(', ')}${names.length > 4 ? ', …' : ''}`,
+      'Add', 'Not now', 'Never');
+    if (answer === 'Never') await context.workspaceState.update('csharpShooter.launchProfilesDeclined', true);
+    if (answer !== 'Add') return;
+  }
+  await addProfileEntries(missing);
+}
+
 function registerLaunch(context) {
   const state = {};
   const provider = new LaunchProfiles(state);
+  context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.addLaunchProfiles', async () => {
+    const added = await addProfileEntries(await missingProfileEntries());
+    vscode.window.showInformationMessage(added.length ? `Added to Run and Debug: ${added.join(', ')}` : 'Run and Debug has every launch profile already.');
+    return added;
+  }));
+  offerProfileEntries(context);
   context.subscriptions.push(
     vscode.debug.registerDebugConfigurationProvider(TYPE, provider, vscode.DebugConfigurationProviderTriggerKind.Dynamic),
     vscode.debug.registerDebugConfigurationProvider(TYPE, { resolveDebugConfiguration: provider.resolveDebugConfiguration.bind(provider), resolveDebugConfigurationWithSubstitutedVariables: provider.resolveDebugConfigurationWithSubstitutedVariables.bind(provider) }),
