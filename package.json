@@ -318,6 +318,12 @@
         "command": "csharpShooter.findInFiles",
         "title": "Znajdź w plikach",
         "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.visualizeData",
+        "title": "Wizualizator DataTable",
+        "icon": "$(search)",
+        "category": "CSharpShooter"
       }
     ],
     "menus": {
@@ -548,6 +554,10 @@
         {
           "command": "csharpShooter.startup.setProject",
           "when": "false"
+        },
+        {
+          "command": "csharpShooter.visualizeData",
+          "when": "false"
         }
       ],
       "csharpShooter.taskRunner.bindings": [
@@ -578,6 +588,30 @@
           "toggled": {
             "condition": "viewItem =~ / b:ProjectOpened( |$)/"
           }
+        }
+      ],
+      "debug/variables/context": [
+        {
+          "command": "csharpShooter.visualizeData",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "group": "inline"
+        },
+        {
+          "command": "csharpShooter.visualizeData",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "group": "navigation"
+        }
+      ],
+      "debug/watch/context": [
+        {
+          "command": "csharpShooter.visualizeData",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "group": "inline"
+        },
+        {
+          "command": "csharpShooter.visualizeData",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "group": "navigation"
         }
       ]
     },

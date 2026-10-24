@@ -357,7 +357,9 @@ function registerLaunch(context) {
   }));
   offerProfileEntries(context);
   context.subscriptions.push(
-    vscode.debug.registerDebugConfigurationProvider(TYPE, provider, vscode.DebugConfigurationProviderTriggerKind.Dynamic),
+    // The list only: VS Code runs every provider's resolve methods for the type, so they are registered once (below), not here too
+    // (a launch would be resolved, and built, twice).
+    vscode.debug.registerDebugConfigurationProvider(TYPE, { provideDebugConfigurations: () => provider.provideDebugConfigurations() }, vscode.DebugConfigurationProviderTriggerKind.Dynamic),
     vscode.debug.registerDebugConfigurationProvider(TYPE, { resolveDebugConfiguration: provider.resolveDebugConfiguration.bind(provider), resolveDebugConfigurationWithSubstitutedVariables: provider.resolveDebugConfigurationWithSubstitutedVariables.bind(provider) }),
     vscode.debug.registerDebugAdapterTrackerFactory(TYPE, browserOpener(state)),
     // Solution Explorer → project → Debug: its profiles to pick from, as VS's start button's list.

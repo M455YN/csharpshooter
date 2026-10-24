@@ -71,6 +71,12 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   On a slow machine that is where C# help, F12 and Razor are until then.
 - Debug with a `launch.json` entry of type `csharpshooter` (`program`, `args`, `cwd`, `env`, `stopAtEntry`,
   `justMyCode`, `console`; `attach` takes `processId`).
+- While debugging, a `DataTable`, `DataSet` or `DataView` has a magnifier beside it in Variables and Watch (and a
+  *Wizualizator DataTable* entry in their context menu), as Visual Studio's DataSet visualizer: its rows in a table read
+  from the stopped program a page (200 rows) at a time as it is scrolled, *Tabela:* to pick a DataSet's table,
+  *Filtruj*, sorting by a header (*Rosnąco*/*Malejąco*), *Kopiuj* / *Kopiuj wszystko* (tab-separated, for Excel) and
+  *Eksportuj do pliku CSV...*. It evaluates C# in the frame (one LINQ expression a page, row by row where that fails) and
+  loads System.Linq and System.Data.Common into the program first if it has not. No editing of cells (VS has it).
 - While debugging, an EF Core query (a `DbSet`, a LINQ query over one) opened in Variables or a watch shows a `SQL` row:
   the SQL it would run, read only as it is opened.
 - `csharpShooter.razorViewsInDesignTime` (on by default) gives the server's Razor every `.cshtml` even when a project
