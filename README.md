@@ -186,7 +186,10 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check; `CHECKS_FILE=checks.json` replaces the checks.
+`SKIP_DEBUG=1` skips the debugging check; `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
+`[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
+their place.
 
 ## Not done
 

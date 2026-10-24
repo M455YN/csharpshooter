@@ -4,3 +4,5 @@ server/
 debugger/
 *.vsix
 .vscode-test/
+# Local name map for the tests (NAMES_FILE)
+test/names.local.json
