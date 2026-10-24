@@ -13,7 +13,8 @@ const { runTests } = require('@vscode/test-electron');
   // The workspace's own tasks (runOn: folderOpen) stay off while the tests run.
   fs.mkdirSync(path.join(profile, 'data', 'User'), { recursive: true });
   fs.writeFileSync(path.join(profile, 'data', 'User', 'settings.json'), JSON.stringify({
-    'task.allowAutomaticTasks': 'off',
+    // AUTOMATIC_TASKS=on lets the workspace's tasks.json start its runOn: folderOpen tasks, as a person's editor does.
+    'task.allowAutomaticTasks': process.env.AUTOMATIC_TASKS === 'on' ? 'on' : 'off',
     ...(process.env.DEBUGGER_PATH ? { 'csharpShooter.debuggerPath': process.env.DEBUGGER_PATH } : {}),
   }));
   try {
