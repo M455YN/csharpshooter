@@ -546,6 +546,76 @@ async function searchChecks(api, ext) {
   return results;
 }
 
+// The full-screen search, as VS's "Szukaj wszędzie" with Find in Files: its filters and prefixes, symbols from the
+// language server, text through ripgrep with VS's options, scope and file types, Find in Files' summary, the panel.
+async function searchEverywhereChecks(api) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const { search, parseQuery, state } = api.searchEverywhere;
+  const p = (q) => JSON.stringify(parseQuery(q, 'code'));
+  expect('prefixes f: t: m: pick the filter, as in VS', parseQuery('f:Login', 'code').filter === 'files' && parseQuery('t: Login', 'code').filter === 'types'
+    && parseQuery('m:Check', 'text').filter === 'members' && parseQuery('Login', 'text').filter === 'text', ['f:Login', 't: Login', 'm:Check'].map(p).join(' | '));
+  const labels = (r, g) => (r.groups[g] || []).map((i) => i.label);
+
+  let r = await search('f:LoginViewModel');
+  expect('Pliki (f:): the solution\'s files by name, from the index', labels(r, 'files').filter((l) => l === 'LoginViewModel.cs').length === 2 && !r.groups.types,
+    `${labels(r, 'files').join(', ')} | ${r.summary}`);
+  // The language server may still be indexing: asked again for a while.
+  for (let i = 0; i < 30 && !(r = await search('t:LoginViewModel')).groups.types?.length; i++) await sleep(1000);
+  const type = r.groups.types?.find((i) => i.label === 'LoginViewModel');
+  expect('Typy (t:): classes from the language server, kind and file', type && type.detail.startsWith('klasa') && type.path.endsWith('LoginViewModel.cs') && type.line > 0,
+    (r.groups.types || []).map((i) => `${i.label} [${i.detail}]:${i.line}`).slice(0, 4).join(' | '));
+  r = await search('m:CheckRightsExpr');
+  const member = r.groups.members?.find((i) => i.label.startsWith('CheckRightsExpr'));
+  expect('Elementy członkowskie (m:): methods, not types', member && member.detail.startsWith('metoda') && member.path.endsWith('RightsChecker.cs') && !r.groups.types,
+    (r.groups.members || []).map((i) => `${i.label} [${i.detail}]`).slice(0, 3).join(' | '));
+  r = await search('LoginViewModel', { filter: 'code' });
+  expect('Kod: files, types and members together', r.groups.files?.length >= 2 && r.groups.types?.length >= 1 && 'members' in r.groups, r.summary);
+
+  r = await search('CheckRightsExpr', { filter: 'text' });
+  const textLines = r.groups.text || [];
+  expect("Tekst: Find in Files' lines and its summary", textLines.length >= 10 && /^Pasujące wiersze: \d+ {4}Pasujące pliki: \d+ {4}Łączna liczba przeszukanych plików: \d+$/.test(r.summary)
+    && textLines.every((l) => l.label.slice(l.ranges[0]?.[0], l.ranges[0]?.[1]) === 'CheckRightsExpr'), r.summary);
+  const all = textLines.length;
+  r = await search('checkrightsexpr', { filter: 'text', matchCase: true });
+  const lower = r.groups.text?.length || 0;
+  r = await search('checkrightsexpr', { filter: 'text' });
+  expect('Uwzględnij wielkość liter: on, the lowercase query finds nothing; off, all', lower === 0 && r.groups.text?.length === all, `on: ${lower}, off: ${r.groups.text?.length}, CheckRightsExpr: ${all}`);
+  r = await search('CheckRights\\w+\\(conditions', { filter: 'text', regex: true });
+  const viaRegex = r.groups.text || [];
+  expect('Użyj wyrażeń regularnych', viaRegex.length > 0 && viaRegex.length < all && viaRegex.every((l) => /CheckRights\w+\(conditions/.test(l.label)), `${viaRegex.length} lines: ${viaRegex[0]?.label}`);
+  r = await search('CheckRights', { filter: 'text', wholeWord: true });
+  const words = r.groups.text || [];
+  expect('Dopasuj całe wyrazy: CheckRights is not CheckRightsExpr', words.every((l) => !/CheckRightsExpr/.test(l.label.slice(l.ranges[0]?.[0] ?? 0))), `${words.length} lines (CheckRightsExpr: ${all})`);
+  r = await search('CheckRightsExpr', { filter: 'text', fileTypes: '*.cshtml' });
+  expect('Typy plików: only those files', (r.groups.text || []).every((l) => l.path.endsWith('.cshtml')) && (r.groups.text || []).length < all, `${(r.groups.text || []).length} lines in .cshtml`);
+  const checker = vscode.Uri.file(member.path); // the one the language server knows (copies of it are synced into other projects)
+  await vscode.window.showTextDocument(checker);
+  r = await search('CheckRightsExpr', { filter: 'text', scope: 'document' });
+  expect('Szukaj w: Bieżący dokument', (r.groups.text || []).length > 0 && r.groups.text.every((l) => l.path.toLowerCase() === checker.fsPath.toLowerCase()), r.summary);
+  r = await search('CheckRightsExpr', { filter: 'text', scope: 'project' });
+  const projectDir = path.dirname(checker.fsPath).toLowerCase().split(/[\\/]authorization/)[0];
+  expect('Szukaj w: Bieżący projekt', (r.groups.text || []).length > 0 && r.groups.text.every((l) => l.path.toLowerCase().startsWith(projectDir)) && r.groups.text.length < all, r.summary);
+  r = await search('(', { filter: 'text', regex: true });
+  const bad = r.message;
+  r = await search('Search Solution Explorer', { filter: 'features' });
+  expect('Funkcje: commands by title, and settings and the palette for the rest', labels(r, 'features').includes('Solution: Search Solution Explorer')
+    && labels(r, 'features').some((l) => l.startsWith('Ustawienia')) && !!bad, `${labels(r, 'features').slice(0, 3).join(' | ')}; bad regex: ${bad}`);
+
+  // The panel: opened by Ctrl+T's command with a query, drawn, then Find in Files (Ctrl+Shift+F) on it.
+  await vscode.commands.executeCommand('csharpShooter.searchEverywhere', 'LoginViewModel');
+  for (let i = 0; i < 40 && !(state.ready && state.last?.query === 'LoginViewModel'); i++) await sleep(250);
+  const shownCode = state.ready && state.last?.query === 'LoginViewModel';
+  if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-everywhere.png'));
+  await vscode.commands.executeCommand('csharpShooter.findInFiles', 'CheckRightsExpr');
+  for (let i = 0; i < 40 && !(state.last?.filter === 'text' && state.last?.summary); i++) await sleep(250);
+  expect('the panel (Ctrl+T, Ctrl+Shift+F) searches as it is typed into', shownCode && state.last?.filter === 'text' && state.last.summary.startsWith('Pasujące wiersze'),
+    `ready: ${state.ready}, last: ${state.last?.filter} "${state.last?.query}" ${state.last?.summary}`);
+  if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-find-in-files.png'));
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  return results;
+}
+
 async function screenshot(file) {
   await sleep(1500);
   const script = `
@@ -640,6 +710,12 @@ async function run() {
     for (const r of await solutionChecks(api.solutionView)) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  solution view: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.everywhere || (!process.env.CHECKS_FILE && process.env.SKIP_EVERYWHERE !== '1')) {
+    for (const r of await searchEverywhereChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  search everywhere: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.search || (!process.env.CHECKS_FILE && process.env.SKIP_SEARCH !== '1')) {
