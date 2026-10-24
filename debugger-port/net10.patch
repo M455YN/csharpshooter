@@ -1,5 +1,5 @@
 diff --git a/Directory.Build.props b/Directory.Build.props
-index ef9fef0..4eec602 100644
+index 4f0f6eb..9676e87 100644
 --- a/Directory.Build.props
 +++ b/Directory.Build.props
 @@ -1,7 +1,7 @@
@@ -9,13 +9,13 @@ index ef9fef0..4eec602 100644
 -    <TargetFramework>net11.0</TargetFramework>
 +    <TargetFramework>net10.0</TargetFramework>
      <!-- What a package says it is (tools/package-mac.sh) until a vX.Y.Z tag on the commit names the version. -->
-     <Version>0.1.0</Version>
+     <Version>0.2.0</Version>
      <Nullable>enable</Nullable>
 diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
-index 769a134..687ed98 100644
+index 22a28d4..e1c51e2 100644
 --- a/src/Passenger.Core/ChildProcesses.cs
 +++ b/src/Passenger.Core/ChildProcesses.cs
-@@ -369,10 +369,7 @@ public static class ChildProcesses
+@@ -384,10 +384,7 @@ public static class ChildProcesses
          start.RedirectStandardInput = true;
          start.RedirectStandardOutput = true;
          start.RedirectStandardError = true;
@@ -25,7 +25,7 @@ index 769a134..687ed98 100644
 -        }
 +        // shortcut: .NET 10 has no StartDetached, so off Windows it stays in our session; the debug adapter never calls this.
          using Process process = Process.Start(start) ?? throw new InvalidOperationException($"{start.FileName} did not start");
-         Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory));
+         Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory) { Start = start });
          // What it writes is nobody's: its pipes closed here, its writes to them fail, which .NET's console passes over.
 diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
 index e7489b6..c9b129e 100644
@@ -143,7 +143,7 @@ index e7489b6..c9b129e 100644
 +    }
  }
 diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
-index d9c6e24..252ba41 100644
+index 9c0c36d..07faf33 100644
 --- a/src/Passenger.DebugAdapter/DebugAdapter.cs
 +++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
 @@ -263,6 +263,8 @@ public sealed partial class DebugAdapter
@@ -164,6 +164,20 @@ index d9c6e24..252ba41 100644
          connection.Handle<ThreadArguments, ExceptionInfoResponse>(DapCommands.ExceptionInfo, ExceptionInfo);
          // Not under the engine's lock: a program waiting for input may be running, and the write is all.
          connection.Handle<InputArguments>(DapCommands.Input, arguments =>
+diff --git a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
+index aaec179..ef545fe 100644
+--- a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
++++ b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
+@@ -17,7 +17,8 @@ namespace Passenger.Debugger.Interop;
+ [GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
+ [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+ [Guid("BADB5F70-58DA-43A9-A1C6-D74819F19B15")]
+-public partial interface IMetaDataTables2 : IMetaDataTables
++// unsafe: .NET 10's COM generator re-declares the base interface's pointer methods here without it.
++public unsafe partial interface IMetaDataTables2 : IMetaDataTables
+ {
+     /// <summary>
+     /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
 index 5211875..29d6432 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
@@ -355,17 +369,3 @@ index 5211875..29d6432 100644
 +    [return: MarshalAs(UnmanagedType.Bool)]
 +    private static partial bool CloseHandle(nint handle);
  }
-diff --git a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
-index aaec179..ef545fe 100644
---- a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
-+++ b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
-@@ -17,7 +17,8 @@ namespace Passenger.Debugger.Interop;
- [GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
- [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
- [Guid("BADB5F70-58DA-43A9-A1C6-D74819F19B15")]
--public partial interface IMetaDataTables2 : IMetaDataTables
-+// unsafe: .NET 10's COM generator re-declares the base interface's pointer methods here without it.
-+public unsafe partial interface IMetaDataTables2 : IMetaDataTables
- {
-     /// <summary>
-     /// <para>Gets the size and contents of the metadata stored in the specified section.</para>

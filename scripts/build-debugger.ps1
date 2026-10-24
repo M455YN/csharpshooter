@@ -3,7 +3,7 @@
 #   powershell -File scripts/build-debugger.ps1 [-Commit <sha>] [-Runtime win-x64]
 param(
     # Passenger's 0.2.0 is a branch that moves on, not a tag: the patch is made against this commit of it.
-    [string]$Commit = '7e647fa18055b2d8e1c95982f000cb5357cd0be0',
+    [string]$Commit = 'b4a6eb16c81f1e647321a1fde5a287fabc6f584c',
     [string]$Runtime = 'win-x64'
 )
 $ErrorActionPreference = 'Stop'
