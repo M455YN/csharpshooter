@@ -90,6 +90,11 @@
             "Never add them (they stay under '.NET (CSharpShooter)...' in Select and Start Debugging)."
           ],
           "description": "Put the projects' launchSettings.json profiles (e.g. 'WebApp: WebApp Development') in .vscode/launch.json, so the Run and Debug dropdown lists them as Visual Studio's start button does. VS Code lists only launch.json's configurations there."
+        },
+        "csharpShooter.solutionSearch.fileContents": {
+          "type": "boolean",
+          "default": false,
+          "description": "Solution Explorer's search also looks in the files' contents (ripgrep), as Visual Studio's 'Search within file contents'. Off by default, as there: only names."
         }
       }
     },
@@ -105,14 +110,22 @@
     "views": {
       "csharpShooter": [
         {
+          "type": "webview",
+          "id": "csharpShooter.search",
+          "name": "Wyszukaj",
+          "initialSize": 1
+        },
+        {
           "id": "csharpShooter.solution",
           "name": "Solution Explorer",
-          "icon": "media/solution-explorer.svg"
+          "icon": "media/solution-explorer.svg",
+          "initialSize": 12
         },
         {
           "id": "csharpShooter.taskRunner",
           "name": "Eksplorator modułu uruchamiającego zadania",
-          "icon": "$(checklist)"
+          "icon": "$(checklist)",
+          "initialSize": 6
         }
       ]
     },
@@ -288,6 +301,12 @@
         "title": "Uruchom projekt startowy bez debugowania",
         "category": "CSharpShooter",
         "icon": "$(run)"
+      },
+      {
+        "command": "csharpShooter.solution.search",
+        "title": "Search Solution Explorer",
+        "icon": "$(search)",
+        "category": "Solution"
       }
     ],
     "menus": {
@@ -695,6 +714,13 @@
             }
           }
         ]
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "csharpShooter.solution.search",
+        "key": "ctrl+;",
+        "mac": "cmd+;"
       }
     ]
   },

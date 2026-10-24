@@ -110,6 +110,13 @@ class SolutionProvider {
     this.onDidChangeTreeData = this.changed.event;
     this.parents = new Map(); // item id -> parent item, for reveal
     this.startupProject = undefined; // marked as VS marks it (bold there, "projekt startowy" here)
+    // The search's result, as VS filters its tree: { gen, hits: Map(lower path -> { ranges, lines }), keep: Set(lower path) }.
+    this.filter = null;
+  }
+
+  setFilter(filter) {
+    this.filter = filter;
+    this.refresh();
   }
 
   setStartup(project) {
@@ -144,7 +151,8 @@ class SolutionProvider {
       this.solution = readSolution(file);
       const count = countProjects(this.solution);
       return this.remember(undefined, [new Item('solution', `Solution '${this.solution.name}'`, EXPANDED, {
-        id: `sln:${file}`, description: `${count} project${count === 1 ? '' : 's'}`, node: this.solution, file,
+        // A filtered tree has ids of its own, so its folders open expanded whatever the user had collapsed.
+        id: this.filter ? `sln?${this.filter.gen}:${file}` : `sln:${file}`, filter: this.filter, description: `${count} project${count === 1 ? '' : 's'}`, node: this.solution, file,
         iconPath: icon('symbol-namespace', 'charts.purple'), contextValue: 'solution', tooltip: file,
       })]);
     }
@@ -152,20 +160,23 @@ class SolutionProvider {
   }
 
   childrenOf(item) {
+    const f = item.filter; // set on the items of a filtered tree, except under a hit (a hit shows all it holds)
+    const kept = (p) => !f || f.keep.has(p.toLowerCase()) || f.hits.has(p.toLowerCase());
     switch (item.kind) {
       case 'solution':
       case 'solutionFolder':
         return [
-          ...item.node.folders.sort((a, b) => a.name.localeCompare(b.name)).map((f) => new Item('solutionFolder', f.name, COLLAPSED, {
-            id: `${item.id}/${f.name}`, node: f, iconPath: YELLOW_FOLDER, contextValue: 'solutionFolder',
-          })),
-          ...item.node.projects.sort((a, b) => path.basename(a).localeCompare(path.basename(b))).map((p) => this.projectItem(p)),
+          ...item.node.folders.filter((x) => !f || countProjectsKept(x, kept)).sort((a, b) => a.name.localeCompare(b.name))
+            .map((x) => new Item('solutionFolder', x.name, f ? EXPANDED : COLLAPSED, {
+              id: `${item.id}/${x.name}`, node: x, iconPath: YELLOW_FOLDER, contextValue: 'solutionFolder', filter: f,
+            })),
+          ...item.node.projects.filter(kept).sort((a, b) => path.basename(a).localeCompare(path.basename(b))).map((p) => this.projectItem(p, f)),
         ];
       case 'project': {
         const dir = path.dirname(item.file);
         return [
-          new Item('dependencies', 'Dependencies', COLLAPSED, { id: `${item.id}#deps`, file: item.file, iconPath: icon('references', 'charts.purple') }),
-          ...this.folderChildren(dir, item.id, item.file),
+          ...(f ? [] : [new Item('dependencies', 'Dependencies', COLLAPSED, { id: `${item.id}#deps`, file: item.file, iconPath: icon('references', 'charts.purple') })]),
+          ...this.folderChildren(dir, item.id, item.file, f),
         ];
       }
       case 'dependencies': {
@@ -188,15 +199,21 @@ class SolutionProvider {
           ...(d.file ? { command: { command: 'csharpShooter.solution.revealProject', title: 'Show project', arguments: [d.file] } } : {}),
         }));
       case 'folder':
-        return this.folderChildren(item.resourceUri.fsPath, item.id, item.project);
+        return this.folderChildren(item.resourceUri.fsPath, item.id, item.project, f);
       case 'file':
-        return item.nested.map((f) => this.fileItem(f, item.id, path.dirname(item.resourceUri.fsPath)));
+        return [
+          ...item.nested.map((n) => this.fileItem(n, item.id, path.dirname(item.resourceUri.fsPath), f)),
+          ...item.lines.map((l) => new Item('line', { label: l.text, highlights: [l.range] }, NONE, {
+            id: `${item.id}:${l.line}`, description: `${l.line}`, iconPath: icon('search'),
+            command: { command: 'vscode.open', title: 'Open', arguments: [item.resourceUri, { selection: new vscode.Range(l.line - 1, l.range[0], l.line - 1, l.range[1]) }] },
+          })),
+        ];
       default:
         return [];
     }
   }
 
-  projectItem(file) {
+  projectItem(file, f) {
     let sdk = '';
     let runnable = false;
     try {
@@ -207,8 +224,9 @@ class SolutionProvider {
     }
     const name = path.basename(file, path.extname(file));
     const startup = !!this.startupProject && path.resolve(this.startupProject).toLowerCase() === path.resolve(file).toLowerCase();
-    return new Item('project', name, COLLAPSED, {
-      id: `proj:${file}`, file, resourceUri: vscode.Uri.file(file), tooltip: file,
+    const hit = f?.hits.has(file.toLowerCase());
+    return new Item('project', name, f && !hit ? EXPANDED : COLLAPSED, {
+      id: `proj${f ? `?${f.gen}` : ''}:${file}`, file, filter: hit ? null : f, resourceUri: vscode.Uri.file(file), tooltip: file,
       // "project", " runnable" when it can be a startup project (an Exe or a web project, as VS has it), " startup" when it is.
       contextValue: ['project', ...(runnable ? ['runnable'] : []), ...(startup ? ['startup'] : [])].join(' '),
       description: [sdk.endsWith('.Web') ? 'web' : '', startup ? 'projekt startowy' : ''].filter(Boolean).join(' · ') || undefined,
@@ -216,7 +234,7 @@ class SolutionProvider {
     });
   }
 
-  folderChildren(dir, parentId, project) {
+  folderChildren(dir, parentId, project, f) {
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -228,22 +246,36 @@ class SolutionProvider {
     const files = entries.filter((e) => e.isFile() && !isHiddenFile(e.name) && !/\.(cs|vb|fs)proj$/i.test(e.name)).map((e) => e.name);
     const parents = nestingParents(files);
     const top = files.filter((f) => !parents.has(f)).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    const nestedUnder = (name) => files.filter((f) => parents.get(f) === name).map((f) => ({ name: f, nested: nestedUnder(f) }));
+    const nestedUnder = (name) => files.filter((x) => parents.get(x) === name).map((x) => ({ name: x, nested: nestedUnder(x) }));
+    const hitOf = (name) => f?.hits.get(path.join(dir, name).toLowerCase());
+    const keepFile = (e) => !!hitOf(e.name) || e.nested.some(keepFile);
     return [
-      ...folders.map((f) => new Item('folder', f, COLLAPSED, {
-        id: `${parentId}/${f}`, resourceUri: vscode.Uri.file(path.join(dir, f)), contextValue: 'folder', project, iconPath: folderIcon(f),
+      ...folders.filter((x) => !f || f.keep.has(path.join(dir, x).toLowerCase()) || hitOf(x)).map((x) => new Item('folder', label(x, hitOf(x)), f && !hitOf(x) ? EXPANDED : COLLAPSED, {
+        id: `${parentId}/${x}`, resourceUri: vscode.Uri.file(path.join(dir, x)), contextValue: 'folder', project, iconPath: folderIcon(x), filter: hitOf(x) ? null : f,
       })),
-      ...top.map((f) => this.fileItem({ name: f, nested: nestedUnder(f) }, parentId, dir)),
+      ...top.map((x) => ({ name: x, nested: nestedUnder(x) })).filter((e) => !f || keepFile(e)).map((e) => this.fileItem(e, parentId, dir, f)),
     ];
   }
 
-  fileItem(entry, parentId, dir) {
+  fileItem(entry, parentId, dir, f) {
     const full = path.join(dir, entry.name);
-    return new Item('file', entry.name, entry.nested.length ? COLLAPSED : NONE, {
-      id: `${parentId}/${entry.name}`, resourceUri: vscode.Uri.file(full), contextValue: 'file', nested: entry.nested,
+    const hit = f?.hits.get(full.toLowerCase());
+    const keepFile = (e) => !!f.hits.get(path.join(dir, e.name).toLowerCase()) || e.nested.some(keepFile);
+    // Under a file whose name matched, its nested files all show; else only those on the way to a hit.
+    const nested = f && !hit?.ranges.length ? entry.nested.filter(keepFile) : entry.nested;
+    const lines = hit?.lines || [];
+    return new Item('file', label(entry.name, hit), nested.length || lines.length ? (f ? EXPANDED : COLLAPSED) : NONE, {
+      id: `${parentId}/${entry.name}`, resourceUri: vscode.Uri.file(full), contextValue: 'file', nested, lines, filter: f,
       command: { command: 'vscode.open', title: 'Open', arguments: [vscode.Uri.file(full)] },
     });
   }
+}
+
+// A name the search matched, its matches highlighted.
+const label = (name, hit) => (hit?.ranges.length ? { label: name, highlights: hit.ranges } : name);
+
+function countProjectsKept(node, kept) {
+  return node.projects.some(kept) || node.folders.some((x) => countProjectsKept(x, kept));
 }
 
 function countProjects(node) {

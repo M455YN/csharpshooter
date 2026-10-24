@@ -154,8 +154,24 @@ Right-click a project or folder → **Add**:
   where the language server finds it. Namespace = `RootNamespace` + folders; file-scoped or block namespace and line
   endings follow the project's own files.
 
+### Search
+
+A box above the tree, as VS's (*Przeszukaj: Solution Explorer (Ctrl+;)*; **Ctrl+;** goes to it). As you type, the tree
+shows only the items whose names match, their folders and projects open, the matches highlighted; Enter or ↓ goes to
+the first; Esc or ✕ brings the whole tree back. Names match as in VS: every word of the query in the name (`"a phrase"`
+as one), case only when the query has a capital, and a single all-capitals word also by the name's letters in order
+(`HC` finds `HomeController.cs`). They come from an index kept in memory, built once and then kept up to date by the
+files created and deleted, so a search takes milliseconds.
+
+▾ → **Szukaj w zawartościach plików** (`csharpShooter.solutionSearch.fileContents`, off by default as in VS) adds the
+files whose text holds the query, its lines under them (click one to go there): ripgrep, the one the editor ships, over
+the projects' folders without `bin`, `obj`, `node_modules` and binary files (about half a second on a solution of
+10 000 files). VS adds classes and methods there, from its language services; this adds text.
+
 Not like VS (yet): files a project includes from outside its folder or removes with `<Compile Remove>` show as on disk;
-no drag and drop, rename, other item templates, NuGet manager or startup project.
+no drag and drop, rename, other item templates or NuGet manager; the search has no *Wyszukuj wśród elementów
+zewnętrznych* (VS's External Dependencies) and no index saved between sessions. VS Code gives a view above the tree at
+least 120 px, so the box has room below it (the result count goes there).
 
 ## Task Runner Explorer
 
@@ -186,7 +202,7 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check; `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
