@@ -102,6 +102,13 @@ at `launchUrl` once the app listens: its port accepts a connection, or its conso
 `IISExpress` profile runs on Kestrel at the IIS Express URLs (`iisSettings`), since IIS Express runs only under Visual
 Studio. If the profile's port is taken before the start, a warning says so.
 
+A notification at the bottom right says what is going on until the browser opens, as VS says it in its status bar:
+*Kompilacja rozpoczęta…*, *Przywracanie pakietów NuGet…*, a project's own targets (*Contoso.Core: PreBuild…*, a gulp target),
+*Kompilowanie X…*, *X — skompilowano*, with the errors and warnings so far, then *Kompilacja zakończyła się powodzeniem*,
+*Uruchamianie z debugerem…* (or *bez debugowania*), *Czekanie, aż aplikacja zacznie nasłuchiwać (url)…*, *Otwieranie
+przeglądarki…*. Its **Cancel** stops the build. The stages come from MSBuild's file log (`-flp`, normal verbosity, a temporary
+file), read as it is written; the terminal keeps MSBuild's own output. Solution Explorer's Build and Rebuild show it too.
+
 The Run and Debug dropdown lists only `launch.json`'s configurations (an extension's own wait behind *.NET
 (CSharpShooter)...* in Select and Start Debugging), so CSharpShooter offers, once per workspace, to add the profiles to
 `.vscode/launch.json` as entries like the one below; *Add Launch Profiles to Run and Debug* in the Command Palette adds
