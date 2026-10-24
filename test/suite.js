@@ -711,6 +711,74 @@ async function razorTypingChecks() {
   return results;
 }
 
+// The DataTable visualizer at a breakpoint: a table the program makes (a helper of the solution's own: 450 rows of
+// Value and Sort), read a page at a time; its filter and sort; copy and CSV; a DataView of it; a DataSet's tables.
+async function visualizerChecks(api, session, frameId) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const viz = api.dataVisualizer;
+  const table = 'Contoso.Core.Grid.GridViewModel.GetGridMultiSelectDataTableSortableParameters(System.Linq.Enumerable.Cast<object>(System.Linq.Enumerable.Range(1, 450)))';
+  const typeOf = async (expression) => {
+    try {
+      const r = await session.customRequest('evaluate', { expression, frameId, context: 'watch' });
+      return r.type;
+    } catch (e) {
+      return `error: ${e.message}`;
+    }
+  };
+  const until = async (test, ms = 60000) => {
+    for (let t = 0; t < ms && !test(); t += 250) await sleep(250);
+    return test();
+  };
+  // At Program.Main the program has not loaded these yet; the visualizer loads System.Linq and System.Data.Common itself.
+  await viz.loadAssemblies(session, frameId, ['System.Data.Common', 'System.Linq', 'Contoso.Core']);
+  const type = await typeOf(table);
+  const when = vscode.extensions.getExtension('local.csharpshooter').packageJSON.contributes.menus['debug/variables/context'].find((m) => m.command === 'csharpShooter.visualizeData').when;
+  const typeTest = new RegExp(/variableType =~ \/(.*)\/$/.exec(when)[1]);
+  expect('the magnifier is offered for the type the debugger reports', viz.kindOf(type) === 'DataTable' && typeTest.test(type) && !typeTest.test('System.Data.DataTableReader'), `${type}; ${when}`);
+
+  const entry = await viz.open({ evaluateName: table, name: 'parameters', type }, session, frameId);
+  if (!entry) return results;
+  await until(() => entry?.said.loaded === 200);
+  const first = { ...entry.said };
+  expect('opens with the columns and a first page of rows, VS\'s status', first.columns?.join() === 'Value,Sort' && first.count === 450 && first.loaded === 200
+    && first.first === '1|1' && first.status === 'Razem wierszy: 450', `${JSON.stringify(first)}; pages by ${entry.source.perRow ? 'row' : 'one LINQ expression'}`);
+  await entry.request({ type: 'more' });
+  await until(() => entry.said.loaded === 400);
+  const page = await entry.source.rows(0, 400, 50);
+  expect('scrolled on: the next page; any page read from the program', entry.said.loaded === 400 && page.length === 50 && page[0].cells.join() === '401,401',
+    `loaded ${entry.said.loaded}, rows 401-450: ${page.length}, first ${page[0]?.cells}`);
+  entry.panel.webview.postMessage({ type: 'typeFilter', text: '44' });
+  await until(() => entry.said.filter === '44' && entry.said.loaded === 450);
+  const filtered = { ...entry.said };
+  entry.panel.webview.postMessage({ type: 'typeFilter', text: '' });
+  entry.panel.webview.postMessage({ type: 'clickHeader', col: 1 });
+  entry.panel.webview.postMessage({ type: 'clickHeader', col: 1 });
+  await until(() => entry.said.sortDir === -1);
+  expect('Filtruj fetches the rest and keeps the rows that have it; a header sorts (Malejąco)', filtered.shown === 14 && entry.said.first === '450|450',
+    `filter "44": ${filtered.shown} of ${filtered.loaded}; sorted down, first: ${entry.said.first}`);
+  const text = viz.csv(await entry.source.columns(0), await entry.source.rows(0, 0, 3));
+  expect('CSV as VS writes it: the header, a row per line', text === 'Value,Sort\r\n1,1\r\n2,2\r\n3,3\r\n', JSON.stringify(text));
+  if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-datatable.png'));
+  entry.panel.dispose();
+
+  const viewType = await typeOf(`new System.Data.DataView(${table})`);
+  const view = await viz.open({ evaluateName: `new System.Data.DataView(${table})`, name: 'view', type: viewType }, session, frameId);
+  await until(() => view?.said.loaded === 200);
+  expect('a DataView: its rows', viz.kindOf(viewType) === 'DataView' && view.said.count === 450 && view.said.first === '1|1', `${viewType}: ${JSON.stringify(view?.said)}`);
+  view?.panel.dispose();
+
+  const setExpression = 'new System.Data.DataSet("Zestaw").Tables.Add("Pierwsza").DataSet';
+  const setType = await typeOf(setExpression);
+  const set = await viz.open({ evaluateName: setExpression, name: 'set', type: setType }, session, frameId);
+  await until(() => set?.said.count === 0 && set.said.columns);
+  const tables = await set?.source.tables();
+  expect('a DataSet: its tables to choose from, an empty one said so', viz.kindOf(setType) === 'DataSet' && tables?.map((t) => t.name).join() === 'Pierwsza' && set.said.count === 0,
+    `${setType}: tables ${tables?.map((t) => t.name)}, ${JSON.stringify(set?.said)}`);
+  set?.panel.dispose();
+  return results;
+}
+
 async function screenshot(file) {
   await sleep(1500);
   const script = `
@@ -764,6 +832,7 @@ async function launchChecks(api, profileName) {
     const environment = await read('ASPNETCORE_ENVIRONMENT');
     const urls = await read('ASPNETCORE_URLS');
     expect('profile environment applied', environment === '"Development"' && urls.includes('https://localhost:44308'), `ASPNETCORE_ENVIRONMENT=${environment}, ASPNETCORE_URLS=${urls}`);
+    if (!process.env.SKIP_VISUALIZER) for (const r of await visualizerChecks(api, session, frame.id)) results.push({ ...r, name: `visualizer: ${r.name}` });
     await session.customRequest('continue', { threadId: body.threadId });
     let ended = false;
     const end = vscode.debug.onDidTerminateDebugSession((s) => s.id === session.id && (ended = true));
