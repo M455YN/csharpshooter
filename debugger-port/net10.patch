@@ -142,11 +142,33 @@ index e7489b6..c9b129e 100644
 +        private static partial bool AssignProcessToJobObject(nint job, nint process);
 +    }
  }
+diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
+index d9c6e24..252ba41 100644
+--- a/src/Passenger.DebugAdapter/DebugAdapter.cs
++++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
+@@ -263,6 +263,8 @@ public sealed partial class DebugAdapter
+                 return Task.CompletedTask;
+             });
+         }, then: RequestShutdown);
++        // Terminated follows the answer, as the protocol has it: the engine lets go of the runtime before its exit callback
++        // can say so, and VS Code holds the session (and the next F5 of it) open until it hears terminated.
+         connection.Handle<TerminateArguments>(DapCommands.Terminate, _ =>
+         {
+             debugger.Ending();
+@@ -271,7 +273,7 @@ public sealed partial class DebugAdapter
+                 debugger.Terminate();
+                 return Task.CompletedTask;
+             });
+-        });
++        }, then: () => connection.SendEvent(DapEvents.Terminated, new TerminatedEvent()));
+         connection.Handle<ThreadArguments, ExceptionInfoResponse>(DapCommands.ExceptionInfo, ExceptionInfo);
+         // Not under the engine's lock: a program waiting for input may be running, and the write is all.
+         connection.Handle<InputArguments>(DapCommands.Input, arguments =>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
-index 5211875..8f4b33e 100644
+index 5211875..29d6432 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
 +++ b/src/Passenger.Debugger/SuspendedLaunch.cs
-@@ -144,53 +144,97 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -144,53 +144,99 @@ public sealed partial class SuspendedLaunch : IDisposable
          }
      }
  
@@ -215,6 +237,8 @@ index 5211875..8f4b33e 100644
 +            }
 +            CloseHandle(started.Process);
 +            Process held = Process.GetProcessById(started.ProcessId);
++            // Its handle opened now, while it is held: a Process found by id reads its exit code through it after the end.
++            _ = held.SafeHandle;
 +            return new SuspendedLaunch(started.ProcessId, started.Thread, held,
 +                new FileStream(parentIn, FileAccess.Write, 1), new FileStream(parentOut, FileAccess.Read, 1), new FileStream(parentErr, FileAccess.Read, 1))
 +            {
@@ -268,7 +292,7 @@ index 5211875..8f4b33e 100644
                  resumed = true;
              }
              return;
-@@ -254,6 +298,11 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -254,6 +300,11 @@ public sealed partial class SuspendedLaunch : IDisposable
      public void Dispose()
      {
          process?.Dispose();
@@ -280,7 +304,7 @@ index 5211875..8f4b33e 100644
          if (resumeHandle != 0)
          {
              DbgShim.CloseResumeHandle(resumeHandle);
-@@ -347,4 +396,50 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -347,4 +398,50 @@ public sealed partial class SuspendedLaunch : IDisposable
      [LibraryImport("kernel32", EntryPoint = "SetHandleInformation", SetLastError = true)]
      [return: MarshalAs(UnmanagedType.Bool)]
      private static partial bool SetHandleInformation(nint handle, uint mask, uint flags);
