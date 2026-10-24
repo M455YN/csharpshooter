@@ -180,6 +180,30 @@ no drag and drop, rename, other item templates or NuGet manager; the search has 
 zewnętrznych* (VS's External Dependencies) and no index saved between sessions. VS Code gives a view above the tree at
 least 120 px, so the box has room below it (the result count goes there).
 
+## Search (Ctrl+T, Ctrl+Shift+F)
+
+Visual Studio 2026's code search (*Szukaj wszędzie*, Ctrl+T) and Find in Files (Ctrl+Shift+F, starting with the selected
+text) in one editor tab, laid out as swiftfind's full-screen search, with VS's Polish texts:
+
+- **Filters**, as VS's: *Kod* (files, types and members together, a few of each with *Pokaż więcej*), *Pliki (f:)*, *Typy
+  (t:)*, *Elementy członkowskie (m:)*; `f:`, `t:`, `m:` typed before the query pick one. Then *Tekst* (Find in Files) and
+  *Funkcje* (VS's Feature Search: the extensions' commands by title, and the query in Settings and in the Command Palette
+  for VS Code's own). Files come from the Solution Explorer's index (the solution's files, at once), types and members
+  from the language server (kind, containing type, file).
+- **Options**: *Uwzględnij wielkość liter*, *Dopasuj całe wyrazy*, *Użyj wyrażeń regularnych* (none set: names match as in
+  the Solution Explorer's search); **Szukaj w**: *Całe rozwiązanie*, *Bieżący projekt*, *Bieżący dokument*, *Wszystkie
+  otwarte dokumenty*; **Typy plików** (`*.cs;*.cshtml`).
+- **Results** as they come (text through the editor's ripgrep), Find in Files' grouped by file; ↑/↓ moves, Enter or
+  a double click opens there, Esc closes. A long line shows from just before its match.
+- **Preview** of the selected result beside or below the list, or hidden (*Przełącz podgląd pionowy / poziomy*, *Ukryj
+  podgląd*), the line and its matches highlighted.
+- **Summary** under them, as Find in Files': *Pasujące wiersze: N  Pasujące pliki: N  Łączna liczba przeszukanych
+  plików: N* (or the count per filter), *Niekompletne wyniki* when cut at 5 000 lines or 500 items; *Ostatnie zapytania*
+  when the box is empty.
+
+Not like VS (yet): no replace, no syntax colours in the preview, no *Zaznaczenie* scope; Ctrl+T and Ctrl+Shift+F take
+VS Code's Go to Symbol in Workspace and Search (rebind them in Keyboard Shortcuts to have those back).
+
 ## Task Runner Explorer
 
 Under the Solution Explorer, after Visual Studio's (its labels are VS's Polish ones: *Eksplorator modułu uruchamiającego
@@ -209,7 +233,7 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
