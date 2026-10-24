@@ -146,7 +146,9 @@ zadania*): each gulpfile of the solution's projects with its tasks (gulp's own `
   bound task moves up or down or is removed (**Przenieś w górę / w dół / Usuń**), as in VS's Bindings tab. The
   gulpfile's `/// <binding ... />` line is written as VS writes it, its BOM and line endings kept.
 - *Otwarcie projektu* (ProjectOpened) bindings start as the workspace opens (`csharpShooter.taskRunner.projectOpenBindings`,
-  on). *Przed kompilacją / Po kompilacji / Oczyszczanie* run around CSharpShooter's builds (F5, Solution Explorer) when
+  on), except a task `.vscode/tasks.json` already starts then (`runOn: folderOpen`, the same gulp task in the same folder,
+  `task.allowAutomaticTasks` not off): that one is left to it, so a watcher never runs twice. A run started elsewhere
+  (tasks.json, Run Task) shows as *uruchomione* in the tree and stops from it. *Przed kompilacją / Po kompilacji / Oczyszczanie* run around CSharpShooter's builds (F5, Solution Explorer) when
   `csharpShooter.taskRunner.buildBindings` is on: off by default, since a project that runs gulp from its `.csproj` when
   built outside Visual Studio (as the sample app does) would run it twice.
 
