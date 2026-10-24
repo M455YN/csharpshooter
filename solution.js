@@ -109,6 +109,12 @@ class SolutionProvider {
     this.changed = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.changed.event;
     this.parents = new Map(); // item id -> parent item, for reveal
+    this.startupProject = undefined; // marked as VS marks it (bold there, "projekt startowy" here)
+  }
+
+  setStartup(project) {
+    this.startupProject = project;
+    this.refresh();
   }
 
   refresh() {
@@ -192,15 +198,20 @@ class SolutionProvider {
 
   projectItem(file) {
     let sdk = '';
+    let runnable = false;
     try {
       sdk = readProject(file).sdk;
+      runnable = sdk.endsWith('.Web') || /<OutputType>\s*(Win)?Exe\s*</i.test(fs.readFileSync(file, 'utf8').replace(/<!--[\s\S]*?-->/g, ''));
     } catch {
       // A project the solution names but the disk does not have: listed, empty.
     }
     const name = path.basename(file, path.extname(file));
+    const startup = !!this.startupProject && path.resolve(this.startupProject).toLowerCase() === path.resolve(file).toLowerCase();
     return new Item('project', name, COLLAPSED, {
-      id: `proj:${file}`, file, resourceUri: vscode.Uri.file(file), contextValue: 'project', tooltip: file,
-      description: sdk.endsWith('.Web') ? 'web' : undefined,
+      id: `proj:${file}`, file, resourceUri: vscode.Uri.file(file), tooltip: file,
+      // "project", " runnable" when it can be a startup project (an Exe or a web project, as VS has it), " startup" when it is.
+      contextValue: ['project', ...(runnable ? ['runnable'] : []), ...(startup ? ['startup'] : [])].join(' '),
+      description: [sdk.endsWith('.Web') ? 'web' : '', startup ? 'projekt startowy' : ''].filter(Boolean).join(' · ') || undefined,
       iconPath: sdk.endsWith('.Web') ? icon('globe', 'charts.blue') : icon('project', 'charts.green'),
     });
   }

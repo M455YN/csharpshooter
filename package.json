@@ -261,6 +261,33 @@
         "command": "csharpShooter.addLaunchProfiles",
         "title": "Add Launch Profiles to Run and Debug",
         "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.startup.setProject",
+        "title": "Ustaw jako projekt startowy",
+        "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.startup.pickProject",
+        "title": "Projekt startowy...",
+        "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.startup.menu",
+        "title": "Profil uruchamiania...",
+        "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.startup.start",
+        "title": "Rozpocznij projekt startowy",
+        "category": "CSharpShooter",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "csharpShooter.startup.startWithoutDebugging",
+        "title": "Uruchom projekt startowy bez debugowania",
+        "category": "CSharpShooter",
+        "icon": "$(run)"
       }
     ],
     "menus": {
@@ -283,48 +310,53 @@
       ],
       "view/item/context": [
         {
+          "command": "csharpShooter.startup.setProject",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project runnable$/",
+          "group": "0_debug@0"
+        },
+        {
           "submenu": "csharpShooter.solution.add",
-          "when": "view == csharpShooter.solution && viewItem =~ /^(project|folder)$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(project|folder)( |$)/",
           "group": "0_add@1"
         },
         {
           "command": "csharpShooter.solution.debugProject",
-          "when": "view == csharpShooter.solution && viewItem == project",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
           "group": "0_debug@1"
         },
         {
           "command": "csharpShooter.solution.build",
-          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)( |$)/",
           "group": "1_build@1"
         },
         {
           "command": "csharpShooter.solution.rebuild",
-          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)( |$)/",
           "group": "1_build@2"
         },
         {
           "command": "csharpShooter.solution.clean",
-          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)( |$)/",
           "group": "1_build@3"
         },
         {
           "command": "csharpShooter.solution.editProject",
-          "when": "view == csharpShooter.solution && viewItem == project",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
           "group": "2_edit@1"
         },
         {
           "command": "csharpShooter.solution.openInTerminal",
-          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)( |$)/",
           "group": "3_open@1"
         },
         {
           "command": "csharpShooter.solution.revealInOS",
-          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)( |$)/",
           "group": "3_open@2"
         },
         {
           "command": "csharpShooter.solution.copyPath",
-          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)( |$)/",
           "group": "4_copy@1"
         },
         {
@@ -477,6 +509,10 @@
         {
           "command": "csharpShooter.taskRunner.removeBinding",
           "when": "false"
+        },
+        {
+          "command": "csharpShooter.startup.setProject",
+          "when": "false"
         }
       ],
       "csharpShooter.taskRunner.bindings": [
@@ -598,6 +634,15 @@
                 "type": "boolean",
                 "default": true,
                 "description": "Open the browser when a profile asks for it, once the app listens."
+              },
+              "startupProject": {
+                "type": "boolean",
+                "default": true,
+                "description": "Run the startup project (status bar, Solution Explorer: Ustaw jako projekt startowy) with its active launch profile (its .csproj.user's ActiveDebugProfile, as Visual Studio keeps it), as VS's F5."
+              },
+              "framework": {
+                "type": "string",
+                "description": "Target framework of a multi-targeted project (its .csproj.user's ActiveDebugFramework for the startup project)."
               }
             }
           },
@@ -630,6 +675,15 @@
           }
         ],
         "configurationSnippets": [
+          {
+            "label": ".NET: startup project (CSharpShooter)",
+            "body": {
+              "name": "Projekt startowy (CSharpShooter)",
+              "type": "csharpshooter",
+              "request": "launch",
+              "startupProject": true
+            }
+          },
           {
             "label": ".NET: launch a project's profile (CSharpShooter)",
             "body": {
