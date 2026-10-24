@@ -38,9 +38,10 @@ function urlsOf({ profile, iis }) {
 }
 
 /** Asks MSBuild what the build writes, so AssemblyName, OutputPath and target framework are the project's own. */
-function msbuildProperties(project, configuration) {
+function msbuildProperties(project, configuration, framework) {
   return new Promise((resolve, reject) => {
-    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', `-p:Configuration=${configuration}`],
+    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', `-p:Configuration=${configuration}`,
+      ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
       { cwd: path.dirname(project), windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
         if (error) return reject(new Error(`dotnet msbuild ${path.basename(project)}: ${stderr || stdout || error.message}`));
         try {
@@ -53,13 +54,13 @@ function msbuildProperties(project, configuration) {
 }
 
 /** Builds the project in a task the person sees, as VS builds on F5; resolves with whether it succeeded. */
-async function build(project, configuration) {
+async function build(project, configuration, framework) {
   // Before Build bindings of the project's gulpfiles (csharpShooter.taskRunner.buildBindings), as VS runs them.
   const { buildBindings } = require('./task-runner');
   if (!(await buildBindings('BeforeBuild', path.dirname(project)))) return false;
   const task = new vscode.Task({ type: 'shell', task: `build ${path.basename(project)}` }, vscode.TaskScope.Workspace,
     `build ${path.basename(project, '.csproj')}`, 'CSharpShooter',
-    new vscode.ShellExecution('dotnet', ['build', project, '-c', configuration], { cwd: path.dirname(project) }), '$msCompile');
+    new vscode.ShellExecution('dotnet', ['build', project, '-c', configuration, ...(framework ? ['-f', framework] : [])], { cwd: path.dirname(project) }), '$msCompile');
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Silent, panel: vscode.TaskPanelKind.Dedicated, clear: true };
   const execution = await vscode.tasks.executeTask(task);
   return new Promise((resolve) => {
@@ -118,18 +119,28 @@ class LaunchProfiles {
 
   /** A configuration that names a project: built, its program found, its profile's environment and URLs applied. */
   async resolveDebugConfigurationWithSubstitutedVariables(folder, config) {
+    // "Projekt startowy (CSharpShooter)": the startup project with its active profile and framework, as VS's F5 runs it.
+    if (config.request === 'launch' && config.startupProject && this.startup) {
+      const now = await this.startup.current();
+      if (!now) {
+        vscode.window.showErrorMessage('No runnable project in this workspace.');
+        return undefined;
+      }
+      config = { ...config, project: now.project, launchProfile: now.profile ?? null, framework: config.framework ?? now.framework,
+        name: `${path.basename(now.project, '.csproj')}: ${now.profile ?? path.basename(now.project, '.csproj')}` };
+    }
     if (config.request !== 'launch' || !config.project) return config;
     const project = path.resolve(folder?.uri.fsPath || '', config.project);
     const configuration = config.configuration || 'Debug';
     if (config.build !== false) {
-      const ok = await build(project, configuration);
+      const ok = await build(project, configuration, config.framework);
       this.state.lastBuild = { project, ok };
       if (!ok) {
         vscode.window.showErrorMessage(`Build of ${path.basename(project)} failed; see the task's terminal and Problems.`);
         return undefined;
       }
     }
-    const props = await msbuildProperties(project, configuration);
+    const props = await msbuildProperties(project, configuration, config.framework);
     const entry = config.launchProfile ? runnableProfiles(project).find((p) => p.name === config.launchProfile) : undefined;
     if (config.launchProfile && !entry) {
       vscode.window.showErrorMessage(`No launch profile "${config.launchProfile}" in ${path.basename(project)} that runs here.`);
@@ -144,7 +155,7 @@ class LaunchProfiles {
     // pass for it to the browser's wait below.
     const portBusy = urls[0] && (await accepts(urls[0]));
     if (portBusy) vscode.window.showWarningMessage(`${urls[0]} is already in use by another process; ${path.basename(project, '.csproj')} may not start there.`);
-    return {
+    const resolved = {
       ...config,
       program: config.program || props.TargetPath,
       cwd: config.cwd || (profile.workingDirectory ? path.resolve(path.dirname(project), profile.workingDirectory) : path.dirname(project)),
@@ -153,6 +164,37 @@ class LaunchProfiles {
       // The browser, as VS opens it: once the app says it listens, at the profile's launchUrl.
       __browser: profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: profile.launchUrl || '', portBusy } : undefined,
     };
+    // Ctrl+F5, as VS's Start Without Debugging: the program in a terminal of its own, no debugger, the browser as F5's.
+    if (config.noDebug) {
+      await runWithoutDebugging(resolved, this.state);
+      return undefined;
+    }
+    return resolved;
+  }
+}
+
+/** Runs a resolved launch without a debugger: a task running the program (dotnet <dll>, or its apphost), then the
+ *  browser once the port answers. The debug session is not started; the task's terminal is the program's console. */
+async function runWithoutDebugging(config, state) {
+  const viaDotnet = /\.dll$/i.test(config.program);
+  const exec = new vscode.ProcessExecution(viaDotnet ? 'dotnet' : config.program, [...(viaDotnet ? [config.program] : []), ...(config.args || [])],
+    { cwd: config.cwd, env: config.env });
+  const label = config.name || path.basename(config.program);
+  const task = new vscode.Task({ type: 'process', task: label }, vscode.TaskScope.Workspace, label, 'CSharpShooter', exec);
+  task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, clear: true };
+  task.isBackground = true;
+  const execution = await vscode.tasks.executeTask(task);
+  state.lastRunWithoutDebugging = { name: label, execution };
+  const browser = config.__browser;
+  if (!browser?.base || browser.portBusy) return;
+  for (let i = 0; i < 300 && vscode.tasks.taskExecutions.includes(execution); i++) {
+    if (await accepts(browser.base)) {
+      const url = `${browser.base.replace(/\/$/, '')}/${browser.path.replace(/^\//, '')}`;
+      state.browserUrl = url;
+      if (!process.env.CSHARPSHOOTER_NO_BROWSER) vscode.env.openExternal(vscode.Uri.parse(url));
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 1000));
   }
 }
 
@@ -209,6 +251,9 @@ async function missingProfileEntries() {
   const out = [];
   for (const folder of vscode.workspace.workspaceFolders || []) {
     const have = vscode.workspace.getConfiguration('launch', folder.uri).get('configurations') || [];
+    if ((await runnableProjects()).length && !have.some((c) => c.type === TYPE && c.startupProject)) {
+      out.push({ folder, entry: require('./startup').startupEntry() });
+    }
     const known = new Set(have.filter((c) => c.type === TYPE && c.launchProfile).map((c) => `${String(c.project).replace(/\\/g, '/').toLowerCase()}|${c.launchProfile}`));
     for (const project of await runnableProjects()) {
       if (!project.toLowerCase().startsWith(folder.uri.fsPath.toLowerCase())) continue;
@@ -270,7 +315,7 @@ function registerLaunch(context) {
       return vscode.debug.startDebugging(folder, configurationFor(item.file, name ?? null));
     }),
   );
-  return { provider, state, runnableProfiles };
+  return { provider, state, runnableProfiles, runnableProjects };
 }
 
-module.exports = { registerLaunch, readLaunchSettings, runnableProfiles, urlsOf };
+module.exports = { registerLaunch, readLaunchSettings, runnableProfiles, runnableProjects, urlsOf };

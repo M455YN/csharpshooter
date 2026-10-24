@@ -8,6 +8,7 @@ const { registerSolutionView } = require('./solution');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
 const { registerTaskRunner } = require('./task-runner');
+const { registerStartup } = require('./startup');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
@@ -125,8 +126,13 @@ async function activate(context) {
   const launch = registerLaunch(context);
   registerCompat(context, output, launch.provider);
   const taskRunner = registerTaskRunner(context, findSolution);
+  const startup = registerStartup(context, findSolution, launch);
+  launch.provider.startup = startup.startup;
+  const markStartup = async () => solutionView.provider.setStartup(await startup.startup.project());
+  startup.startup.onDidChange(markStartup);
+  markStartup();
   await startServer(context);
-  return { whenReady: () => ready, solutionView, launch, taskRunner, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, solutionView, launch, taskRunner, startup, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {

@@ -73,6 +73,24 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   sets `RazorCompileOnBuild=false`; without it such views get no C# help at all. Only the server's design-time builds
   change.
 
+## Startup project and active profile (as Visual Studio)
+
+As in VS 2026, the solution has a startup project and each project an active launch profile, kept where VS keeps them:
+the startup project is read from VS's own `.vs/<solution>/v*/.suo` (so VS's choice carries over; a later change there
+does too), then kept per workspace; the active profile is the project's `.csproj.user` `<ActiveDebugProfile>` (and
+`<ActiveDebugFramework>` for a multi-targeted one), read and written as VS reads and writes it, so a choice holds in both.
+
+- **Status bar**, as VS's toolbar: *$(project) WebApp* picks the startup project; *▷ WebApp Development* opens the
+  start button's menu: *Rozpocznij* (F5), *Uruchom bez debugowania* (Ctrl+F5), the project's profiles, *Platforma (…)*
+  for a multi-targeted project, *Właściwości debugowania …* (its `launchSettings.json`).
+- **Solution Explorer**: the startup project says *projekt startowy*; *Ustaw jako projekt startowy* on a runnable
+  project (an Exe or a web project; a class library gets VS's "cannot be run directly" message).
+- **Run and Debug**: the entry *Projekt startowy (CSharpShooter)* (`"startupProject": true`) always runs the startup
+  project with its active profile; select it once and F5 / Ctrl+F5 do what they do in VS. Ctrl+F5 runs the program
+  without the debugger, in a terminal of its own, and opens the browser as F5 does.
+
+Not yet: several startup projects at once (VS's `.slnLaunch` launch profiles).
+
 ## F5 (launch profiles)
 
 Each runnable project's `Properties/launchSettings.json` profiles are in Run and Debug's list (".NET (CSharpShooter)"),
