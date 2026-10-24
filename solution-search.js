@@ -288,6 +288,9 @@ function registerSolutionSearch(context, findSolution, solutionView) {
   watcher.onDidChange((u) => /\.(csproj|sln|slnx)$/i.test(u.fsPath) && changed(() => (index = undefined)));
   context.subscriptions.push(watcher);
 
+  // ⤢: the same query in the full-screen search, on Tekst when the box looks in the files' contents.
+  const fullscreen = (text) => vscode.commands.executeCommand(config().get('fileContents') ? 'csharpShooter.findInFiles' : 'csharpShooter.searchEverywhere', text || '');
+
   // Enter or Down in the box goes to the first result, as in VS.
   const firstResult = async () => {
     const walk = async (item) => {
@@ -324,6 +327,7 @@ function registerSolutionSearch(context, findSolution, solutionView) {
 <div class="box">
   <input id="q" placeholder="${esc(T.placeholder)}" aria-label="${esc(T.placeholder)}" spellcheck="false">
   <button id="clear" title="Wyczyść" aria-label="Wyczyść">✕</button>
+  <button id="full" title="Wyszukaj na pełnym ekranie (Ctrl+T)" aria-label="Wyszukaj na pełnym ekranie">⤢</button>
   <button id="more" title="Opcje wyszukiwania" aria-label="Opcje wyszukiwania" aria-expanded="false">▾</button>
 </div>
 <div class="status" id="status" aria-live="polite"></div>
@@ -343,6 +347,7 @@ function registerSolutionSearch(context, findSolution, solutionView) {
     if (e.key === 'Escape') { q.value = ''; send(); }
   });
   clear.onclick = () => { q.value = ''; send(); q.focus(); };
+  document.getElementById('full').onclick = () => vscode.postMessage({ type: 'fullscreen', text: q.value });
   document.getElementById('more').onclick = (e) => {
     const open = document.getElementById('options').classList.toggle('open');
     e.currentTarget.setAttribute('aria-expanded', open);
@@ -371,6 +376,7 @@ function registerSolutionSearch(context, findSolution, solutionView) {
         }
         if (m.type === 'query') await search(m.text);
         if (m.type === 'first') await firstResult();
+        if (m.type === 'fullscreen') await fullscreen(m.text);
         if (m.type === 'contents') {
           await config().update('fileContents', m.value, vscode.ConfigurationTarget.Global);
           if (query) await search(query, m.value);
@@ -390,7 +396,7 @@ function registerSolutionSearch(context, findSolution, solutionView) {
     return undefined;
   }));
 
-  return { search, matcher, firstResult, boxShown: () => boxShown, getIndex };
+  return { search, matcher, firstResult, boxShown: () => boxShown, getIndex, fullscreen };
 }
 
 module.exports = { registerSolutionSearch, matcher, terms, grep, ripgrepPath };

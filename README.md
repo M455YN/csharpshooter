@@ -165,7 +165,7 @@ Right-click a project or folder → **Add**:
 
 A box above the tree, as VS's (*Przeszukaj: Solution Explorer (Ctrl+;)*; **Ctrl+;** goes to it). As you type, the tree
 shows only the items whose names match, their folders and projects open, the matches highlighted; Enter or ↓ goes to
-the first; Esc or ✕ brings the whole tree back. Names match as in VS: every word of the query in the name (`"a phrase"`
+the first; Esc or ✕ brings the whole tree back; ⤢ (or the search icon on its title) takes the query to the full-screen search below. Names match as in VS: every word of the query in the name (`"a phrase"`
 as one), case only when the query has a capital, and a single all-capitals word also by the name's letters in order
 (`HC` finds `HomeController.cs`). They come from an index kept in memory, built once and then kept up to date by the
 files created and deleted, so a search takes milliseconds.
@@ -183,7 +183,7 @@ least 120 px, so the box has room below it (the result count goes there).
 ## Search (Ctrl+T, Ctrl+Shift+F)
 
 Visual Studio 2026's code search (*Szukaj wszędzie*, Ctrl+T) and Find in Files (Ctrl+Shift+F, starting with the selected
-text) in one editor tab, laid out as swiftfind's full-screen search, with VS's Polish texts:
+text; ⤢ in the Solution Explorer's box with its query) in one editor tab, laid out as swiftfind's full-screen search, with VS's Polish texts:
 
 - **Filters**, as VS's: *Kod* (files, types and members together, a few of each with *Pokaż więcej*), *Pliki (f:)*, *Typy
   (t:)*, *Elementy członkowskie (m:)*; `f:`, `t:`, `m:` typed before the query pick one. Then *Tekst* (Find in Files) and

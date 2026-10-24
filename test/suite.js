@@ -612,6 +612,12 @@ async function searchEverywhereChecks(api) {
   expect('the panel (Ctrl+T, Ctrl+Shift+F) searches as it is typed into', shownCode && state.last?.filter === 'text' && state.last.summary.startsWith('Pasujące wiersze'),
     `ready: ${state.ready}, last: ${state.last?.filter} "${state.last?.query}" ${state.last?.summary}`);
   if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-find-in-files.png'));
+  // ⤢ in the Solution Explorer's box, and the search icon on its title: the same query in this panel.
+  await api.solutionView.search.fullscreen('HomeController');
+  for (let i = 0; i < 40 && state.last?.query !== 'HomeController'; i++) await sleep(250);
+  const icon = vscode.extensions.getExtension('local.csharpshooter').packageJSON.contributes.menus['view/title'].find((m) => m.command === 'csharpShooter.searchEverywhere');
+  expect('the Solution Explorer box (⤢) and title open it with their query', state.last?.query === 'HomeController' && state.last.groups.files?.length > 0 && icon?.when.includes('csharpShooter.solution'),
+    `"${state.last?.query}" ${state.last?.summary}; title icon: ${icon?.when}`);
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
   return results;
 }
