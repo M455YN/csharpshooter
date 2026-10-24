@@ -5,6 +5,7 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { LanguageClient, State } = require('vscode-languageclient/node');
 const { registerSolutionView } = require('./solution');
+const { registerSolutionSearch } = require('./solution-search');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
 const { registerTaskRunner } = require('./task-runner');
@@ -123,6 +124,7 @@ async function activate(context) {
     await startServer(context);
   }));
   const solutionView = registerSolutionView(context, findSolution);
+  solutionView.search = registerSolutionSearch(context, findSolution, solutionView);
   const launch = registerLaunch(context);
   registerCompat(context, output, launch.provider);
   const taskRunner = registerTaskRunner(context, findSolution);
