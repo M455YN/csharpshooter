@@ -104,6 +104,15 @@ async function debugCheck(d) {
     const top = stack.stackFrames[0];
     if (!top) return { ok: false, got: [`stopped (${body.reason}) on thread ${body.threadId} with no frames`] };
     const value = await session.customRequest('evaluate', { expression: d.evaluate, frameId: top.id, context: 'watch' });
+    // d.expectChild: a row the value shows when opened (EF Core's SQL of a query), a lazy row's value read as VS Code reads it.
+    let children = [];
+    if (d.expectChild && value.variablesReference) {
+      for (const v of (await session.customRequest('variables', { variablesReference: value.variablesReference })).variables) {
+        const lazy = v.presentationHint?.lazy && v.variablesReference
+          ? (await session.customRequest('variables', { variablesReference: v.variablesReference })).variables[0]?.value : undefined;
+        children.push(`${v.name}=${(lazy ?? v.value).replace(/\s+/g, ' ')}`);
+      }
+    }
     await session.customRequest('continue', { threadId: body.threadId });
     // Only a program that prints (expectOutput) is waited for: WebApp writes nothing to its console for minutes.
     const output = d.expectOutput ? await Promise.race([printedEvent, sleep(60000).then(() => null)]) : undefined;
@@ -113,8 +122,10 @@ async function debugCheck(d) {
     await Promise.race([ended, sleep(30000)]);
     const at = `${path.basename(top.source?.path || '?')}:${top.line}`;
     const ok = path.basename(top.source?.path || '') === path.basename(d.breakpoint.file) && top.line === pos.line + 1 && (!d.expectOutput || output !== null)
-      && (!d.expectValue || value.result.includes(d.expectValue));
+      && (!d.expectValue || value.result.includes(d.expectValue))
+      && (!d.expectChild || children.some((c) => c.includes(d.expectChild)));
     return { ok, got: [`${session.type} session`, `stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`,
+      ...(d.expectChild ? [`opened: ${children.find((c) => c.includes(d.expectChild)) || children.slice(0, 5).join(' | ')}`] : []),
       output ? `program ${output.category}: ${output.output.trim().slice(0, 80)}` : output === null ? 'no program output within 60 s' : 'output not checked'] };
   } finally {
     tracker.dispose();
