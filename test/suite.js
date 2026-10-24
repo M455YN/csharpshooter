@@ -297,6 +297,31 @@ async function taskRunnerChecks(api) {
   return results;
 }
 
+// With tasks.json's runOn: folderOpen watchers started by the editor: each runs once (Project Open leaves them to
+// tasks.json), the Task Runner shows them running, and stops them.
+async function autorunChecks(api) {
+  const { runner } = api.taskRunner;
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const watchers = ['watchFiles_WebApp', 'watchFiles_ContosoCore', 'watchFiles_ContosoLobby'];
+  const runsOf = (w) => vscode.tasks.taskExecutions.filter((e) => e.task.name.includes(w));
+  for (let i = 0; i < 40 && !watchers.every((w) => runsOf(w).length); i++) await sleep(500);
+  await sleep(3000); // and a moment more, for any second run to show
+  const counts = watchers.map((w) => `${w}: ${runsOf(w).map((e) => e.task.name).join(' + ') || 'none'}`);
+  expect("each watcher runs once (tasks.json's, not again by Project Open)", watchers.every((w) => runsOf(w).length === 1), counts.join(' | '));
+  const rows = [];
+  for (const f of (await runner.getChildren()).filter((n) => n.kind === 'gulpfile')) {
+    const [tasksGroup] = await runner.getChildren(f);
+    rows.push(...(await runner.getChildren(tasksGroup)).filter((r) => watchers.includes(r.task)));
+  }
+  expect("the Task Runner shows tasks.json's runs as running", rows.length === 3 && rows.every((r) => r.contextValue.startsWith('trTask.running')),
+    rows.map((r) => `${r.task}: ${r.description || 'idle'}`).join(', '));
+  for (const r of rows) await vscode.commands.executeCommand('csharpShooter.taskRunner.stop', r);
+  for (let i = 0; i < 30 && watchers.some((w) => runsOf(w).length); i++) await sleep(500);
+  expect('and stops them', watchers.every((w) => !runsOf(w).length), watchers.map((w) => `${w}: ${runsOf(w).length}`).join(', '));
+  return results;
+}
+
 // The editor's own window only (PrintWindow), never the rest of the screen.
 async function screenshot(file) {
   await sleep(1500);
@@ -390,6 +415,12 @@ async function run() {
     for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.autorun) {
+    for (const r of await autorunChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  autorun: ${r.name}: ${r.got.join('; ').slice(0, 220)}`);
     }
   }
   if (checks.taskRunner || (!process.env.CHECKS_FILE && process.env.SKIP_TASK_RUNNER !== '1')) {
