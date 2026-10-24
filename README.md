@@ -16,8 +16,9 @@ npm install
 npm run fetch-server
 ```
 
-The debugger is Passenger 0.2.0's, ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK
-and runs on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
+The debugger is Passenger's, from its `0.2.0` branch at commit `7e647fa` (a branch that moves on, so the script fetches
+that commit, not the branch), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
+on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
 
 ```bash
 powershell -File scripts/build-debugger.ps1
@@ -45,13 +46,13 @@ since the server and the debugger in it are built for Windows x64; for another s
 Install it in VSCodium:
 
 ```bash
-codium --install-extension csharpshooter-win32-x64-0.0.1.vsix
+codium --install-extension csharpshooter-win32-x64-0.0.2.vsix
 ```
 
 or in VS Code:
 
 ```bash
-code --install-extension csharpshooter-win32-x64-0.0.1.vsix
+code --install-extension csharpshooter-win32-x64-0.0.2.vsix
 ```
 
 or from the editor: Extensions → `…` → **Install from VSIX...**. Then reload the window.
@@ -89,6 +90,21 @@ In `launch.json`:
 ```
 
 (`configuration`, `build: false`, `launchBrowser: false`, `env` and `args` override the profile.)
+
+### launch.json written for Microsoft's debuggers
+
+F5 on a configuration of type `coreclr` (Microsoft's C# extension) or `dotnet` (C# Dev Kit) runs it on CSharpShooter's
+debugger when the extension that owns the type is not installed or is disabled (`csharpShooter.runMicrosoftConfigurations`:
+`auto`, the default; `always`; `never`), so an existing `launch.json` works unchanged:
+
+- `coreclr` launch: `program`, `args`, `cwd`, `env`, `envFile`, `stopAtEntry`, `justMyCode`, `console`, `preLaunchTask`;
+  the `launchSettings.json` profile of the project in `cwd` as the C# extension applies it (`launchSettingsProfile`, else
+  the first `Project` profile; `null` for none); `serverReadyAction` opens the browser once the app listens. `coreclr`
+  attach: `processId`.
+- `dotnet`: `projectPath` and `launchConfigurationId` (`TargetFramework=…;Profile`) run as CSharpShooter's own F5 on that
+  project and profile.
+- Left out, and named in the CSharpShooter output: `sourceFileMap`, `symbolOptions`, `requireExactSource`,
+  `sourceLinkOptions`, `logging` and the like. `pipeTransport` (a remote machine or container) is refused.
 
 ## Solution Explorer
 
