@@ -11,12 +11,15 @@ const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
 const { registerTaskRunner } = require('./task-runner');
 const { registerStartup } = require('./startup');
+const { launchProgress } = require('./build-progress');
+const { readSolution } = require('./solution');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
 const toServerUri = (uri) => (uri.scheme === 'file' ? pathToFileURL(uri.fsPath).href : uri.toString());
 
 let client;
+let loading; // what the start is doing, until the projects are loaded (for the tests: its lines)
 let output;
 // Resolved once the server has loaded the solution; the tests wait on it.
 let readyResolve;
@@ -31,6 +34,45 @@ const emptyListRequests = [
 ];
 const nullRequests = ['textDocument/hover', 'textDocument/signatureHelp', 'textDocument/linkedEditingRange', 'textDocument/rename',
   'textDocument/willSaveWaitUntil', 'completionItem/resolve', 'codeAction/resolve'];
+
+const plural = (n) => (n === 1 ? 'projekt' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'projekty' : 'projektów');
+
+/** Says at the bottom right, and with a spinner in the status bar, that C# is not ready yet while the server starts and
+ *  loads the solution, as VS says it is loading the solution: on a slow machine that takes a while, and C# help, F12 and
+ *  the Solution Explorer's symbols wait for it. */
+function startLoading() {
+  const progress = launchProgress('C#', { cancellable: false }); // nothing to cancel: the server goes on loading
+  const bar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000);
+  bar.command = 'csharpShooter.showOutput';
+  bar.tooltip = 'Serwer C# wczytuje rozwiązanie: podpowiedzi C#, przejdź do definicji i Razor ruszą po wczytaniu projektów.';
+  const t0 = Date.now();
+  let stage = '';
+  const show = () => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    progress.report(`${stage} ${s} s`);
+    bar.text = `$(sync~spin) ${stage.replace(/…$/, '')}`;
+  };
+  const timer = setInterval(show, 1000);
+  bar.show();
+  const handle = {
+    lines: progress.lines,
+    done: false,
+    stage(text) {
+      stage = text;
+      show();
+    },
+    finish(message) {
+      if (handle.done) return;
+      handle.done = true;
+      clearInterval(timer);
+      progress.done();
+      bar.dispose();
+      if (message) vscode.window.setStatusBarMessage(`$(check) ${message}`, 15000);
+      progress.lines.push(message || '');
+    },
+  };
+  return handle;
+}
 
 function setting(name) {
   return vscode.workspace.getConfiguration('csharpShooter').get(name);
@@ -50,8 +92,12 @@ async function findSolution() {
 }
 
 async function startServer(context) {
+  loading?.finish();
+  loading = startLoading();
+  loading.stage('Uruchamianie serwera C#…');
   const serverDll = bundled(context, setting('serverPath'), 'server', 'Microsoft.CodeAnalysis.LanguageServer.dll');
   if (!fs.existsSync(serverDll)) {
+    loading.finish();
     vscode.window.showErrorMessage(`C# language server not found: ${serverDll}. Run "npm run fetch-server" in the extension folder.`);
     return;
   }
@@ -79,8 +125,11 @@ async function startServer(context) {
       },
     });
 
+  const t0 = Date.now();
+  let solutionName = '';
   client.onNotification('workspace/projectInitializationComplete', () => {
     output.appendLine('Projects loaded.');
+    loading?.finish(`Rozwiązanie ${solutionName} wczytane w ${Math.round((Date.now() - t0) / 1000)} s: podpowiedzi C#, F12 i Razor gotowe`);
     readyResolve();
   });
   client.onNotification('window/_roslyn_showToast', (toast) => output.appendLine(`[toast] ${toast.message}`));
@@ -89,12 +138,27 @@ async function startServer(context) {
   for (const method of emptyListRequests) client.onRequest(method, () => []);
   for (const method of nullRequests) client.onRequest(method, () => null);
 
-  await client.start();
+  try {
+    await client.start();
+  } catch (e) {
+    loading.finish();
+    throw e;
+  }
   const solution = await findSolution();
   if (solution) {
+    solutionName = path.basename(solution, path.extname(solution));
+    let count = 0;
+    try {
+      const walk = (node) => node.projects.length + node.folders.reduce((n, f) => n + walk(f), 0);
+      count = walk(readSolution(solution));
+    } catch {
+      // the count is only for the message
+    }
+    loading.stage(`Wczytywanie rozwiązania ${solutionName}${count ? ` (${count} ${plural(count)})` : ''}…`);
     output.appendLine(`Opening ${solution}`);
     await client.sendNotification('solution/open', { solution: toServerUri(vscode.Uri.file(solution)) });
   } else {
+    loading.stage('Wczytywanie projektów…');
     const projects = await vscode.workspace.findFiles('**/*.csproj', '**/{node_modules,bin,obj}/**');
     await client.sendNotification('project/open', { projects: projects.map(toServerUri) });
   }
@@ -118,6 +182,7 @@ class DebugAdapterFactory {
 async function activate(context) {
   output = vscode.window.createOutputChannel('CSharpShooter');
   context.subscriptions.push(output);
+  context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.showOutput', () => output.show()));
   context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('csharpshooter', new DebugAdapterFactory(context)));
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.restartServer', async () => {
     await stopServer();
@@ -135,7 +200,7 @@ async function activate(context) {
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, solutionView, launch, taskRunner, startup, searchEverywhere, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, startup, searchEverywhere, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {
