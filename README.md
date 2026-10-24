@@ -133,6 +133,25 @@ Right-click a project or folder → **Add**:
 Not like VS (yet): files a project includes from outside its folder or removes with `<Compile Remove>` show as on disk;
 no drag and drop, rename, other item templates, NuGet manager or startup project.
 
+## Task Runner Explorer
+
+Under the Solution Explorer, after Visual Studio's (its labels are VS's Polish ones: *Eksplorator modułu uruchamiającego
+zadania*): each gulpfile of the solution's projects with its tasks (gulp's own `--tasks-simple`) and bindings, and each
+`package.json` with scripts.
+
+- ▶ / **Uruchom** runs a task in a terminal of its own, as VS runs it: `node_modules\.bin` first on `PATH`, gulp with
+  `--color`. ■ / **Zatrzymaj** stops it. A run ends with "Zadanie X zakończone z kodem zakończenia N" in the
+  *Eksplorator modułu uruchamiającego zadania* output.
+- **Powiązania** (right-click a task) checks the events it is bound to and toggles them; under *Powiązania* in the tree, a
+  bound task moves up or down or is removed (**Przenieś w górę / w dół / Usuń**), as in VS's Bindings tab. The
+  gulpfile's `/// <binding ... />` line is written as VS writes it, its BOM and line endings kept.
+- *Otwarcie projektu* (ProjectOpened) bindings start as the workspace opens (`csharpShooter.taskRunner.projectOpenBindings`,
+  on). *Przed kompilacją / Po kompilacji / Oczyszczanie* run around CSharpShooter's builds (F5, Solution Explorer) when
+  `csharpShooter.taskRunner.buildBindings` is on: off by default, since a project that runs gulp from its `.csproj` when
+  built outside Visual Studio (as the sample app does) would run it twice.
+
+Not like VS: Grunt, output parsed into Problems (VS's JSHint listeners), a console tab per run.
+
 ## Test
 
 Runs the checks in `test/suite.js` in a real editor against a real solution (written for a sample ASP.NET Core MVC solution):
