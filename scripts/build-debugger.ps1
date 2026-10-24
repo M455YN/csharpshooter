@@ -1,19 +1,23 @@
-# Builds Passenger's debug adapter for .NET 10 into debugger/: clones the tag, applies debugger-port/net10.patch, publishes.
-#   powershell -File scripts/build-debugger.ps1 [-Tag 0.2.0] [-Runtime win-x64]
+# Builds Passenger's debug adapter for .NET 10 into debugger/: fetches the commit the port was made on, applies
+# debugger-port/net10.patch, publishes.
+#   powershell -File scripts/build-debugger.ps1 [-Commit <sha>] [-Runtime win-x64]
 param(
-    [string]$Tag = '0.2.0',
+    # Passenger's 0.2.0 is a branch that moves on, not a tag: the patch is made against this commit of it.
+    [string]$Commit = '7e647fa18055b2d8e1c95982f000cb5357cd0be0',
     [string]$Runtime = 'win-x64'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$work = Join-Path ([IO.Path]::GetTempPath()) "passenger-$Tag-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+$work = Join-Path ([IO.Path]::GetTempPath()) "passenger-$($Commit.Substring(0, 7))-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
 $out = Join-Path $root 'debugger'
 
-git clone --quiet --depth 1 --branch $Tag https://github.com/Zaneris/passenger $work
-if ($LASTEXITCODE) { throw "git clone failed" }
+git init --quiet $work
+git -C $work fetch --quiet --depth 1 https://github.com/Zaneris/passenger $Commit
+if ($LASTEXITCODE) { throw "fetching Passenger $Commit failed" }
+git -C $work checkout --quiet FETCH_HEAD
 try {
     git -C $work apply --whitespace=nowarn (Join-Path $root 'debugger-port\net10.patch')
-    if ($LASTEXITCODE) { throw "the patch does not apply to Passenger $Tag" }
+    if ($LASTEXITCODE) { throw "the patch does not apply to Passenger $Commit" }
     # The .NET 10 SDK, and lock files restored afresh for net10.0.
     Set-Content -Encoding utf8 (Join-Path $work 'global.json') '{ "sdk": { "version": "10.0.100", "rollForward": "latestFeature" } }'
     Get-ChildItem (Join-Path $work 'src') -Recurse -Filter packages.lock.json | Remove-Item
