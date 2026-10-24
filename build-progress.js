@@ -18,13 +18,13 @@ const QUIET_TARGETS = new Set(['AddPrunePackageReferences', 'GenerateTargetFrame
   'ResolveLockFileReferences', 'ResolveLockFileAnalyzers', 'GenerateRazorTargetAssemblyInfo', 'RazorCoreGenerate', 'RazorCoreCompile']);
 
 /** A notification that stays while a build and a start go on; report() changes its line, done() closes it. */
-function launchProgress(title) {
+function launchProgress(title, { cancellable = true } = {}) {
   let report = () => {};
   let finish;
   const ended = new Promise((resolve) => (finish = resolve));
   const tokenSource = new vscode.CancellationTokenSource();
   const shown = new Promise((resolve) => {
-    vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title, cancellable: true }, (progress, token) => {
+    vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title, cancellable }, (progress, token) => {
       token.onCancellationRequested(() => {
         tokenSource.cancel();
         finish();

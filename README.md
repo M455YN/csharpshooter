@@ -65,6 +65,10 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
 ## Use
 
 - The first `.sln`/`.slnx` in the workspace loads (or set `csharpShooter.solution`).
+- While the server starts and loads it, a notification at the bottom right and a spinner in the status bar say so
+  (*Uruchamianie serwera C#…*, *Wczytywanie rozwiązania X (5 projektów)… 12 s*), as VS says it is loading the solution;
+  once the projects are loaded the status bar says *Rozwiązanie X wczytane w N s: podpowiedzi C#, F12 i Razor gotowe*.
+  On a slow machine that is where C# help, F12 and Razor are until then.
 - Debug with a `launch.json` entry of type `csharpshooter` (`program`, `args`, `cwd`, `env`, `stopAtEntry`,
   `justMyCode`, `console`; `attach` takes `processId`).
 - While debugging, an EF Core query (a `DbSet`, a LINQ query over one) opened in Variables or a watch shows a `SQL` row:
