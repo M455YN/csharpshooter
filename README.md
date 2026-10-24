@@ -16,7 +16,7 @@ npm install
 npm run fetch-server
 ```
 
-The debugger is Passenger's, from its `0.2.0` branch at commit `7e647fa` (a branch that moves on, so the script fetches
+The debugger is Passenger's, from its `0.2.0` branch at commit `b4a6eb1` (a branch that moves on, so the script fetches
 that commit, not the branch), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
 on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
 
@@ -46,13 +46,13 @@ since the server and the debugger in it are built for Windows x64; for another s
 Install it in VSCodium:
 
 ```bash
-codium --install-extension csharpshooter-win32-x64-0.0.2.vsix
+codium --install-extension csharpshooter-win32-x64-0.0.3.vsix
 ```
 
 or in VS Code:
 
 ```bash
-code --install-extension csharpshooter-win32-x64-0.0.2.vsix
+code --install-extension csharpshooter-win32-x64-0.0.3.vsix
 ```
 
 or from the editor: Extensions → `…` → **Install from VSIX...**. Then reload the window.
@@ -67,6 +67,8 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
 - The first `.sln`/`.slnx` in the workspace loads (or set `csharpShooter.solution`).
 - Debug with a `launch.json` entry of type `csharpshooter` (`program`, `args`, `cwd`, `env`, `stopAtEntry`,
   `justMyCode`, `console`; `attach` takes `processId`).
+- While debugging, an EF Core query (a `DbSet`, a LINQ query over one) opened in Variables or a watch shows a `SQL` row:
+  the SQL it would run, read only as it is opened.
 - `csharpShooter.razorViewsInDesignTime` (on by default) gives the server's Razor every `.cshtml` even when a project
   sets `RazorCompileOnBuild=false`; without it such views get no C# help at all. Only the server's design-time builds
   change.
