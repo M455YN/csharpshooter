@@ -26,6 +26,16 @@ const defaultDebug = {
   evaluate: 'args.Length',
 };
 
+const BREAK_IN_MAIN = { file: 'WebApp/Program.cs', needle: 'CreateHostBuilder(args).Build().Run();' };
+const microsoftConfigs = [
+  { label: 'coreclr launch (launchSettingsProfile)', breakpoint: BREAK_IN_MAIN, evaluate: 'System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")',
+    expectValue: 'Development', config: { type: 'coreclr', request: 'launch', name: 'test', program: '${workspaceFolder}/WebApp/bin/Debug/net10.0/WebApp.dll',
+      cwd: '${workspaceFolder}/WebApp', launchSettingsProfile: 'WebApp Development VSCode', sourceFileMap: { '/x': 'D:/x' } } },
+  { label: 'dotnet launch (C# Dev Kit: projectPath, launchConfigurationId)', breakpoint: BREAK_IN_MAIN, evaluate: 'System.Environment.GetEnvironmentVariable("ASPNETCORE_URLS")',
+    expectValue: 'https://localhost:44308', config: { type: 'dotnet', request: 'launch', name: 'test', projectPath: '${workspaceFolder}/WebApp/WebApp.csproj',
+      launchConfigurationId: 'TargetFramework=net10.0;WebApp Development' } },
+];
+
 async function position(file, needle, off) {
   const doc = await vscode.workspace.openTextDocument(path.resolve(root(), file));
   const line = doc.getText().split(/\r?\n/).findIndex((l) => l.includes(needle));
@@ -59,9 +69,10 @@ async function check(c, deadline) {
   return { ok: false, got };
 }
 
+// d.config: a launch.json configuration of any type (coreclr, dotnet) to start instead of CSharpShooter's own; named 'test'.
 async function debugCheck(d) {
-  const program = path.resolve(root(), d.program);
-  if (!fs.existsSync(program)) return { ok: false, got: [`not built: ${program}`] };
+  const program = d.program && path.resolve(root(), d.program);
+  if (program && !fs.existsSync(program)) return { ok: false, got: [`not built: ${program}`] };
   const { doc, pos } = await position(d.breakpoint.file, d.breakpoint.needle, 0);
   vscode.debug.addBreakpoints([new vscode.SourceBreakpoint(new vscode.Location(doc.uri, pos))]);
   let stopped, printed;
@@ -70,7 +81,11 @@ async function debugCheck(d) {
   const tracker = vscode.debug.registerDebugAdapterTrackerFactory('csharpshooter', {
     // This test's session only: one an earlier check stopped may still be ending.
     createDebugAdapterTracker: (session) => session.name !== 'test' ? undefined : ({
+      onWillReceiveMessage: (m) => process.env.TRACE && console.log('[dap ->]', m.command, JSON.stringify(m.arguments || {}).slice(0, 200)),
+      onError: (e) => process.env.TRACE && console.log('[dap error]', e.message),
+      onExit: (code) => process.env.TRACE && console.log('[dap exit]', code),
       onDidSendMessage: (m) => {
+        if (process.env.TRACE) console.log('[dap <-]', m.type, m.event || m.command, m.success === false ? m.message : '', m.event === 'output' ? m.body.output.slice(0, 150) : '');
         if (m.type === 'event' && m.event === 'stopped') stopped({ ...m.body, session });
         // The program's own output, which reaches the adapter through the pipes it was started with.
         if (m.type === 'event' && m.event === 'output' && ['stdout', 'stderr'].includes(m.body.category) && m.body.output.trim()) printed(m.body);
@@ -78,12 +93,12 @@ async function debugCheck(d) {
     }),
   });
   try {
-    const started = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], {
+    const started = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], d.config || {
       type: 'csharpshooter', request: 'launch', name: 'test', program, cwd: path.resolve(root(), d.cwd), env: d.env, justMyCode: true,
     });
     if (!started) return { ok: false, got: ['startDebugging returned false'] };
-    const body = await Promise.race([stoppedEvent, sleep(120000).then(() => null)]);
-    if (!body) return { ok: false, got: ['no stop within 120 s'] };
+    const body = await Promise.race([stoppedEvent, sleep(d.config ? 240000 : 120000).then(() => null)]);
+    if (!body) return { ok: false, got: ['no stop within the time given'] };
     const { session } = body; // not activeDebugSession, which may still be an earlier check's ending session
     const stack = await session.customRequest('stackTrace', { threadId: body.threadId, startFrame: 0, levels: 1 });
     const top = stack.stackFrames[0];
@@ -92,10 +107,14 @@ async function debugCheck(d) {
     await session.customRequest('continue', { threadId: body.threadId });
     // Only a program that prints (expectOutput) is waited for: WebApp writes nothing to its console for minutes.
     const output = d.expectOutput ? await Promise.race([printedEvent, sleep(60000).then(() => null)]) : undefined;
+    // Ended, its program with it, before the next check builds and starts that program again.
+    const ended = new Promise((r) => { const d2 = vscode.debug.onDidTerminateDebugSession((x) => x.id === session.id && (d2.dispose(), r())); });
     await vscode.debug.stopDebugging(session);
+    await Promise.race([ended, sleep(30000)]);
     const at = `${path.basename(top.source?.path || '?')}:${top.line}`;
-    const ok = path.basename(top.source?.path || '') === path.basename(d.breakpoint.file) && top.line === pos.line + 1 && (!d.expectOutput || output !== null);
-    return { ok, got: [`stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`,
+    const ok = path.basename(top.source?.path || '') === path.basename(d.breakpoint.file) && top.line === pos.line + 1 && (!d.expectOutput || output !== null)
+      && (!d.expectValue || value.result.includes(d.expectValue));
+    return { ok, got: [`${session.type} session`, `stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`,
       output ? `program ${output.category}: ${output.output.trim().slice(0, 80)}` : output === null ? 'no program output within 60 s' : 'output not checked'] };
   } finally {
     tracker.dispose();
@@ -268,6 +287,13 @@ async function run() {
     for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.microsoft || (!process.env.CHECKS_FILE && process.env.SKIP_MICROSOFT !== '1')) {
+    for (const m of microsoftConfigs.filter((c) => !process.env.ONLY_DOTNET || c.config.type === 'dotnet')) {
+      const r = await debugCheck(m);
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5 on ${m.label}: ${r.got.join('; ')}`);
     }
   }
   if (checks.debug && process.env.SKIP_DEBUG !== '1') {
