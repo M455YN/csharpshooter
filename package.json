@@ -75,6 +75,21 @@
           "type": "boolean",
           "default": false,
           "description": "Run a gulpfile's Before Build, After Build and Clean bindings around CSharpShooter's builds (F5, Solution Explorer). Off by default: a project that runs gulp from its .csproj when built outside Visual Studio (BuildingInsideVisualStudio != true) would run it twice."
+        },
+        "csharpShooter.launchProfilesInLaunchJson": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "always",
+            "never"
+          ],
+          "default": "ask",
+          "enumDescriptions": [
+            "Ask once per workspace when launch.json lacks some of the projects' launch profiles.",
+            "Add them without asking.",
+            "Never add them (they stay under '.NET (CSharpShooter)...' in Select and Start Debugging)."
+          ],
+          "description": "Put the projects' launchSettings.json profiles (e.g. 'WebApp: WebApp Development') in .vscode/launch.json, so the Run and Debug dropdown lists them as Visual Studio's start button does. VS Code lists only launch.json's configurations there."
         }
       }
     },
@@ -241,6 +256,11 @@
         "title": "Usuń",
         "icon": "$(close)",
         "category": "Eksplorator zadań"
+      },
+      {
+        "command": "csharpShooter.addLaunchProfiles",
+        "title": "Add Launch Profiles to Run and Debug",
+        "category": "CSharpShooter"
       }
     ],
     "menus": {

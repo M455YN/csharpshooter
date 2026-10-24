@@ -84,6 +84,12 @@ at `launchUrl` once the app listens: its port accepts a connection, or its conso
 `IISExpress` profile runs on Kestrel at the IIS Express URLs (`iisSettings`), since IIS Express runs only under Visual
 Studio. If the profile's port is taken before the start, a warning says so.
 
+The Run and Debug dropdown lists only `launch.json`'s configurations (an extension's own wait behind *.NET
+(CSharpShooter)...* in Select and Start Debugging), so CSharpShooter offers, once per workspace, to add the profiles to
+`.vscode/launch.json` as entries like the one below; *Add Launch Profiles to Run and Debug* in the Command Palette adds
+the missing ones at any time. `csharpShooter.launchProfilesInLaunchJson`: `ask` (default), `always`, `never`. The
+file's other entries are left as they are.
+
 In `launch.json`:
 
 ```json
