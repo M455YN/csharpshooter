@@ -328,14 +328,14 @@ function registerSearchEverywhere(context, solutionView) {
     return panel;
   };
 
-  // Ctrl+Shift+F starts with the selected text, as Find in Files does.
+  // Ctrl+T is VS's code search (Kod); Ctrl+Shift+F, Find in Files, starts with the selected text.
   const selection = () => {
     const e = vscode.window.activeTextEditor;
     const text = e && !e.selection.isEmpty ? e.document.getText(e.selection) : '';
     return text.includes('\n') ? '' : text;
   };
   context.subscriptions.push(
-    vscode.commands.registerCommand('csharpShooter.searchEverywhere', (text) => show(undefined, typeof text === 'string' ? text : undefined)),
+    vscode.commands.registerCommand('csharpShooter.searchEverywhere', (text) => show('code', typeof text === 'string' ? text : undefined)),
     vscode.commands.registerCommand('csharpShooter.findInFiles', (text) => show('text', typeof text === 'string' ? text : selection() || undefined)),
   );
 

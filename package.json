@@ -323,6 +323,11 @@
     "menus": {
       "view/title": [
         {
+          "command": "csharpShooter.searchEverywhere",
+          "when": "view == csharpShooter.solution || view == csharpShooter.search",
+          "group": "navigation@0"
+        },
+        {
           "command": "csharpShooter.solution.syncWithActive",
           "when": "view == csharpShooter.solution",
           "group": "navigation@1"
