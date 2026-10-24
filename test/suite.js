@@ -322,6 +322,54 @@ async function autorunChecks(api) {
   return results;
 }
 
+// What the Run and Debug view offers: its configuration list and Select and Start Debugging's picker, photographed.
+async function runViewProbe() {
+  await vscode.commands.executeCommand('workbench.view.debug');
+  await sleep(2000);
+  await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-run-view.png'));
+  vscode.commands.executeCommand('workbench.action.debug.selectandstart');
+  await sleep(2500);
+  await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-select-and-start.png'));
+  await vscode.commands.executeCommand('workbench.action.closeQuickOpen');
+  return [];
+}
+
+// launch.json with the launch profiles in it (csharpShooter.launchProfilesInLaunchJson: always): listed in Run and Debug
+// as VS lists them, the workspace's own entries kept, and one started by its name as F5 starts the selected one.
+async function launchJsonChecks() {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const configs = () => vscode.workspace.getConfiguration('launch', vscode.workspace.workspaceFolders[0].uri).get('configurations') || [];
+  for (let i = 0; i < 40 && !configs().some((c) => c.type === 'csharpshooter'); i++) await sleep(500);
+  const names = configs().map((c) => c.name);
+  expect('launch profiles are in launch.json, the existing entry kept',
+    ['WebApp: WebApp Development', 'WebApp: WebApp Development VSCode', 'Contoso.Lobby: Contoso.Lobby Development'].every((n) => names.includes(n)) && configs()[0].type === 'coreclr',
+    names.join(' | '));
+  const entry = configs().find((c) => c.name === 'WebApp: WebApp Development');
+  expect('an entry names the project relative to the folder', entry?.project === '${workspaceFolder}/WebApp/WebApp.csproj' && entry.launchProfile === 'WebApp Development',
+    JSON.stringify(entry));
+  if (process.env.SCREENSHOT) {
+    await vscode.commands.executeCommand('workbench.view.debug');
+    vscode.commands.executeCommand('workbench.action.debug.selectandstart');
+    await sleep(2500);
+    await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-launch-json.png'));
+    await vscode.commands.executeCommand('workbench.action.closeQuickOpen');
+  }
+  // Started by its name, as F5 starts the configuration the dropdown has selected; its build is skipped here.
+  let session;
+  const started = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((s) => (d.dispose(), r(s))); });
+  const ok = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], 'WebApp: WebApp Development');
+  session = ok ? await Promise.race([started, sleep(240000).then(() => null)]) : null;
+  expect('started by its name, as F5 does', session?.type === 'csharpshooter' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
+    session ? `${session.type} session "${session.name}", ASPNETCORE_ENVIRONMENT=${session.configuration.env?.ASPNETCORE_ENVIRONMENT}` : 'no session');
+  if (session) {
+    const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((x) => x.id === session.id && (d.dispose(), r())); });
+    await vscode.debug.stopDebugging(session);
+    await Promise.race([ended, sleep(30000)]);
+  }
+  return results;
+}
+
 // The editor's own window only (PrintWindow), never the rest of the screen.
 async function screenshot(file) {
   await sleep(1500);
@@ -415,6 +463,13 @@ async function run() {
     for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.runViewProbe) await runViewProbe();
+  if (checks.launchJson) {
+    for (const r of await launchJsonChecks()) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  launch.json: ${r.name}: ${r.got.join('; ').slice(0, 260)}`);
     }
   }
   if (checks.autorun) {
