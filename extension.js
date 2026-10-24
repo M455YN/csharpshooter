@@ -67,11 +67,10 @@ async function startServer(context) {
   client = new LanguageClient('csharpShooter', 'C# (Roslyn)',
     { command: 'dotnet', args },
     {
-      documentSelector: [
-        { scheme: 'file', language: 'csharp' },
-        { scheme: 'file', language: 'razor' },
-        { scheme: 'file', language: 'aspnetcorerazor' },
-      ],
+      // Roslyn's own features are for C#. Razor registers its own for .cshtml/.razor (language aspnetcorerazor, as VS and
+      // Passenger open them): its trigger characters (@, =, ", space…) and no C# commit characters, so '-' in asp-for
+      // goes on typing the name instead of taking the first item.
+      documentSelector: [{ scheme: 'file', language: 'csharp' }],
       outputChannel: output,
       uriConverters: { code2Protocol: toServerUri, protocol2Code: (value) => vscode.Uri.parse(value) },
       middleware: {
