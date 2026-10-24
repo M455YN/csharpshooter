@@ -205,6 +205,98 @@ async function solutionChecks(view) {
   return results;
 }
 
+// Task Runner Explorer: the gulpfiles, their tasks and bindings, Project Open's watchers, a binding toggled and put back,
+// and Before Build run as CSharpShooter's builds run it.
+async function taskRunnerChecks(api) {
+  const { runner } = api.taskRunner;
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const label = (n) => (typeof n.label === 'string' ? n.label : n.label.label);
+  const files = await runner.getChildren();
+  const where = files.map((f) => `${label(f)} (${f.description})`);
+  expect('gulpfiles of the projects', ['WebApp', 'Contoso.Core', 'Contoso.Lobby'].every((p) => files.some((f) => f.description === p && f.kind === 'gulpfile')), where.join(', '));
+  const sb = files.find((f) => f.description === 'WebApp' && f.kind === 'gulpfile');
+  const [tasksGroup, bindingsGroup] = await runner.getChildren(sb);
+  const taskRows = await runner.getChildren(tasksGroup);
+  const tasks = taskRows.map(label);
+  expect('tasks, as gulp lists them', ['beforeBuild', 'watchFiles_WebApp', 'minAllControlsSiteJS'].every((t) => tasks.includes(t)), tasks.join(', '));
+  const bindings = await runner.getChildren(bindingsGroup);
+  const shown = bindings.map((b) => `${label(b)}: ${b.tasks.join(', ')}`);
+  expect('bindings from the /// <binding> line', shown.includes('Przed kompilacją (1): beforeBuild') && shown.includes('Otwarcie projektu (1): watchFiles_WebApp'), shown.join(' | '));
+
+  const marks = taskRows.filter((r) => / b:/.test(r.contextValue)).map((r) => `${label(r)} [${r.contextValue.split(' ').slice(1).join(' ')}]`);
+  expect('a task shows the events it is bound to (the Bindings menu checks them)',
+    marks.includes('beforeBuild [b:BeforeBuild]') && marks.includes('watchFiles_WebApp [b:ProjectOpened]'), marks.join(', '));
+
+  // Project Open: started as the workspace opened.
+  for (let i = 0; i < 20 && runner.running.size < 3; i++) await sleep(500);
+  const watching = [...runner.running.keys()].map((k) => k.split('|')[1]);
+  // As VS runs them: node_modules\.bin first on PATH, gulp with --color.
+  const exec = vscode.tasks.taskExecutions.find((e) => e.task.name.startsWith('watchFiles_WebApp'))?.task.execution;
+  const pathValue = exec && Object.entries(exec.options?.env || {}).find(([k]) => k.toUpperCase() === 'PATH')?.[1];
+  const binDir = path.join(path.dirname(sb.file), 'node_modules', '.bin');
+  expect('runs with node_modules\\.bin first on PATH and --color', exec && exec.args.includes('--color') && pathValue?.startsWith(binDir),
+    exec ? `${exec.process} ${exec.args.map((a) => path.basename(a)).join(' ')}; PATH starts ${pathValue?.slice(0, binDir.length)}` : 'no execution');
+  expect('Project Open bindings started with the workspace', ['watchFiles_WebApp', 'watchFiles_ContosoCore', 'watchFiles_ContosoLobby'].every((w) => watching.includes(w)), watching.join(', '));
+  if (process.env.SCREENSHOT) {
+    await vscode.commands.executeCommand('workbench.view.extension.csharpShooter');
+    await vscode.commands.executeCommand('csharpShooter.taskRunner.focus');
+    await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-task-runner.png'));
+  }
+  for (const key of [...runner.running.keys()]) runner.stop(...key.split('|'));
+  for (let i = 0; i < 30 && runner.running.size; i++) await sleep(500);
+  expect('running tasks stop', runner.running.size === 0, runner.running.size ? `${runner.running.size} still running` : 'all stopped');
+
+  // A binding toggled on and off again leaves the gulpfile as it was, its BOM included (Contoso.Lobby's has one).
+  const lobby = files.find((f) => f.description === 'Contoso.Lobby' && f.kind === 'gulpfile').file;
+  const before = fs.readFileSync(lobby);
+  try {
+    await vscode.commands.executeCommand('csharpShooter.taskRunner.bindAfterBuild', { file: lobby, task: 'beforeBuild' });
+    const line = fs.readFileSync(lobby, 'utf8').split(/\r?\n/)[0];
+    await vscode.commands.executeCommand('csharpShooter.taskRunner.bindAfterBuild', { file: lobby, task: 'beforeBuild' });
+    const same = Buffer.compare(before, fs.readFileSync(lobby)) === 0;
+
+    const lobbyNode = (await runner.getChildren()).find((f) => f.file === lobby);
+    const afterBuild = async () => {
+      const [, group] = await runner.getChildren(lobbyNode);
+      const event = (await runner.getChildren(group)).find((b) => b.binding === 'AfterBuild');
+      return event.tasks.length ? await runner.getChildren(event) : [];
+    };
+    for (const task of ['beforeBuild', 'watchFiles_ContosoLobby']) {
+      await vscode.commands.executeCommand('csharpShooter.taskRunner.bindAfterBuild', { file: lobby, task });
+    }
+    const rows = await afterBuild();
+    const placed = rows.map((r) => `${label(r)}[${r.contextValue.split(' ').filter((f) => f === 'up' || f === 'down').join(',')}]`).join(' ');
+    await vscode.commands.executeCommand('csharpShooter.taskRunner.moveDown', rows[0]);
+    const movedDown = (await afterBuild()).map(label).join(', ');
+    await vscode.commands.executeCommand('csharpShooter.taskRunner.moveUp', (await afterBuild())[1]);
+    const movedUp = (await afterBuild()).map(label).join(', ');
+    for (const row of await afterBuild()) await vscode.commands.executeCommand('csharpShooter.taskRunner.removeBinding', row);
+    const back = Buffer.compare(before, fs.readFileSync(lobby)) === 0;
+    expect('binding order: move down, move up, remove (VS\'s Bindings tab)',
+      placed === 'beforeBuild[down] watchFiles_ContosoLobby[up]' && movedDown === 'watchFiles_ContosoLobby, beforeBuild' && movedUp === 'beforeBuild, watchFiles_ContosoLobby' && back,
+      `${placed} | down: ${movedDown} | up: ${movedUp} | removed, file ${back ? 'as it was' : 'DIFFERENT'}`);
+    expect('toggle a binding, then back', line.includes("AfterBuild='beforeBuild'") && same, `${line.replace('\uFEFF', '<BOM>')} -> restored ${same ? 'byte for byte' : 'DIFFERENTLY'}`);
+  } finally {
+    fs.writeFileSync(lobby, before);
+  }
+
+  // Before Build, as a build of WebApp runs it when buildBindings is on.
+  const config = vscode.workspace.getConfiguration('csharpShooter.taskRunner');
+  await config.update('buildBindings', true, vscode.ConfigurationTarget.Global);
+  try {
+    const { buildBindings } = require(path.join(api.extensionPath, 'task-runner.js'));
+    const t0 = Date.now();
+    const ok = await buildBindings('BeforeBuild', path.dirname(sb.file));
+    expect('a run ends saying its exit code', runner.lastExit?.task === 'beforeBuild' && runner.lastExit.code === 0,
+      `Zadanie ${runner.lastExit?.task} zakończone z kodem zakończenia ${runner.lastExit?.code}`);
+    expect('Before Build binding runs before a build', ok, `gulp beforeBuild ${ok ? 'succeeded' : 'FAILED'} in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+  } finally {
+    await config.update('buildBindings', undefined, vscode.ConfigurationTarget.Global);
+  }
+  return results;
+}
+
 // The editor's own window only (PrintWindow), never the rest of the screen.
 async function screenshot(file) {
   await sleep(1500);
@@ -298,6 +390,12 @@ async function run() {
     for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.taskRunner || (!process.env.CHECKS_FILE && process.env.SKIP_TASK_RUNNER !== '1')) {
+    for (const r of await taskRunnerChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  task runner: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
     }
   }
   if (checks.microsoft || (!process.env.CHECKS_FILE && process.env.SKIP_MICROSOFT !== '1')) {
