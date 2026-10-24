@@ -16,7 +16,11 @@ const { runTests } = require('@vscode/test-electron');
     // AUTOMATIC_TASKS=on lets the workspace's tasks.json start its runOn: folderOpen tasks, as a person's editor does.
     'task.allowAutomaticTasks': process.env.AUTOMATIC_TASKS === 'on' ? 'on' : 'off',
     ...(process.env.DEBUGGER_PATH ? { 'csharpShooter.debuggerPath': process.env.DEBUGGER_PATH } : {}),
+    // LAUNCH_PROFILES=always: launch.json gets the launch profiles (it is put back afterwards); else nothing is asked.
+    'csharpShooter.launchProfilesInLaunchJson': process.env.LAUNCH_PROFILES === 'always' ? 'always' : 'never',
   }));
+  const launchJson = path.join(workspace, '.vscode', 'launch.json');
+  const launchBefore = fs.existsSync(launchJson) ? fs.readFileSync(launchJson) : null;
   try {
     await runTests({
       vscodeExecutablePath: exe,
@@ -28,6 +32,10 @@ const { runTests } = require('@vscode/test-electron');
       extensionTestsEnv: { ...process.env },
     });
   } finally {
+    if (process.env.LAUNCH_PROFILES === 'always') {
+      if (launchBefore) fs.writeFileSync(launchJson, launchBefore);
+      else fs.rmSync(launchJson, { force: true });
+    }
     // The editor can hold its profile's files a moment after it exits; a leftover temp folder is no test failure.
     try {
       fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
