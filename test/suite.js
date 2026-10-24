@@ -622,6 +622,95 @@ async function searchEverywhereChecks(api) {
   return results;
 }
 
+// Razor files as VS and Passenger open them (aspnetcorerazor, Razor's own completion): typed as a person types, the
+// list stays open through an attribute's '-', its item goes in; a tag helper's own attributes; asp-for's value; '@'.
+// Nothing is saved: each file is reverted.
+async function razorTypingChecks() {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const labels = (list) => (list?.items || []).map((i) => (typeof i.label === 'string' ? i.label : i.label.label));
+  const type = async (text, gap = 150) => {
+    for (const ch of text) {
+      await vscode.commands.executeCommand('type', { text: ch });
+      await sleep(gap);
+    }
+  };
+  // A new line above `needle`'s, indented as it, the cursor on it.
+  const freshLine = async (file, needle) => {
+    const doc = await vscode.workspace.openTextDocument(path.resolve(root(), file));
+    const editor = await vscode.window.showTextDocument(doc);
+    const at = doc.positionAt(doc.getText().indexOf(needle));
+    await editor.edit((e) => e.insert(new vscode.Position(at.line, 0), `${' '.repeat(at.character)}\n`));
+    const start = new vscode.Position(at.line, at.character);
+    editor.selection = new vscode.Selection(start, start);
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    return { doc, editor, line: at.line };
+  };
+  // Waits for the list (asked as VS Code asks while typing), then takes its selected item.
+  const accept = async () => {
+    await sleep(2500);
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    await sleep(500);
+  };
+  const revert = () => vscode.commands.executeCommand('workbench.action.files.revert');
+
+  const login = 'WebApp/Views/Pass/Login.cshtml';
+  let { doc, editor, line } = await freshLine(login, '<input asp-for');
+  expect('a .cshtml opens as aspnetcorerazor, with quick suggestions in strings', doc.languageId === 'aspnetcorerazor'
+    && vscode.workspace.getConfiguration('editor', doc).get('quickSuggestions').strings === 'on', `${doc.languageId}, ${JSON.stringify(vscode.workspace.getConfiguration('editor', doc).get('quickSuggestions'))}`);
+  await type('<input ');
+  const items = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, editor.selection.active);
+  const aspFor = items?.items.find((i) => (i.label.label || i.label) === 'asp-for');
+  expect("Razor's list: no C# commit characters ('-' does not take an item)", aspFor && !(aspFor.commitCharacters || []).includes('-'),
+    `asp-for commits on: ${JSON.stringify(aspFor?.commitCharacters)}`);
+  await type('asp-f');
+  const typed = doc.lineAt(line).text.trim();
+  await accept();
+  const taken = doc.lineAt(line).text.trim();
+  expect('typing <input asp-f: the list stays open through "-", asp-for goes in', typed === '<input asp-f' && /^<input asp-for/.test(taken), `typed: ${typed} → ${taken}`);
+  await revert();
+
+  // asp-for's value: the model's properties, typed inside the quotes.
+  ({ doc, editor, line } = await freshLine(login, '<input asp-for'));
+  await type('<input asp-for="', 120);
+  await sleep(1500);
+  const quote = doc.lineAt(line).text.indexOf('"', doc.lineAt(line).text.indexOf('asp-for')) + 1;
+  editor.selection = new vscode.Selection(line, quote, line, quote);
+  const values = labels(await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, new vscode.Position(line, quote)));
+  await type('Lo');
+  await accept();
+  const value = doc.lineAt(line).text.trim();
+  expect("asp-for's value: the model's properties as it is typed", values.includes('Login') && /asp-for="Login/.test(value), `${values.filter((v) => /^Lo/.test(v)).join(', ')} | ${value}`);
+  await revert();
+
+  // A tag helper of the solution's own (page-title): its attributes, '-' in them typed through.
+  const coach = 'WebApp/Views/Employee/Coach.cshtml';
+  ({ doc, editor, line } = await freshLine(coach, '<page-title '));
+  await type('<page-title ');
+  const own = labels(await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, editor.selection.active));
+  await type('icon-n');
+  await accept();
+  const ownLine = doc.lineAt(line).text.trim();
+  expect("the solution's own tag helper: its attributes listed, icon-name typed through '-' and taken", own.includes('icon-name') && /^<page-title icon-name/.test(ownLine),
+    `${own.filter((o) => /icon|title|visible/.test(o)).join(', ')} | ${ownLine}`);
+  await revert();
+
+  // '@' in markup: Razor's directives and the C# (a trigger character of Razor's, not of C#'s).
+  ({ doc, editor, line } = await freshLine(login, '<input asp-for'));
+  await type('@');
+  const at = labels(await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, editor.selection.active, '@'));
+  await type('Model'); // "Mod" alone is a class of the solution's own, which the list rightly puts first
+  await sleep(2500);
+  if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/.png$/i, '-at-model.png'));
+  await accept();
+  const atLine = doc.lineAt(line).text.trim();
+  const around = [line - 1, line, line + 1].map((n) => doc.lineAt(n).text.trim()).join(' ⏎ ') + ` (lang ${doc.languageId}, active ${path.basename(vscode.window.activeTextEditor?.document.fileName || '')})`;
+  expect("'@': the C# and Razor's directives, @Model taken", at.includes('Model') && atLine.startsWith('@Model'), `${at.length} items (${['Model', 'using', 'if'].filter((x) => at.includes(x)).join(', ')}) | ${around}`);
+  await revert();
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  return results;
+}
+
 async function screenshot(file) {
   await sleep(1500);
   const script = `
@@ -716,6 +805,12 @@ async function run() {
     for (const r of await solutionChecks(api.solutionView)) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  solution view: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.razorTyping || (!process.env.CHECKS_FILE && process.env.SKIP_RAZOR_TYPING !== '1')) {
+    for (const r of await razorTypingChecks()) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  razor typing: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.everywhere || (!process.env.CHECKS_FILE && process.env.SKIP_EVERYWHERE !== '1')) {
