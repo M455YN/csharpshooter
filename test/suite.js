@@ -343,7 +343,7 @@ async function launchJsonChecks() {
   for (let i = 0; i < 40 && !configs().some((c) => c.type === 'csharpshooter'); i++) await sleep(500);
   const names = configs().map((c) => c.name);
   expect('launch profiles are in launch.json, the existing entry kept',
-    ['WebApp: WebApp Development', 'WebApp: WebApp Development VSCode', 'Contoso.Lobby: Contoso.Lobby Development'].every((n) => names.includes(n)) && configs()[0].type === 'coreclr',
+    ['Projekt startowy (CSharpShooter)', 'WebApp: WebApp Development', 'WebApp: WebApp Development VSCode', 'Contoso.Lobby: Contoso.Lobby Development'].every((n) => names.includes(n)) && configs()[0].type === 'coreclr',
     names.join(' | '));
   const entry = configs().find((c) => c.name === 'WebApp: WebApp Development');
   expect('an entry names the project relative to the folder', entry?.project === '${workspaceFolder}/WebApp/WebApp.csproj' && entry.launchProfile === 'WebApp Development',
@@ -367,6 +367,81 @@ async function launchJsonChecks() {
     await vscode.debug.stopDebugging(session);
     await Promise.race([ended, sleep(30000)]);
   }
+  return results;
+}
+
+// Startup project and active profile as VS keeps them: read from VS's .suo and .csproj.user, shown in the status bar and
+// the Solution Explorer, changed from there, and run by F5 and Ctrl+F5 on the "Projekt startowy" entry. The projects'
+// .csproj.user files are put back as they were.
+async function startupChecks(api) {
+  const { startup, status } = api.startup;
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const label = (n) => (typeof n.label === 'string' ? n.label : n.label.label);
+  const proj = (name) => path.resolve(root(), name, `${name}.csproj`);
+  const userFiles = ['WebApp', 'Contoso.Lobby'].map((p) => `${proj(p)}.user`);
+  const saved = userFiles.map((f) => (fs.existsSync(f) ? fs.readFileSync(f) : null));
+  const folder = vscode.workspace.workspaceFolders[0];
+  try {
+    expect("startup project read from VS's .suo", path.basename(await startup.project()) === 'WebApp.csproj', await startup.project());
+    expect("active profile read from VS's .csproj.user (ActiveDebugProfile)", startup.profile(proj('WebApp')) === 'WebApp Development', startup.profile(proj('WebApp')));
+    await sleep(1000);
+    expect('status bar: startup project and the start button with its profile', status.project.includes('WebApp') && status.start.includes('WebApp Development'),
+      `${status.project} | ${status.start}`);
+
+    const rows = async () => (await api.solutionView.provider.getChildren((await api.solutionView.provider.getChildren())[0]));
+    const marks = async () => (await rows()).map((r) => `${label(r)}[${r.contextValue}]${r.description ? ` (${r.description})` : ''}`).join(', ');
+    let shown = await marks();
+    expect('Solution Explorer marks the startup project; runnable ones only can become it',
+      shown.includes('WebApp[project runnable startup] (web · projekt startowy)') && shown.includes('Contoso.Lobby[project runnable] (web)') && shown.includes('Contoso.Core[project]'), shown);
+
+    const refused = await vscode.commands.executeCommand('csharpShooter.startup.setProject', proj('Contoso.Core'));
+    expect('a class library cannot be the startup project (VS\'s message)', refused === false && path.basename(await startup.project()) === 'WebApp.csproj', `setProject(Contoso.Core) -> ${refused}`);
+
+    await vscode.commands.executeCommand('csharpShooter.startup.setProject', (await rows()).find((r) => label(r) === 'Contoso.Lobby'));
+    await vscode.commands.executeCommand('csharpShooter.startup.selectProfile', proj('Contoso.Lobby'), 'Contoso.Lobby Development VSCode');
+    await sleep(1000);
+    shown = await marks();
+    const written = fs.readFileSync(`${proj('Contoso.Lobby')}.user`, 'utf8').match(/<ActiveDebugProfile>([^<]*)</)?.[1];
+    expect('Ustaw jako projekt startowy, and a profile chosen: written to .csproj.user as VS writes it',
+      path.basename(await startup.project()) === 'Contoso.Lobby.csproj' && written === 'Contoso.Lobby Development VSCode' && status.start.includes('Contoso.Lobby Development VSCode') && shown.includes('Contoso.Lobby[project runnable startup]'),
+      `startup ${path.basename(await startup.project())}, ActiveDebugProfile=${written}, status ${status.project} | ${status.start}`);
+
+    // F5 on the startup entry: WebApp again, with its profile from .csproj.user.
+    await vscode.commands.executeCommand('csharpShooter.startup.setProject', proj('WebApp'));
+    const started = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((s) => (d.dispose(), r(s))); });
+    const ok = await vscode.debug.startDebugging(folder, api.startup.startupEntry());
+    const session = ok ? await Promise.race([started, sleep(240000).then(() => null)]) : null;
+    expect('F5 on "Projekt startowy (CSharpShooter)" runs the startup project with its active profile',
+      session?.name === 'WebApp: WebApp Development' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
+      session ? `${session.type} session "${session.name}", ASPNETCORE_ENVIRONMENT=${session.configuration.env?.ASPNETCORE_ENVIRONMENT}` : 'no session');
+    if (session) {
+      const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((x) => x.id === session.id && (d.dispose(), r())); });
+      await vscode.debug.stopDebugging(session);
+      await Promise.race([ended, sleep(30000)]);
+    }
+
+    // Ctrl+F5: no debug session; the program in a task, the browser once it listens.
+    api.launch.state.browserUrl = undefined;
+    let debugSessions = 0;
+    const counting = vscode.debug.onDidStartDebugSession(() => debugSessions++);
+    await vscode.debug.startDebugging(folder, api.startup.startupEntry(), { noDebug: true });
+    const run = api.launch.state.lastRunWithoutDebugging;
+    for (let i = 0; i < 180 && run && !api.launch.state.browserUrl; i++) await sleep(1000);
+    counting.dispose();
+    expect('Ctrl+F5 runs it without the debugger, the browser once it listens',
+      run?.name === 'WebApp: WebApp Development' && debugSessions === 0 && api.launch.state.browserUrl === 'https://localhost:44308/',
+      `task "${run?.name}", debug sessions ${debugSessions}, browser ${api.launch.state.browserUrl}`);
+    if (run) {
+      const ended = new Promise((r) => { const d = vscode.tasks.onDidEndTask((e) => e.execution === run.execution && (d.dispose(), r())); });
+      run.execution.terminate();
+      await Promise.race([ended, sleep(30000)]);
+    }
+  } finally {
+    userFiles.forEach((f, i) => (saved[i] ? fs.writeFileSync(f, saved[i]) : fs.rmSync(f, { force: true })));
+  }
+  const back = userFiles.every((f, i) => saved[i] && Buffer.compare(saved[i], fs.readFileSync(f)) === 0);
+  expect('.csproj.user files put back as they were', back, back ? 'byte for byte' : 'DIFFERENT');
   return results;
 }
 
@@ -466,6 +541,12 @@ async function run() {
     }
   }
   if (checks.runViewProbe) await runViewProbe();
+  if (checks.startup) {
+    for (const r of await startupChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  startup: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
+    }
+  }
   if (checks.launchJson) {
     for (const r of await launchJsonChecks()) {
       failed += r.ok ? 0 : 1;
