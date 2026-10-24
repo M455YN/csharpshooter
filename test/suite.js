@@ -585,6 +585,7 @@ async function launchChecks(api, profileName) {
     const [sln] = await api.solutionView.provider.getChildren();
     const web = (await api.solutionView.provider.getChildren(sln)).find((p) => p.label === 'WebApp');
     const t0 = Date.now();
+    if (process.env.SCREENSHOT) setTimeout(() => screenshot(process.env.SCREENSHOT.replace(/.png$/i, '-building.png')), 6000);
     const started = await vscode.commands.executeCommand('csharpShooter.solution.debugProject', web, profileName);
     const build = api.launch.state.lastBuild;
     expect('build before launch', started && build?.ok, `${build ? (build.ok ? 'build succeeded' : 'build FAILED') : 'no build'} in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
@@ -603,6 +604,13 @@ async function launchChecks(api, profileName) {
     const end = vscode.debug.onDidTerminateDebugSession((s) => s.id === session.id && (ended = true));
     for (let i = 0; i < 120 && !api.launch.state.browserUrl && !ended; i++) await sleep(1000);
     expect('app listens, browser opened at', api.launch.state.browserUrl, api.launch.state.browserUrl || (ended ? 'app ended' : 'not listening within 120 s'));
+    // What the notification at the bottom right said, in order: the build's stages, the start, the wait, the browser.
+    const said = api.launch.state.lastProgress?.lines || [];
+    const steps = ['Kompilacja rozpoczęta', 'Kompilowanie WebApp', 'WebApp — skompilowano', 'Kompilacja zakończyła się powodzeniem', 'Odczytywanie właściwości projektu',
+      'Uruchamianie z debugerem', 'Czekanie, aż aplikacja zacznie nasłuchiwać (https://localhost:44308', 'Otwieranie przeglądarki'];
+    const at = steps.map((s) => said.findIndex((l) => l.startsWith(s)));
+    expect('bottom right: what the build and the start are doing', at.every((i, n) => i >= 0 && (n === 0 || i >= at[n - 1])),
+      [...new Set(said)].join(' | '));
     if (!ended) await vscode.debug.stopDebugging(session);
     // Ended before the next check starts one of its own.
     for (let i = 0; i < 30 && !ended; i++) await sleep(1000);
