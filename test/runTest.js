@@ -21,12 +21,20 @@ const { runTests } = require('@vscode/test-electron');
   }));
   const launchJson = path.join(workspace, '.vscode', 'launch.json');
   const launchBefore = fs.existsSync(launchJson) ? fs.readFileSync(launchJson) : null;
+  // NAMES_FILE: [["WebApp", "<your web project>"], ...], the suite's sample names swapped for your solution's, in order.
+  let suite = path.resolve(__dirname, 'suite.js');
+  if (process.env.NAMES_FILE) {
+    const pairs = JSON.parse(fs.readFileSync(process.env.NAMES_FILE, 'utf8'));
+    const source = pairs.reduce((s, [from, to]) => s.split(from).join(to), fs.readFileSync(suite, 'utf8'));
+    suite = path.join(profile, 'suite.js');
+    fs.writeFileSync(suite, source);
+  }
   try {
     await runTests({
       vscodeExecutablePath: exe,
       // EXTENSION_PATH: an installed copy (a .vsix unpacked), to test what the package holds.
       extensionDevelopmentPath: process.env.EXTENSION_PATH || path.resolve(__dirname, '..'),
-      extensionTestsPath: path.resolve(__dirname, 'suite.js'),
+      extensionTestsPath: suite,
       // A profile and extensions folder of its own: only this extension runs.
       launchArgs: [workspace, '--user-data-dir', path.join(profile, 'data'), '--extensions-dir', path.join(profile, 'ext'), '--disable-workspace-trust'],
       extensionTestsEnv: { ...process.env },
