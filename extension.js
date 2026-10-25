@@ -8,6 +8,7 @@ const { registerSolutionView } = require('./solution');
 const { registerSolutionSearch } = require('./solution-search');
 const { registerSearchEverywhere } = require('./search-everywhere');
 const { registerDataVisualizer } = require('./data-visualizer');
+const { registerPublishPage } = require('./publish-page');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
 const { registerTaskRunner } = require('./task-runner');
@@ -193,6 +194,7 @@ async function activate(context) {
   solutionView.search = registerSolutionSearch(context, findSolution, solutionView);
   const searchEverywhere = registerSearchEverywhere(context, solutionView);
   const dataVisualizer = registerDataVisualizer(context);
+  const publishPage = registerPublishPage(context, require('./solution').newPublishProfile);
   const launch = registerLaunch(context);
   registerCompat(context, output, launch.provider);
   const taskRunner = registerTaskRunner(context, findSolution);
@@ -202,7 +204,7 @@ async function activate(context) {
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, startup, searchEverywhere, dataVisualizer, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, startup, searchEverywhere, dataVisualizer, publishPage, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {
