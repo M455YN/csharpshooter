@@ -850,7 +850,19 @@
           "strings": "on"
         }
       }
-    }
+    },
+    "themes": [
+      {
+        "label": "Visual Studio 2026 Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/visual-studio-2026-dark-color-theme.json"
+      },
+      {
+        "label": "Visual Studio 2026 Light",
+        "uiTheme": "vs",
+        "path": "./themes/visual-studio-2026-light-color-theme.json"
+      }
+    ]
   },
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",

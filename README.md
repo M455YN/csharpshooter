@@ -236,6 +236,21 @@ text; ⤢ in the Solution Explorer's box with its query) in one editor tab, laid
 Not like VS (yet): no replace, no syntax colours in the preview, no *Zaznaczenie* scope; Ctrl+T and Ctrl+Shift+F take
 VS Code's Go to Symbol in Workspace and Search (rebind them in Keyboard Shortcuts to have those back).
 
+## Visual Studio 2026 look
+
+Two colour themes, *Visual Studio 2026 Dark* and *Visual Studio 2026 Light* (File > Preferences > Theme > Color Theme),
+made from VS 2026's own theme files by `scripts/make-themes.js`: the shell's colours (title bar, tabs with the accent line,
+tool windows, menus, status bar grey and red while debugging, buttons, text boxes, selection) from `Theme.Dark.pkgdef` /
+`Theme.Light.pkgdef`, the editor's from `EditorColors.pkgdef` and VS's Fonts and Colors defaults, C# classified as VS
+classifies it (classes, interfaces, structs, methods, parameters, locals, control keywords) through the server's semantic
+tokens, Razor and HTML as VS shows them.
+
+```bash
+node scripts/make-themes.js "C:/Program Files/Microsoft Visual Studio/18/Community"
+```
+
+Not like VS: VS Code's own layout (activity bar, no toolbar row) stays; the colourful themes (Cool Slate, Juicy Plum...).
+
 ## Task Runner Explorer
 
 Under the Solution Explorer, after Visual Studio's (its labels are VS's Polish ones: *Eksplorator modułu uruchamiającego
@@ -265,7 +280,7 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
