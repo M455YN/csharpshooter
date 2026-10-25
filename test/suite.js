@@ -626,6 +626,9 @@ async function searchEverywhereChecks(api) {
 // list stays open through an attribute's '-', its item goes in; a tag helper's own attributes; asp-for's value; '@'.
 // Nothing is saved: each file is reverted.
 async function razorTypingChecks() {
+  // shortcut: a settle for the window's own start-up (its Chat, its first file opened) before keys are typed, which took
+  // the focus from them on a fresh window; a check of the focus itself would be the upgrade.
+  await sleep(8000);
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
   const labels = (list) => (list?.items || []).map((i) => (typeof i.label === 'string' ? i.label : i.label.label));
@@ -643,7 +646,10 @@ async function razorTypingChecks() {
     await editor.edit((e) => e.insert(new vscode.Position(at.line, 0), `${' '.repeat(at.character)}\n`));
     const start = new vscode.Position(at.line, at.character);
     editor.selection = new vscode.Selection(start, start);
+    // VS Code's Chat beside the editor takes the focus a while after the window opens; keys typed then go to it.
+    await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
     await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    await sleep(300);
     return { doc, editor, line: at.line };
   };
   // Waits for the list (asked as VS Code asks while typing), then takes its selected item.
@@ -665,6 +671,7 @@ async function razorTypingChecks() {
     `asp-for commits on: ${JSON.stringify(aspFor?.commitCharacters)}`);
   await type('asp-f');
   const typed = doc.lineAt(line).text.trim();
+  if (process.env.SCREENSHOT && typed !== '<input asp-f') await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-typing-lost.png'));
   await accept();
   const taken = doc.lineAt(line).text.trim();
   expect('typing <input asp-f: the list stays open through "-", asp-for goes in', typed === '<input asp-f' && /^<input asp-for/.test(taken), `typed: ${typed} → ${taken}`);
@@ -825,6 +832,36 @@ async function visualizerChecks(api, session, frameId) {
   return results;
 }
 
+// Opublikuj, as VS publishes to a folder: a new profile written as VS writes it, dotnet publish with it, the app in its
+// folder. A temporary folder and a profile removed afterwards: the project's own profiles (and where they publish) are left.
+async function publishChecks(api) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const [sln] = await api.solutionView.provider.getChildren();
+  const web = (await api.solutionView.provider.getChildren(sln)).find((p) => p.label === 'Contoso.Excel'); // the web projects do not publish in Release (WebApp's views' RZ2009)
+  const target = fs.mkdtempSync(path.join(require('os').tmpdir(), 'csharpshooter-publish-'));
+  const profiles = path.join(path.dirname(web.file), 'Properties', 'PublishProfiles');
+  const before = fs.existsSync(profiles) ? fs.readdirSync(profiles) : [];
+  const hadFolder = fs.existsSync(profiles);
+  let made;
+  try {
+    const r = await vscode.commands.executeCommand('csharpShooter.solution.publish', web, { folder: target });
+    made = r?.profile && path.join(profiles, `${r.profile}.pubxml`);
+    const xml = made && fs.existsSync(made) ? fs.readFileSync(made, 'utf8') : '';
+    expect('a new folder profile, as VS writes it, beside the project\'s own', r?.profile && !before.includes(`${r.profile}.pubxml`)
+      && xml.includes(`<PublishUrl>${target}</PublishUrl>`) && xml.includes('<LastUsedBuildConfiguration>Release</LastUsedBuildConfiguration>') && xml.includes('<_TargetId>Folder</_TargetId>'),
+      `${r?.profile}: ${xml.replace(/\s+/g, ' ').slice(0, 200)}`);
+    const dll = fs.existsSync(path.join(target, 'Contoso.Excel.dll'));
+    expect('dotnet publish with it: the app in that folder, the folder as MSBuild resolves it', r?.code === 0 && dll
+      && path.resolve(r.folder).toLowerCase() === path.resolve(target).toLowerCase(), `exit ${r?.code}, folder ${r?.folder}, Contoso.Excel.dll there: ${dll}`);
+  } finally {
+    if (made) fs.rmSync(made, { force: true });
+    if (!hadFolder && fs.existsSync(profiles) && !fs.readdirSync(profiles).length) fs.rmdirSync(profiles);
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+  return results;
+}
+
 async function screenshot(file) {
   await sleep(1500);
   const script = `
@@ -934,6 +971,12 @@ async function run() {
     for (const r of await razorTypingChecks()) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  razor typing: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
+    }
+  }
+  if (checks.publish || (!process.env.CHECKS_FILE && process.env.SKIP_PUBLISH !== '1')) {
+    for (const r of await publishChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  publish: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.everywhere || (!process.env.CHECKS_FILE && process.env.SKIP_EVERYWHERE !== '1')) {
