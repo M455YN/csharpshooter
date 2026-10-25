@@ -1,5 +1,6 @@
 // C# and Razor through Microsoft's roslyn-language-server, debugging through Passenger's debug adapter.
 const vscode = require('vscode');
+const { t, tn } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -38,7 +39,6 @@ const emptyListRequests = [
 const nullRequests = ['textDocument/hover', 'textDocument/signatureHelp', 'textDocument/linkedEditingRange', 'textDocument/rename',
   'textDocument/willSaveWaitUntil', 'completionItem/resolve', 'codeAction/resolve'];
 
-const plural = (n) => (n === 1 ? 'projekt' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'projekty' : 'projektów');
 
 /** Says at the bottom right, and with a spinner in the status bar, that C# is not ready yet while the server starts and
  *  loads the solution, as VS says it is loading the solution: on a slow machine that takes a while, and C# help, F12 and
@@ -47,7 +47,7 @@ function startLoading() {
   const progress = launchProgress('C#', { cancellable: false }); // nothing to cancel: the server goes on loading
   const bar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000);
   bar.command = 'csharpShooter.showOutput';
-  bar.tooltip = 'Serwer C# wczytuje rozwiązanie: podpowiedzi C#, przejdź do definicji i Razor ruszą po wczytaniu projektów.';
+  bar.tooltip = t('The C# server is loading the solution: C# completion, Go to Definition and Razor start once the projects are loaded.');
   const t0 = Date.now();
   let stage = '';
   const show = () => {
@@ -97,11 +97,11 @@ async function findSolution() {
 async function startServer(context) {
   loading?.finish();
   loading = startLoading();
-  loading.stage('Uruchamianie serwera C#…');
+  loading.stage(t('Starting the C# server…'));
   const serverDll = bundled(context, setting('serverPath'), 'server', 'Microsoft.CodeAnalysis.LanguageServer.dll');
   if (!fs.existsSync(serverDll)) {
     loading.finish();
-    vscode.window.showErrorMessage(`C# language server not found: ${serverDll}. Run "npm run fetch-server" in the extension folder.`);
+    vscode.window.showErrorMessage(t('C# language server not found: {0}. Run "npm run fetch-server" in the extension folder.', serverDll));
     return;
   }
   const logDir = path.join(context.logUri.fsPath, 'roslyn');
@@ -132,7 +132,7 @@ async function startServer(context) {
   let solutionName = '';
   client.onNotification('workspace/projectInitializationComplete', () => {
     output.appendLine('Projects loaded.');
-    loading?.finish(`Rozwiązanie ${solutionName} wczytane w ${Math.round((Date.now() - t0) / 1000)} s: podpowiedzi C#, F12 i Razor gotowe`);
+    loading?.finish(t('Solution {0} loaded in {1} s: C# completion, F12 and Razor ready', solutionName, Math.round((Date.now() - t0) / 1000)));
     readyResolve();
   });
   client.onNotification('window/_roslyn_showToast', (toast) => output.appendLine(`[toast] ${toast.message}`));
@@ -157,11 +157,11 @@ async function startServer(context) {
     } catch {
       // the count is only for the message
     }
-    loading.stage(`Wczytywanie rozwiązania ${solutionName}${count ? ` (${count} ${plural(count)})` : ''}…`);
+    loading.stage(count ? tn(count, 'Loading solution {1} (1 project)…', 'Loading solution {1} ({0} projects)…', solutionName) : t('Loading solution {0}…', solutionName));
     output.appendLine(`Opening ${solution}`);
     await client.sendNotification('solution/open', { solution: toServerUri(vscode.Uri.file(solution)) });
   } else {
-    loading.stage('Wczytywanie projektów…');
+    loading.stage(t('Loading projects…'));
     const projects = await vscode.workspace.findFiles('**/*.csproj', '**/{node_modules,bin,obj}/**');
     await client.sendNotification('project/open', { projects: projects.map(toServerUri) });
   }
@@ -177,7 +177,7 @@ class DebugAdapterFactory {
   constructor(context) { this.context = context; }
   createDebugAdapterDescriptor() {
     const exe = bundled(this.context, setting('debuggerPath'), 'debugger', process.platform === 'win32' ? 'Passenger.DebugAdapter.exe' : 'Passenger.DebugAdapter');
-    if (!fs.existsSync(exe)) throw new Error(`Debug adapter not found: ${exe}`);
+    if (!fs.existsSync(exe)) throw new Error(t('Debug adapter not found: {0}', exe));
     return new vscode.DebugAdapterExecutable(exe, ['--interpreter=vscode']);
   }
 }
@@ -199,6 +199,14 @@ async function activate(context) {
   const searchEverywhere = registerSearchEverywhere(context, solutionView);
   const dataVisualizer = registerDataVisualizer(context);
   registerRazorEnter(context);
+  // Texts already shown (trees, the status bar, open pages) keep their language until the window reloads.
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
+    if (!e.affectsConfiguration('csharpShooter.uiLanguage')) return;
+    const reload = t('Reload Window');
+    if ((await vscode.window.showInformationMessage(t("CSharpShooter's texts change language once the window reloads."), reload)) === reload) {
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
+    }
+  }));
   const publishPage = registerPublishPage(context, require('./solution').newPublishProfile);
   const launch = registerLaunch(context);
   registerCompat(context, output, launch.provider);

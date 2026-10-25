@@ -2,23 +2,28 @@
 // whose names match, from an index kept in memory; "Szukaj w zawartościach plików" adds the files whose text has it
 // (ripgrep, the one the editor ships), with the lines under them.
 const vscode = require('vscode');
+const { table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const childProcess = require('child_process');
 const { readSolution } = require('./solution');
 
 const HIDDEN_DIRS = new Set(['bin', 'obj', 'node_modules', '.vs', '.git']);
-const T = {
-  placeholder: 'Przeszukaj: Solution Explorer (Ctrl+;)',
-  fileContents: 'Szukaj w zawartościach plików',
-  fileContentsTip: 'Dołącz zawartości plików do wyników wyszukiwania',
-  noResults: 'Brak wyników.',
-  tooMany: 'Zbyt wiele wyników do wyświetlenia. Spróbuj uściślić swoje kryteria wyszukiwania.',
-  searchingContents: 'Przeszukiwanie zawartości plików…',
-  found: 'Pasujące elementy',
-  lines: 'wiersze',
-  noRipgrep: 'Nie znaleziono ripgrep (rg) edytora: zawartość plików nie jest przeszukiwana.',
-};
+const T = table({
+  placeholder: 'Search Solution Explorer (Ctrl+;)',
+  fileContents: 'Search within file contents',
+  fileContentsTip: 'Include file contents in the search results',
+  noResults: 'No results found.',
+  tooMany: 'Too many results to display. Try refining your search criteria.',
+  searchingContents: 'Searching file contents…',
+  found: 'Matching items',
+  lines: 'lines',
+  noRipgrep: "The editor's ripgrep (rg) was not found: file contents are not searched.",
+  clear: 'Clear',
+  searchOptions: 'Search options',
+  fullscreen: 'Search in full screen (Ctrl+T)',
+  fullscreenLabel: 'Search in full screen',
+});
 const MAX_NAME_HITS = 2000;
 const BINARY = ['png', 'jpg', 'jpeg', 'gif', 'ico', 'bmp', 'webp', 'tif', 'tiff', 'woff', 'woff2', 'ttf', 'eot', 'otf', 'bcmap', 'pdf',
   'zip', '7z', 'dll', 'exe', 'pdb', 'nupkg', 'mp3', 'mp4', 'wav', 'xlsx', 'docx', 'pptx', 'map'];
@@ -326,9 +331,9 @@ function registerSolutionSearch(context, findSolution, solutionView) {
 </style></head><body>
 <div class="box">
   <input id="q" placeholder="${esc(T.placeholder)}" aria-label="${esc(T.placeholder)}" spellcheck="false">
-  <button id="clear" title="Wyczyść" aria-label="Wyczyść">✕</button>
-  <button id="full" title="Wyszukaj na pełnym ekranie (Ctrl+T)" aria-label="Wyszukaj na pełnym ekranie">⤢</button>
-  <button id="more" title="Opcje wyszukiwania" aria-label="Opcje wyszukiwania" aria-expanded="false">▾</button>
+  <button id="clear" title="${esc(T.clear)}" aria-label="${esc(T.clear)}">✕</button>
+  <button id="full" title="${esc(T.fullscreen)}" aria-label="${esc(T.fullscreenLabel)}">⤢</button>
+  <button id="more" title="${esc(T.searchOptions)}" aria-label="${esc(T.searchOptions)}" aria-expanded="false">▾</button>
 </div>
 <div class="status" id="status" aria-live="polite"></div>
 <div class="options" id="options">

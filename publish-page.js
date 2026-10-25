@@ -3,21 +3,45 @@
 // deployment mode, target runtime, target location, file publish options), saved to its .pubxml, and how the last publish
 // ended. Publishing itself is csharpShooter.solution.publish; this is its page.
 const vscode = require('vscode');
+const { table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { readProject } = require('./solution');
 
-const T = {
-  title: 'Opublikuj', newProfile: 'Nowy profil', publish: 'Opublikuj', moreActions: 'Więcej akcji', rename: 'Zmień nazwę', delete: 'Usuń',
-  renameProfile: 'Zmień nazwę profilu', deleteConfirm: 'Usuń profil publikowania', ready: 'Gotowy do opublikowania.',
-  publishing: (where) => `Trwa publikowanie folderu ${where}...`, succeeded: 'Publikowanie zakończyło się powodzeniem.',
-  failed: 'Publikowanie zakończyło się niepowodzeniem.', openFolder: 'Otwórz folder',
-  settings: 'Ustawienia profilu', configuration: 'Konfiguracja', framework: 'Struktura docelowa', mode: 'Tryb wdrożenia',
-  dependent: 'Zależny od struktury', selfContained: 'Samodzielny', runtime: 'Docelowe środowisko uruchomieniowe', portable: 'Przenośne',
-  location: 'Lokalizacja docelowa', browse: 'Przeglądaj...', options: 'Opcje publikowania plików', deleteExisting: 'Usuń istniejące pliki',
-  singleFile: 'Utwórz pojedynczy plik', readyToRun: 'Włącz kompilację ReadyToRun', trim: 'Przytnij nieużywany kod', save: 'Zapisz',
-  noProfiles: 'Ten projekt nie ma jeszcze profilu publikowania: utwórz go przyciskiem Nowy profil.', saved: 'Zapisano.',
-};
+const T = table({
+  title: 'Publish',
+  profile: 'Profile',
+  newProfile: 'New profile',
+  publish: 'Publish',
+  moreActions: 'More actions',
+  rename: 'Rename',
+  delete: 'Delete',
+  renameProfile: 'Rename profile',
+  deleteConfirm: 'Delete publish profile',
+  ready: 'Ready to publish.',
+  publishing: 'Publishing to folder {0}...',
+  succeeded: 'Publish succeeded.',
+  failed: 'Publish failed.',
+  openFolder: 'Open folder',
+  settings: 'Profile settings',
+  configuration: 'Configuration',
+  framework: 'Target framework',
+  mode: 'Deployment mode',
+  dependent: 'Framework-dependent',
+  selfContained: 'Self-contained',
+  runtime: 'Target runtime',
+  portable: 'Portable',
+  location: 'Target location',
+  browse: 'Browse...',
+  options: 'File publish options',
+  deleteExisting: 'Delete all existing files prior to publish',
+  singleFile: 'Produce single file',
+  readyToRun: 'Enable ReadyToRun compilation',
+  trim: 'Trim unused code',
+  save: 'Save',
+  noProfiles: 'This project has no publish profile yet: create one with New profile.',
+  saved: 'Saved.',
+});
 const RUNTIMES = ['win-x64', 'win-x86', 'win-arm64', 'linux-x64', 'linux-arm64', 'linux-musl-x64', 'osx-x64', 'osx-arm64'];
 
 const dirOf = (projectFile) => path.join(path.dirname(projectFile), 'Properties', 'PublishProfiles');
@@ -191,7 +215,7 @@ function registerPublishPage(context, newPublishProfile) {
 </style></head><body>
 <h1>${esc(T.title)}</h1>
 <div class="bar">
-  <select id="profile" aria-label="Profil"></select>
+  <select id="profile" aria-label="${esc(T.profile)}"></select>
   <button id="new">${esc(T.newProfile)}</button>
   <button id="publish" class="primary">${esc(T.publish)}</button>
   <div class="menu" id="more"><button id="moreBtn">${esc(T.moreActions)} ▾</button><ul>

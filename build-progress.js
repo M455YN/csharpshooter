@@ -2,6 +2,7 @@
 // stages read from MSBuild's file log as it is written (the terminal keeps MSBuild's own output), then the start, the
 // wait for the app to listen, the browser.
 const vscode = require('vscode');
+const { t } = require('./l10n');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -69,7 +70,7 @@ function followBuildLog(file, report) {
   let node = ''; // the node of the last "N>" line; the lines under it carry no prefix
   let offset = 0;
   let rest = '';
-  const suffix = () => [counts.errors ? `błędy: ${counts.errors}` : '', counts.warnings ? `ostrzeżenia: ${counts.warnings}` : ''].filter(Boolean).join(', ');
+  const suffix = () => [counts.errors ? t('errors: {0}', counts.errors) : '', counts.warnings ? t('warnings: {0}', counts.warnings) : ''].filter(Boolean).join(', ');
   const say = (text) => report(suffix() ? `${text} (${suffix()})` : text);
   const name = (p) => path.basename(p).replace(/\.\w+proj$/, '');
   const line = (l) => {
@@ -84,8 +85,8 @@ function followBuildLog(file, report) {
     if (m) {
       const target = m[1];
       const project = projectOf.get(node) || '';
-      if (target === 'Restore') say('Przywracanie pakietów NuGet…');
-      else if (target === 'CoreCompile') say(`Kompilowanie ${project}…`);
+      if (target === 'Restore') say(t('Restoring NuGet packages…'));
+      else if (target === 'CoreCompile') say(t('Compiling {0}…', project));
       else if (!QUIET_TARGETS.has(target) && !seen.has(`${project}:${target}`)) {
         seen.add(`${project}:${target}`);
         say(`${project}: ${target}…`);
@@ -95,7 +96,7 @@ function followBuildLog(file, report) {
     m = /^\s+(\S+) -> (\S.*\.(dll|exe))\s*$/i.exec(l);
     if (m) {
       if (!counts.built.includes(m[1])) counts.built.push(m[1]);
-      say(`${m[1]} — skompilowano`);
+      say(t('{0} — compiled', m[1]));
       return;
     }
     // N>path(12,5): error CS1002: ...; each once (restore and the summary at the end repeat them).

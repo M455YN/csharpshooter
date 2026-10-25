@@ -143,20 +143,29 @@ async function solutionChecks(view) {
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
 
   const [sln] = await children();
-  expect('solution node', sln && label(sln) === "Solution 'WebApp'" && sln.description === '5 projects', `${label(sln)} (${sln.description})`);
+  expect('solution node', sln && label(sln) === 'Rozwiązanie „WebApp”' && sln.description === '5 projektów', `${label(sln)} (${sln.description})`);
   const projects = await children(sln);
   expect('projects', projects.map(label).join(',') === 'Contoso.Excel,Contoso.Core,Contoso.Lobby,WebApp,Tests', projects.map((p) => `${label(p)}${p.description ? ` [${p.description}]` : ''}`).join(', '));
   const web = projects.find((p) => label(p) === 'WebApp');
   const top = (await children(web)).map(label);
-  expect('project tree like VS (no bin/obj/node_modules/.user)', top[0] === 'Dependencies' && top.includes('Views') && !top.some((n) => /^(bin|obj|node_modules)$|\.user$/.test(n)), top.join(', '));
-  const deps = await child(web, 'Dependencies');
+  expect('project tree like VS (no bin/obj/node_modules/.user)', top[0] === 'Zależności' && top.includes('Views') && !top.some((n) => /^(bin|obj|node_modules)$|\.user$/.test(n)), top.join(', '));
+  const deps = await child(web, 'Zależności');
   const depGroups = await children(deps);
-  const projRefs = (await children(depGroups.find((g) => label(g) === 'Projects'))).map(label);
-  const packages = await children(depGroups.find((g) => label(g) === 'Packages'));
+  const projRefs = (await children(depGroups.find((g) => label(g) === 'Projekty'))).map(label);
+  const packages = await children(depGroups.find((g) => label(g) === 'Pakiety'));
   const pkgNames = packages.map(label);
   expect('dependencies: project references', projRefs.includes('Contoso.Core'), projRefs.join(', '));
   expect('dependencies: packages, commented ones left out', pkgNames.includes('Newtonsoft.Json') && !pkgNames.includes('NuGet.Common'),
     packages.slice(0, 6).map((p) => `${label(p)} ${p.description}`).join(', '));
+  // English: the same tree with csharpShooter.uiLanguage en, then Polish again.
+  const ui = vscode.workspace.getConfiguration('csharpShooter');
+  await ui.update('uiLanguage', 'en', vscode.ConfigurationTarget.Global);
+  const [slnEn] = await children();
+  const depsEn = (await children(projects.find((p) => label(p) === 'WebApp')))[0];
+  const groupsEn = (await children(depsEn)).map(label);
+  await ui.update('uiLanguage', 'pl', vscode.ConfigurationTarget.Global);
+  expect('English with csharpShooter.uiLanguage en', label(slnEn) === "Solution 'WebApp'" && slnEn.description === '5 projects' && label(depsEn) === 'Dependencies' && groupsEn.includes('Packages'),
+    `${label(slnEn)} (${slnEn.description}), ${label(depsEn)}: ${groupsEn.join(', ')}`);
   const core = projects.find((p) => label(p) === 'Contoso.Core');
   const resx = await child(await child(core, 'Properties'), 'Resources.resx');
   const nested = resx ? (await children(resx)).map(label) : [];
@@ -544,7 +553,7 @@ async function searchChecks(api, ext) {
   let rows = await shown();
   const files = rows.filter((x) => x.trim() === 'LoginViewModel.cs');
   expect('names: the tree filtered to the hits, their folders and projects open, other projects gone',
-    files.length === 2 && rows.some((x) => x.trim() === 'ViewModels') && !rows.some((x) => /Dependencies|Contoso\.Excel|Tests$/.test(x)) && !rows.some((x) => x.includes('WorktimeLog')),
+    files.length === 2 && rows.some((x) => x.trim() === 'ViewModels') && !rows.some((x) => /Zależności|Contoso\.Excel|Tests$/.test(x)) && !rows.some((x) => x.includes('WorktimeLog')),
     rows.join(' / '));
   expect('names: instant from the index (built once, then searched in memory)', warm < 150, `first ${cold} ms (index built), then ${warm} ms`);
 

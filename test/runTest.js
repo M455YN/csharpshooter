@@ -18,6 +18,8 @@ const { runTests } = require('@vscode/test-electron');
     ...(process.env.DEBUGGER_PATH ? { 'csharpShooter.debuggerPath': process.env.DEBUGGER_PATH } : {}),
     // LAUNCH_PROFILES=always: launch.json gets the launch profiles (it is put back afterwards); else nothing is asked.
     'csharpShooter.launchProfilesInLaunchJson': process.env.LAUNCH_PROFILES === 'always' ? 'always' : 'never',
+    // The checks read Visual Studio's Polish texts; one of them switches to English and back.
+    'csharpShooter.uiLanguage': 'pl',
   }));
   const launchJson = path.join(workspace, '.vscode', 'launch.json');
   const launchBefore = fs.existsSync(launchJson) ? fs.readFileSync(launchJson) : null;

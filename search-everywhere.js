@@ -3,6 +3,7 @@
 // (Find in Files, through ripgrep) and Funkcje (VS's Feature Search: commands and settings); VS's options and scope; the
 // results grouped, a preview beside or below them, and Find in Files' summary under them.
 const vscode = require('vscode');
+const { table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { matcher, grep, ripgrepPath } = require('./solution-search');
@@ -10,36 +11,58 @@ const { matcher, grep, ripgrepPath } = require('./solution-search');
 const K = vscode.SymbolKind;
 const TYPE_KINDS = new Set([K.Class, K.Interface, K.Enum, K.Struct]);
 const MEMBER_KINDS = new Set([K.Method, K.Property, K.Field, K.Constructor, K.Function, K.Constant, K.EnumMember, K.Event, K.Operator]);
-const KIND_NAMES = { [K.Class]: 'klasa', [K.Interface]: 'interfejs', [K.Enum]: 'wyliczenie', [K.Struct]: 'struktura', [K.Method]: 'metoda',
-  [K.Property]: 'właściwość', [K.Field]: 'pole', [K.Constructor]: 'konstruktor', [K.Function]: 'funkcja', [K.Constant]: 'stała',
-  [K.EnumMember]: 'element wyliczenia', [K.Event]: 'zdarzenie', [K.Operator]: 'operator' };
+const KIND_NAMES = table({ [K.Class]: 'class', [K.Interface]: 'interface', [K.Enum]: 'enum', [K.Struct]: 'struct', [K.Method]: 'method', [K.Property]: 'property', [K.Field]: 'field', [K.Constructor]: 'constructor', [K.Function]: 'function', [K.Constant]: 'constant', [K.EnumMember]: 'enum member', [K.Event]: 'event', [K.Operator]: 'operator' });
 const MAX_ITEMS = 500;
 const MAX_LINES = 5000;
-// VS's texts (Microsoft.VisualStudio.Shell.UI.Internal, Packages.Search.Strings, and msenvui's Find in Files), in Polish.
-const T = {
-  title: 'Wyszukaj',
-  watermark: 'Wyszukaj',
-  code: 'Kod', files: 'Pliki', types: 'Typy', members: 'Elementy członkowskie', text: 'Tekst', features: 'Funkcje',
-  codeTip: 'Wyszukuje pliki, typy i elementy członkowskie.',
-  filesTip: 'Filtruj, aby uzyskać tylko pliki.',
-  typesTip: 'Filtruj, aby uzyskać tylko typy, klasy, interfejsy i wyliczenia.',
-  membersTip: 'Filtruj, aby uzyskać tylko składowe klasy i typu.',
-  textTip: 'Znajdź w plikach: wiersze plików, które zawierają tekst.',
-  featuresTip: 'Wyszukaj polecenia i ustawienia.',
-  matchCase: 'Uwzględnij wielkość liter', wholeWord: 'Dopasuj całe wyrazy', regex: 'Użyj wyrażeń regularnych',
-  scope: 'Szukaj w:', solution: 'Całe rozwiązanie', project: 'Bieżący projekt', document: 'Bieżący dokument', open: 'Wszystkie otwarte dokumenty',
-  fileTypes: 'Typy plików:',
-  previewRight: 'Przełącz podgląd pionowy', previewBottom: 'Przełącz podgląd poziomy', hidePreview: 'Ukryj podgląd', showPreview: 'Pokaż podgląd',
-  noPreview: 'W tej chwili nie ma elementów do wyświetlenia w podglądzie.', noCodePreview: 'Ten plik nie ma podglądu.',
-  seeMore: 'Pokaż więcej', seeLess: 'Pokaż mniej', recent: 'Ostatnie zapytania',
-  noResults: 'Nie znaleziono wyników', noResultsYet: 'Nie ma jeszcze wyników', incomplete: 'Niekompletne wyniki',
-  noResultsWithFilter: 'Zakres lub filtry ograniczają dostępne wyniki. Spróbuj je zresetować, aby zobaczyć wyniki.',
-  summary: (lines, files, searched) => `Pasujące wiersze: ${lines}    Pasujące pliki: ${files}    Łączna liczba przeszukanych plików: ${searched}`,
-  noProject: 'Brak bieżącego projektu: otwórz plik projektu albo zmień zakres.',
-  noDocument: 'Brak bieżącego dokumentu.',
-  noRipgrep: 'Nie znaleziono ripgrep (rg) edytora.',
-  settings: (q) => `Ustawienia: „${q}”`, palette: (q) => `Paleta poleceń: „${q}”`,
-};
+// VS's texts (Microsoft.VisualStudio.Shell.UI.Internal, Packages.Search.Strings, and msenvui's Find in Files), in English
+// and Polish.
+const T = table({
+  title: 'Search',
+  results: 'Search results',
+  watermark: 'Search',
+  code: 'Code',
+  files: 'Files',
+  types: 'Types',
+  members: 'Members',
+  text: 'Text',
+  features: 'Features',
+  codeTip: 'Searches files, types and members.',
+  filesTip: 'Filter to files only.',
+  typesTip: 'Filter to types, classes, interfaces and enums only.',
+  membersTip: 'Filter to class and type members only.',
+  textTip: 'Find in Files: lines of files that contain the text.',
+  featuresTip: 'Search commands and settings.',
+  matchCase: 'Match case',
+  wholeWord: 'Match whole word',
+  regex: 'Use regular expressions',
+  scope: 'Look in:',
+  solution: 'Entire solution',
+  project: 'Current project',
+  document: 'Current document',
+  open: 'All open documents',
+  fileTypes: 'File types:',
+  previewRight: 'Toggle vertical preview',
+  previewBottom: 'Toggle horizontal preview',
+  hidePreview: 'Hide preview',
+  showPreview: 'Show preview',
+  noPreview: 'There are no items to preview right now.',
+  noCodePreview: 'This file has no preview.',
+  seeMore: 'Show more',
+  seeLess: 'Show less',
+  recent: 'Recent searches',
+  noResults: 'No results found',
+  noResultsYet: 'No results yet',
+  incomplete: 'Incomplete results',
+  noResultsWithFilter: 'The scope or filters are limiting the available results. Try resetting them to see results.',
+  summary: 'Matching lines: {0}    Matching files: {1}    Total files searched: {2}',
+  noProject: 'No current project: open a file of a project, or change the scope.',
+  noDocument: 'No current document.',
+  noRipgrep: "The editor's ripgrep (rg) was not found.",
+  settings: 'Settings: "{0}"',
+  palette: 'Command Palette: "{0}"',
+  settingsDetail: 'Settings',
+  paletteDetail: 'Command Palette',
+});
 
 /** "f:", "t:", "m:" at the start pick a filter, as in VS. */
 function parseQuery(raw, filter) {
@@ -172,8 +195,8 @@ function registerSearchEverywhere(context, solutionView) {
       }
     }
     // VS's Feature Search also finds options; VS Code's own commands are in its palette, which an extension cannot list.
-    items.push({ kind: 'command', label: T.settings(query), ranges: [], detail: 'Ustawienia', command: 'workbench.action.openSettings', args: [query] });
-    items.push({ kind: 'command', label: T.palette(query), ranges: [], detail: 'Paleta poleceń', command: 'workbench.action.quickOpen', args: [`>${query}`] });
+    items.push({ kind: 'command', label: T.settings(query), ranges: [], detail: T.settingsDetail, command: 'workbench.action.openSettings', args: [query] });
+    items.push({ kind: 'command', label: T.palette(query), ranges: [], detail: T.paletteDetail, command: 'workbench.action.quickOpen', args: [`>${query}`] });
     return { items: items.slice(0, MAX_ITEMS) };
   };
 
@@ -432,7 +455,7 @@ function registerSearchEverywhere(context, solutionView) {
   </div>
 </header>
 <main id="main" class="${esc(layout)}">
-  <div id="results" role="listbox" aria-label="Wyniki wyszukiwania"></div>
+  <div id="results" role="listbox" aria-label="${esc(T.results)}"></div>
   <div id="preview"><div class="message">${esc(T.noPreview)}</div></div>
 </main>
 <footer id="footer"></footer>

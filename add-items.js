@@ -1,6 +1,7 @@
 // Solution view → Add: New Folder, View (.cshtml), Controller (C#), as Visual Studio's Add menu makes them. Each takes
 // the clicked item, then asks for a name; tests pass the name (and the controller's base class) instead.
 const vscode = require('vscode');
+const { t, tn } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { readProject } = require('./solution');
@@ -77,7 +78,7 @@ async function askName(prompt, value, validate) {
 /** Writes a new file, refusing to overwrite one, then opens it and shows it in the Solution view. */
 async function create(file, text, reveal) {
   if (fs.existsSync(file)) {
-    vscode.window.showErrorMessage(`${path.basename(file)} already exists.`);
+    vscode.window.showErrorMessage(t('{0} already exists.', path.basename(file)));
     return undefined;
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -89,11 +90,11 @@ async function create(file, text, reveal) {
 
 async function addFolder(item, name, reveal) {
   const { dir } = targetOf(item);
-  name ??= await askName('New folder name', 'NewFolder', (v) => (!v || /[<>:"/\\|?*]/.test(v) ? 'Not a folder name' : null));
+  name ??= await askName(t('New folder name'), 'NewFolder', (v) => (!v || /[<>:"/\\|?*]/.test(v) ? t('Not a folder name') : null));
   if (!name) return undefined;
   const folder = path.join(dir, name);
   if (fs.existsSync(folder)) {
-    vscode.window.showErrorMessage(`${name} already exists.`);
+    vscode.window.showErrorMessage(t('{0} already exists.', name));
     return undefined;
   }
   fs.mkdirSync(folder);
@@ -103,7 +104,7 @@ async function addFolder(item, name, reveal) {
 
 async function addView(item, name, reveal) {
   const { dir } = targetOf(item, 'Views');
-  name ??= await askName('View name', 'Index', (v) => (v && IDENTIFIER.test(v.replace(/\.cshtml$/i, '')) ? null : 'Not a view name'));
+  name ??= await askName(t('View name'), 'Index', (v) => (v && IDENTIFIER.test(v.replace(/\.cshtml$/i, '')) ? null : t('Not a view name')));
   if (!name) return undefined;
   name = name.replace(/\.cshtml$/i, '');
   const eol = process.platform === 'win32' ? '\r\n' : '\n';
@@ -114,17 +115,17 @@ async function addView(item, name, reveal) {
 async function addController(item, name, reveal, options = {}) {
   const { dir, project } = targetOf(item, 'Controllers');
   if (!project) return undefined;
-  name ??= await askName('Controller name', 'HomeController', (v) => (v && IDENTIFIER.test(v) ? null : 'Not a class name'));
+  name ??= await askName(t('Controller name'), 'HomeController', (v) => (v && IDENTIFIER.test(v) ? null : t('Not a class name')));
   if (!name) return undefined;
   if (!name.endsWith('Controller')) name += 'Controller';
 
   const style = projectStyle(project);
   let base = options.baseClass;
   if (!base) {
-    const choices = [...style.bases.map(([b, n]) => ({ label: b, description: `used by ${n} controller${n === 1 ? '' : 's'} here` })),
-      { label: 'Controller', description: 'MVC controller with views' }, { label: 'ControllerBase', description: 'API controller' }]
+    const choices = [...style.bases.map(([b, n]) => ({ label: b, description: tn(n, 'used by 1 controller here', 'used by {0} controllers here') })),
+      { label: 'Controller', description: t('MVC controller with views') }, { label: 'ControllerBase', description: t('API controller') }]
       .filter((c, i, all) => all.findIndex((x) => x.label === c.label) === i);
-    base = (await vscode.window.showQuickPick(choices, { placeHolder: `Base class of ${name}` }))?.label;
+    base = (await vscode.window.showQuickPick(choices, { placeHolder: t('Base class of {0}', name) }))?.label;
     if (!base) return undefined;
   }
 

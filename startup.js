@@ -3,28 +3,29 @@
 // (<ActiveDebugProfile>, the file and element VS reads and writes, so a choice made here or there holds in both).
 // F5 on the "Projekt startowy (CSharpShooter)" entry, the status bar and the Solution Explorer follow them.
 const vscode = require('vscode');
+const { table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 
 const TYPE = 'csharpshooter';
 const ENTRY_NAME = 'Projekt startowy (CSharpShooter)';
-// VS's own Polish words for these (CommonIDE and ManagedProjectSystem resources).
-const T = {
-  startupMark: 'projekt startowy',
-  setStartup: 'Ustaw jako projekt startowy',
-  notRunnable: 'Projekt z typem wyjściowym biblioteki klasy nie może być bezpośrednio uruchomiony.',
-  start: 'Rozpocznij',
-  startNoDebug: 'Uruchom bez debugowania',
-  profiles: 'Profile uruchamiania',
-  framework: (tfm) => `Platforma (${tfm})`,
-  debugProperties: (project) => `Właściwości debugowania ${project}`,
-  pickProject: 'Projekt startowy',
-  noProfile: 'Brak skonfigurowanych aktywnych profilów uruchamiania dla tego projektu.',
-  configurations: 'Konfiguracje rozwiązania',
-  platforms: 'Platformy rozwiązania',
-  restart: 'Uruchom ponownie',
-  saveAll: 'Zapisz wszystko',
-};
+// VS's own words for these (CommonIDE and ManagedProjectSystem resources), in English and Polish (l10n/pl.json).
+const T = table({
+  startupMark: 'startup project',
+  setStartup: 'Set as Startup Project',
+  notRunnable: 'A project with an output type of Class Library cannot be started directly.',
+  start: 'Start',
+  startNoDebug: 'Start Without Debugging',
+  profiles: 'Launch Profiles',
+  framework: 'Framework ({0})',
+  debugProperties: '{0} Debug Properties',
+  pickProject: 'Startup Project',
+  noProfile: 'There are no active launch profiles configured for this project.',
+  configurations: 'Solution Configurations',
+  platforms: 'Solution Platforms',
+  restart: 'Restart',
+  saveAll: 'Save All',
+});
 
 const projectName = (file) => path.basename(file, path.extname(file));
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();

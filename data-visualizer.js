@@ -3,23 +3,36 @@
 // evaluation (Passenger compiles C# with Roslyn's expression compiler, as VS does): its tables, its columns, its rows a page
 // at a time as the table is scrolled; filtered, sorted, copied and saved as CSV here, with VS's Polish texts.
 const vscode = require('vscode');
+const { t, table } = require('./l10n');
 const fs = require('fs');
 
 const PAGE = 200;
-const T = {
-  title: (name) => `Wizualizator ${name}`,
-  table: 'Tabela:',
-  filter: 'Filtruj', clearFilter: 'Wyczyść filtr',
-  copy: 'Kopiuj', copyAll: 'Kopiuj wszystko', exportCsv: 'Eksportuj do pliku CSV...', saveCsv: 'Zapisz plik CSV', csvFile: 'Plik CSV',
-  currentRow: (n, total) => `Wiersz ${n} z ${total}`, totalRows: (n) => `Razem wierszy: ${n}`, selectedRows: (n) => `Zaznaczono wierszy: ${n}`,
-  fetching: 'Trwa pobieranie większej ilości danych z aplikacji...', fetchingAll: 'Trwa pobieranie pozostałych danych...',
-  exporting: 'Trwa eksportowanie danych...', exportExcel: 'Eksportuj do programu Excel...',
-  updateError: 'Błąd aktualizacji wiersza', cannotEdit: 'Nie można zaktualizować komórki, ponieważ nie można edytować wiersza.',
-  unavailable: 'Wizualizatory są niedostępne, gdy program docelowy jest uruchomiony lub jeśli nie można ocenić wyrażenia.',
-  empty: (name) => `<Obiekt ${name} jest pusty>`,
-  deleted: 'Usunięto', ascending: 'Rosnąco', descending: 'Malejąco',
-  noExpression: 'Tej zmiennej nie da się ocenić jako wyrażenia: dodaj ją do czujki (Watch) i otwórz wizualizator stamtąd.',
-};
+const T = table({
+  title: '{0} Visualizer',
+  table: 'Table:',
+  filter: 'Filter',
+  clearFilter: 'Clear filter',
+  copy: 'Copy',
+  copyAll: 'Copy all',
+  exportCsv: 'Export to CSV file...',
+  saveCsv: 'Save CSV file',
+  csvFile: 'CSV file',
+  currentRow: 'Row {0} of {1}',
+  totalRows: 'Total rows: {0}',
+  selectedRows: 'Selected rows: {0}',
+  fetching: 'Fetching more data from the application...',
+  fetchingAll: 'Fetching the rest of the data...',
+  exporting: 'Exporting data...',
+  exportExcel: 'Export to Excel...',
+  updateError: 'Row update error',
+  cannotEdit: 'The cell cannot be updated because the row cannot be edited.',
+  unavailable: 'Visualizers are unavailable while the target is running or if the expression cannot be evaluated.',
+  empty: '<{0} object is empty>',
+  deleted: 'Deleted',
+  ascending: 'Ascending',
+  descending: 'Descending',
+  noExpression: 'This variable cannot be evaluated as an expression: add it to Watch and open the visualizer from there.',
+});
 // Separators the cells are sent with: control characters a table's text does not hold.
 const ROW = '\u001e';
 const CELL = '\u001f';
@@ -398,7 +411,9 @@ function registerDataVisualizer(context) {
   const T = ${JSON.stringify({ deleted: T.deleted, ascending: T.ascending, descending: T.descending })};
   const $ = (id) => document.getElementById(id);
   let columns = [], rows = [], count = 0, sortBy = -1, sortDir = 0, filter = '', selected = new Set(), last = -1, view = [], pendingAll = null;
-  const fmt = { cur: ${T.currentRow.toString()}, total: ${T.totalRows.toString()}, sel: ${T.selectedRows.toString()} };
+  const fill = (s, ...a) => s.replace(/\\{(\\d)\\}/g, (m, i) => a[i]);
+  const texts = ${JSON.stringify({ cur: t('Row {0} of {1}'), total: t('Total rows: {0}'), sel: t('Selected rows: {0}') })};
+  const fmt = { cur: (n, c) => fill(texts.cur, n, c), total: (n) => fill(texts.total, n), sel: (n) => fill(texts.sel, n) };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => '&#' + c.charCodeAt(0) + ';');
   const text = (r) => r.deleted ? columns.map(() => '') : r.cells.map((c) => c == null ? '' : c);
   const compare = (a, b) => {
