@@ -170,6 +170,14 @@ the title bar has **Sync with Active Document** and **Refresh**; a project's or 
 Build, Rebuild, Clean (`dotnet build/clean` in a task), Edit Project File, Open in Terminal, Open Folder in File
 Explorer and Copy Full Path. It follows files created and deleted on disk.
 
+**Opublikuj...** (a project's menu) publishes it to a folder as Visual Studio does: pick one of its profiles
+(`Properties/PublishProfiles/*.pubxml`, VS's own) or *Nowy profil*, which asks for the folder and writes a
+`FolderProfile.pubxml` as VS writes one; then `dotnet publish` with it in a task, its stages at the bottom right as a
+build's. The profile's `LastUsedBuildConfiguration` and `TargetFramework` go on the command line (`-c`, `-f`): the SDK
+takes neither from a profile (a multi-targeted project fails without `-f`). It ends with VS's *Publikowanie zakończyło
+się powodzeniem.* and the folder as MSBuild resolves it, with *Otwórz folder*. Not like VS (yet): only folder profiles
+(no Azure, FTP, Web Deploy), and no dialog for a profile's runtime, self-contained or single-file (edit its .pubxml).
+
 Right-click a project or folder → **Add**:
 - **New Folder...**
 - **View (.cshtml)...**: `Name.cshtml` with `ViewData["Title"]`, in the folder (a project's `Views` when the project
