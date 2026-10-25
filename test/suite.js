@@ -776,6 +776,52 @@ async function visualizerChecks(api, session, frameId) {
   expect('a DataSet: its tables to choose from, an empty one said so', viz.kindOf(setType) === 'DataSet' && tables?.map((t) => t.name).join() === 'Pierwsza' && set.said.count === 0,
     `${setType}: tables ${tables?.map((t) => t.name)}, ${JSON.stringify(set?.said)}`);
   set?.panel.dispose();
+  // IEnumerable, as VS's IEnumerable visualizer: a value per row, or an object's properties as columns.
+  const numbers = 'System.Linq.Enumerable.ToList(System.Linq.Enumerable.Range(1, 300))';
+  const numbersType = await typeOf(numbers);
+  const list = await viz.open({ evaluateName: numbers, name: 'numbers', type: numbersType }, session, frameId);
+  await until(() => list?.said.loaded === 200);
+  expect('IEnumerable of values: one Value column, its rows a page at a time', viz.kindOf(numbersType) === 'IEnumerable' && typeTest.test(numbersType)
+    && list.said.columns?.join() === 'Value' && list.said.count === 300 && list.said.first === '1', `${numbersType}: ${JSON.stringify(list?.said)}`);
+  list?.panel.dispose();
+  const versions = 'System.Linq.Enumerable.ToList(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(1, 3), i => new System.Version(i, 2)))';
+  const objects = await viz.open({ evaluateName: versions, name: 'versions', type: await typeOf(versions) }, session, frameId);
+  await until(() => objects?.said.loaded === 3);
+  const versionColumns = await objects?.source.columns(0);
+  const versionRows = await objects?.source.rows(0, 0, 3);
+  const major = versionColumns?.findIndex((c) => c.name === 'Major');
+  expect("IEnumerable of objects: a column per property, each row's values", major >= 0 && versionColumns.some((c) => c.name === 'Minor')
+    && versionRows?.map((r) => r.cells[major]).join() === '1,2,3', `${versionColumns?.map((c) => `${c.name}:${c.type}`).join(', ')} | ${versionRows?.map((r) => r.cells.join('|')).join(' / ')}`);
+  objects?.panel.dispose();
+
+  // Editing a cell, as VS's DataSet visualizer: the table kept where the evaluations find it again (an expression of a call
+  // would make a new one each time).
+  await session.customRequest('evaluate', { expression: `System.AppDomain.CurrentDomain.SetData("csharpshooter-test", ${table})`, frameId, context: 'watch' });
+  const kept = '(System.Data.DataTable)System.AppDomain.CurrentDomain.GetData("csharpshooter-test")';
+  const edited = await viz.open({ evaluateName: kept, name: 'kept', type: 'System.Data.DataTable' }, session, frameId);
+  await until(() => edited?.said.loaded === 200);
+  await edited.request({ type: 'edit', row: 0, col: 0, value: 'zmieniony' });
+  await edited.request({ type: 'edit', row: 1, col: 1, value: 'abc' });
+  const refused = edited.said.editError;
+  await edited.request({ type: 'edit', row: 2, col: 1, value: null });
+  const after = await edited.source.rows(0, 0, 3);
+  await until(() => edited.said.first === 'zmieniony|1');
+  expect('a cell edited is set in the program; a value its column cannot take is refused; empty is DBNull',
+    after[0].cells.join() === 'zmieniony,1' && after[1].cells.join() === '2,2' && !!refused && after[2].cells[1] === null && edited.said.first === 'zmieniony|1',
+    `${after.map((r) => r.cells.join('|')).join(' / ')}; refused: ${refused}; shown first: ${edited.said.first}`);
+
+  // Eksportuj do programu Excel...: an .xlsx, its numbers as numbers (Sort is a long column).
+  const opened = process.env.CSHARPSHOOTER_NO_BROWSER;
+  process.env.CSHARPSHOOTER_NO_BROWSER = '1';
+  await edited.request({ type: 'xlsx' });
+  if (opened === undefined) delete process.env.CSHARPSHOOTER_NO_BROWSER;
+  const book = edited.said.xlsx && require('fs').readFileSync(edited.said.xlsx);
+  const sheet = book?.toString('utf8') || '';
+  expect('Eksportuj do programu Excel: an .xlsx of every row, numbers as numbers', book?.slice(0, 2).toString() === 'PK' && sheet.includes('xl/worksheets/sheet1.xml')
+    && sheet.includes('<t xml:space="preserve">zmieniony</t>') && sheet.includes('<c><v>450</v></c>') && (sheet.match(/<row>/g) || []).length === 451,
+    `${edited.said.xlsx}: ${book?.length} bytes, ${(sheet.match(/<row>/g) || []).length} rows`);
+  edited.panel.dispose();
+  await session.customRequest('evaluate', { expression: 'System.AppDomain.CurrentDomain.SetData("csharpshooter-test", null)', frameId, context: 'watch' });
   return results;
 }
 
