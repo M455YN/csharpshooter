@@ -313,6 +313,48 @@ function isNestedUnder(item, target) {
   return walk(item.nested);
 }
 
+/** A folder profile written as VS writes one (FolderProfile, FolderProfile1… while the name is taken); its name, or
+ *  undefined when no folder is given. */
+async function newPublishProfile(projectFile, dir, taken, folder) {
+  const framework = readProject(projectFile).frameworks[0] || '';
+  folder ??= await vscode.window.showInputBox({ title: 'Lokalizacja folderu', prompt: 'Podaj ścieżkę do folderu lokalnego lub sieciowego',
+    value: `bin\\Release\\${framework}\\publish\\` });
+  if (!folder) return undefined;
+  let name = 'FolderProfile';
+  for (let n = 1; taken.includes(name); n++) name = `FolderProfile${n}`;
+  const xml = (s) => s.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${name}.pubxml`), `<?xml version="1.0" encoding="utf-8"?>
+<!--
+https://go.microsoft.com/fwlink/?LinkID=208121.
+-->
+<Project>
+  <PropertyGroup>
+    <DeleteExistingFiles>false</DeleteExistingFiles>
+    <ExcludeApp_Data>false</ExcludeApp_Data>
+    <LaunchSiteAfterPublish>true</LaunchSiteAfterPublish>
+    <LastUsedBuildConfiguration>Release</LastUsedBuildConfiguration>
+    <LastUsedPlatform>Any CPU</LastUsedPlatform>
+    <PublishProvider>FileSystem</PublishProvider>
+    <PublishUrl>${xml(folder)}</PublishUrl>
+    <PublishDir>${xml(folder)}</PublishDir>
+    <WebPublishMethod>FileSystem</WebPublishMethod>
+    <_TargetId>Folder</_TargetId>${framework ? `\n    <TargetFramework>${framework}</TargetFramework>` : ''}
+  </PropertyGroup>
+</Project>
+`.replace(/\n/g, '\r\n'));
+  return name;
+}
+
+/** Where a publish with a profile lands, as MSBuild evaluates it (a relative folder is the project's). */
+function publishDir(projectFile, configuration, profile, framework) {
+  return new Promise((resolve) => {
+    require('child_process').execFile('dotnet', ['msbuild', projectFile, '-getProperty:PublishDir', `-p:Configuration=${configuration}`, `-p:PublishProfile=${profile}`,
+      ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
+      { cwd: path.dirname(projectFile), windowsHide: true }, (error, stdout) => resolve(error ? undefined : path.resolve(path.dirname(projectFile), stdout.trim())));
+  });
+}
+
 function registerSolutionView(context, findSolution) {
   const provider = new SolutionProvider(findSolution);
   const view = vscode.window.createTreeView('csharpShooter.solution', { treeDataProvider: provider, showCollapseAll: true });
@@ -331,9 +373,12 @@ function registerSolutionView(context, findSolution) {
   watcher.onDidChange((u) => /\.(csproj|sln|slnx)$/i.test(u.fsPath) && refreshSoon());
   context.subscriptions.push(watcher);
 
-  // A dotnet command in a task; resolves with its exit code once it ends.
+  // A dotnet command in a task (a command line, or dotnet's arguments, each quoted for the shell); resolves with its exit
+  // code once it ends.
   const terminalTask = async (name, cmd, cwd, started = () => {}) => {
-    const execution = await vscode.tasks.executeTask(new vscode.Task({ type: 'shell', task: name }, vscode.TaskScope.Workspace, name, 'CSharpShooter', new vscode.ShellExecution(cmd, { cwd })));
+    const shell = typeof cmd === 'string' ? new vscode.ShellExecution(cmd, { cwd })
+      : new vscode.ShellExecution('dotnet', cmd.map((value) => ({ value, quoting: vscode.ShellQuoting.Strong })), { cwd });
+    const execution = await vscode.tasks.executeTask(new vscode.Task({ type: 'shell', task: name }, vscode.TaskScope.Workspace, name, 'CSharpShooter', shell));
     started(execution);
     return new Promise((resolve) => {
       const done = vscode.tasks.onDidEndTaskProcess((e) => e.execution === execution && (done.dispose(), resolve(e.exitCode)));
@@ -341,13 +386,14 @@ function registerSolutionView(context, findSolution) {
   };
   // A build in a task, what it does said at the bottom right as F5's build says it, and its outcome in the status bar as VS's.
   const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
-  const buildTask = async (name, cmd, cwd) => {
+  // `args`: dotnet's, quoted one by one, so the file logger's ';' never ends the shell's command (PowerShell's would).
+  const buildTask = async (name, args, cwd) => {
     const progress = launchProgress(name);
     const log = buildLog();
     const following = followBuildLog(log.file, progress.report);
     progress.report('Kompilacja rozpoczęta…');
     try {
-      const code = await terminalTask(name, `${cmd} "${log.arg}"`, cwd, (execution) => progress.token.onCancellationRequested(() => execution.terminate()));
+      const code = await terminalTask(name, [...args, log.arg], cwd, (execution) => progress.token.onCancellationRequested(() => execution.terminate()));
       vscode.window.setStatusBarMessage(code === 0 ? 'Kompilacja zakończyła się powodzeniem' : 'Kompilacja nie powiodła się', 10000);
       return code;
     } finally {
@@ -366,9 +412,44 @@ function registerSolutionView(context, findSolution) {
   const register = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   register('csharpShooter.solution.refresh', () => provider.refresh());
-  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', () => buildTask(`build ${item.label}`, `dotnet build "${target(item)}"`, path.dirname(target(item))), 'AfterBuild'));
-  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', () => buildTask(`rebuild ${item.label}`, `dotnet build --no-incremental "${target(item)}"`, path.dirname(target(item))), 'AfterBuild'));
+  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', () => buildTask(`build ${item.label}`, ['build', target(item)], path.dirname(target(item))), 'AfterBuild'));
+  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', () => buildTask(`rebuild ${item.label}`, ['build', '--no-incremental', target(item)], path.dirname(target(item))), 'AfterBuild'));
   register('csharpShooter.solution.clean', (item) => bound(item, 'Clean', () => terminalTask(`clean ${item.label}`, `dotnet clean "${target(item)}"`, path.dirname(target(item)))));
+  // Opublikuj, as VS's folder publish: a profile of the project's (Properties/PublishProfiles/*.pubxml) or a new one, then
+  // dotnet publish with it. The configuration is given on the command line (the SDK does not take it from a profile, as
+  // Passenger notes) and the folder is said as MSBuild resolves it. `choice` (the tests'): a profile's name, or { folder }.
+  register('csharpShooter.solution.publish', async (item, choice) => {
+    const project = path.dirname(item.file);
+    const dir = path.join(project, 'Properties', 'PublishProfiles');
+    const profiles = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.pubxml')).map((f) => path.basename(f, '.pubxml')) : [];
+    const read = (name, tag) => new RegExp(`<${tag}>([^<]*)</${tag}>`).exec(fs.readFileSync(path.join(dir, `${name}.pubxml`), 'utf8'))?.[1];
+    let profile = typeof choice === 'string' ? choice : undefined;
+    if (!profile) {
+      const NEW = 'Nowy profil';
+      const picked = choice?.folder ? NEW : (await vscode.window.showQuickPick([
+        ...profiles.map((p) => ({ label: p, description: read(p, 'PublishUrl') || read(p, 'PublishDir') || '', detail: read(p, 'LastUsedBuildConfiguration') })),
+        { label: NEW, description: 'Folder' }], { title: `Opublikuj: ${item.label}`, placeHolder: 'Miejsce docelowe' }))?.label;
+      if (!picked) return undefined;
+      profile = picked === NEW ? await newPublishProfile(item.file, dir, profiles, choice?.folder) : picked;
+      if (!profile) return undefined;
+    }
+    const configuration = read(profile, 'LastUsedBuildConfiguration') || 'Release';
+    // A multi-targeted project's outer build reads no TargetFramework from the profile either (NETSDK1129 without -f).
+    const framework = read(profile, 'TargetFramework');
+    if (!(await buildBindings('BeforeBuild', project))) return undefined;
+    const code = await buildTask(`publish ${item.label} (${profile})`,
+      ['publish', item.file, '-c', configuration, ...(framework ? ['-f', framework] : []), `-p:PublishProfile=${profile}`], project);
+    let folder;
+    if (code === 0) {
+      await buildBindings('AfterBuild', project);
+      folder = await publishDir(item.file, configuration, profile, framework);
+      vscode.window.showInformationMessage(`Publikowanie zakończyło się powodzeniem. ${folder || ''}`, 'Otwórz folder')
+        .then((b) => b && folder && vscode.env.openExternal(vscode.Uri.file(folder)));
+    } else {
+      vscode.window.showErrorMessage('Publikowanie zakończyło się niepowodzeniem.');
+    }
+    return { code, profile, folder };
+  });
   register('csharpShooter.solution.editProject', (item) => vscode.window.showTextDocument(vscode.Uri.file(item.file)));
   register('csharpShooter.solution.revealInOS', (item) => vscode.commands.executeCommand('revealFileInOS', item.resourceUri || vscode.Uri.file(item.file)));
   register('csharpShooter.solution.copyPath', (item) => vscode.env.clipboard.writeText((item.resourceUri || vscode.Uri.file(item.file)).fsPath));

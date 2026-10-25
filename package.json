@@ -325,6 +325,11 @@
         "title": "Wizualizator (DataTable, DataSet, IEnumerable)",
         "icon": "$(search)",
         "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.solution.publish",
+        "title": "Opublikuj...",
+        "category": "Solution"
       }
     ],
     "menus": {
@@ -380,6 +385,11 @@
           "command": "csharpShooter.solution.clean",
           "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project)( |$)/",
           "group": "1_build@3"
+        },
+        {
+          "command": "csharpShooter.solution.publish",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
+          "group": "1_build@4"
         },
         {
           "command": "csharpShooter.solution.editProject",
@@ -558,6 +568,10 @@
         },
         {
           "command": "csharpShooter.visualizeData",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.publish",
           "when": "false"
         }
       ],
