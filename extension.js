@@ -192,6 +192,9 @@ async function activate(context) {
     await startServer(context);
   }));
   const solutionView = registerSolutionView(context, findSolution);
+  // With a solution in the workspace, the side bar opens on the Solution Explorer, as VS opens on it (an extension's
+  // icon cannot be put above VS Code's Explorer; once dragged there, VS Code keeps it).
+  findSolution().then((solution) => solution && vscode.commands.executeCommand('workbench.view.extension.csharpShooter'));
   solutionView.search = registerSolutionSearch(context, findSolution, solutionView);
   const searchEverywhere = registerSearchEverywhere(context, solutionView);
   const dataVisualizer = registerDataVisualizer(context);
