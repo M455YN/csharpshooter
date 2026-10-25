@@ -104,9 +104,13 @@ does too), then kept per workspace; the active profile is the project's `.csproj
   .sln's own, e.g. a solution's "debug app"); *Any CPU ▾* (*Platformy rozwiązania*); *$(project) WebApp* picks the
   startup project; *▷ WebApp Development* opens the start button's menu: *Rozpocznij* (F5), *Uruchom bez debugowania*
   (Ctrl+F5), the project's profiles, *Platforma (…)* for a multi-targeted project, *Właściwości debugowania …* (its
-  `launchSettings.json`); then *Uruchom bez debugowania* and *Uruchom ponownie* (grey until something is debugged). The
+  `launchSettings.json`); then *Uruchom bez debugowania* and *Uruchom ponownie* (grey until something runs). The
   configuration and platform go to F5's build and to the Solution Explorer's Build / Rebuild, each project's mapped as the
   .sln maps it (`{guid}.<cfg>|<platform>.ActiveCfg`), as VS builds; a launch.json entry's own `configuration` wins.
+- **Uruchom ponownie** (the status bar's ↻, Ctrl+Shift+F5), as VS's: the app under the debugger is ended first, a start
+  still building is cancelled, an app run with Ctrl+F5 (or left running by an earlier start of the project) is stopped,
+  and only then is it built and started again. VS Code's own restart on the debug toolbar builds while the app still
+  runs; use this one.
 - **Solution Explorer**: the startup project says *projekt startowy*; *Ustaw jako projekt startowy* on a runnable
   project (an Exe or a web project; a class library gets VS's "cannot be run directly" message).
 - **Run and Debug**: the entry *Projekt startowy (CSharpShooter)* (`"startupProject": true`) always runs the startup

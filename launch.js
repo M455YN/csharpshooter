@@ -128,6 +128,7 @@ class LaunchProfiles {
 
   /** A configuration that names a project: built, its program found, its profile's environment and URLs applied. */
   async resolveDebugConfigurationWithSubstitutedVariables(folder, config) {
+    const asked = config;
     // "Projekt startowy (CSharpShooter)": the startup project with its active profile and framework, as VS's F5 runs it.
     if (config.request === 'launch' && config.startupProject && this.startup) {
       const now = await this.startup.current();
@@ -140,14 +141,38 @@ class LaunchProfiles {
     }
     if (config.request !== 'launch' || !config.project) return config;
     const project = path.resolve(folder?.uri.fsPath || '', config.project);
+    const key = project.toLowerCase();
+    const state = this.state;
+    state.lastStart = { folder, config: asked }; // what Restart starts again
+    state.starting ||= new Map();
+    state.programs ||= new Map();
+    // A start of the same project still going (its build, or the wait for its app) gives way to this one, and its app
+    // still running from the start before (Restart, or F5 again) is stopped, so the build can write its files; as VS's
+    // Restart does.
+    const before = state.starting.get(key);
+    if (before) {
+      before.progress.cancel();
+      await before.finished;
+    }
+    // Not while a debug session of it is still on: VS Code's own restart (the debug toolbar's) resolves before it ends
+    // the session, and gives up when the session ends under it.
+    const live = [...(state.sessions || [])].some((s) => s.configuration.project && path.resolve(s.configuration.project).toLowerCase() === key);
+    state.lastStopped = live ? [] : await stopRunning(state.programs.get(key));
     // What it is doing, at the bottom right, until the browser opens (or the start is done when there is none to wait for).
     const progress = launchProgress(config.name || path.basename(project, '.csproj'));
-    this.state.lastProgress = progress;
+    state.lastProgress = progress;
     let handedOver = false;
+    let finish;
+    const run = { progress, finished: new Promise((r) => (finish = r)) };
+    state.starting.set(key, run);
+    state.changed?.fire();
     try {
       return await this.launch(folder, config, project, progress, () => (handedOver = true));
     } finally {
       if (!handedOver) progress.done();
+      if (state.starting.get(key) === run) state.starting.delete(key);
+      finish();
+      state.changed?.fire();
     }
   }
 
@@ -165,6 +190,7 @@ class LaunchProfiles {
         return undefined;
       }
     }
+    if (progress.token.isCancellationRequested) return undefined; // a Restart came in meanwhile
     progress.report('Odczytywanie właściwości projektu…');
     const props = await msbuildProperties(project, settings, config.framework);
     const entry = config.launchProfile ? runnableProfiles(project).find((p) => p.name === config.launchProfile) : undefined;
@@ -190,6 +216,8 @@ class LaunchProfiles {
       // The browser, as VS opens it: once the app says it listens, at the profile's launchUrl.
       __browser: profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: profile.launchUrl || '', portBusy } : undefined,
     };
+    if (progress.token.isCancellationRequested) return undefined;
+    this.state.programs.set(project.toLowerCase(), resolved.program);
     // Ctrl+F5, as VS's Start Without Debugging: the program in a terminal of its own, no debugger, the browser as F5's.
     if (config.noDebug) {
       handOver();
@@ -242,6 +270,28 @@ async function startWithoutDebugging(config, state, progress) {
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
+}
+
+/** Stops the processes running `program` (a project's .dll, or its apphost beside it) and waits until they have gone;
+ *  gives their ids. */
+async function stopRunning(program) {
+  if (!program) return [];
+  const dll = path.resolve(program).toLowerCase();
+  const exe = dll.replace(/\.dll$/, process.platform === 'win32' ? '.exe' : '');
+  if (process.platform === 'win32') {
+    const quote = (v) => `'${v.replace(/'/g, "''")}'`;
+    const script = `$d = ${quote(dll)}; $e = ${quote(exe)}
+$p = @(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID } | Where-Object { ($_.ExecutablePath -and $_.ExecutablePath.ToLower() -eq $e) -or ($_.CommandLine -and $_.CommandLine.ToLower().Contains($d)) })
+$p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+$p | ForEach-Object { Wait-Process -Id $_.ProcessId -Timeout 15 -ErrorAction SilentlyContinue; $_.ProcessId }`;
+    const out = await new Promise((resolve) => execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true }, (e, stdout) => resolve(stdout || '')));
+    return out.split(/\s+/).filter(Boolean).map(Number);
+  }
+  const out = await new Promise((resolve) => execFile('ps', ['-eo', 'pid=,args='], (e, stdout) => resolve(stdout || '')));
+  const pids = out.split('\n').map((l) => /^\s*(\d+)\s+(.*)$/.exec(l)).filter((m) => m && (m[2].toLowerCase().includes(dll) || m[2].toLowerCase().split(' ')[0] === exe)).map((m) => +m[1]);
+  for (const pid of pids) try { process.kill(pid, 'SIGKILL'); } catch { /* gone already */ }
+  for (let i = 0; i < 30 && pids.some((pid) => { try { process.kill(pid, 0); return true; } catch { return false; } }); i++) await new Promise((r) => setTimeout(r, 500));
+  return pids;
 }
 
 const listeningMessage = (url) => `Czekanie, aż aplikacja zacznie nasłuchiwać (${url})…`;
@@ -352,8 +402,26 @@ async function offerProfileEntries(context) {
 }
 
 function registerLaunch(context) {
-  const state = {};
+  const state = { changed: new vscode.EventEmitter(), sessions: new Set() };
   const provider = new LaunchProfiles(state);
+  // Something to restart: an app under the debugger, a start still building, or a run without the debugger.
+  const running = () => state.sessions.size > 0 || state.starting?.size > 0
+    || (!!state.lastRunWithoutDebugging && vscode.tasks.taskExecutions.includes(state.lastRunWithoutDebugging.execution));
+  context.subscriptions.push(state.changed, vscode.tasks.onDidStartTask(() => state.changed.fire()), vscode.tasks.onDidEndTask(() => state.changed.fire()),
+    vscode.debug.onDidStartDebugSession((s) => s.type === TYPE && (state.sessions.add(s), state.changed.fire())),
+    vscode.debug.onDidTerminateDebugSession((s) => state.sessions.delete(s) && state.changed.fire()),
+    // Uruchom ponownie, as VS's: the app under the debugger ended first (VS Code's own restart builds while it still runs),
+    // then the last start again, which stops a start still building and what a run left going before it builds.
+    vscode.commands.registerCommand('csharpShooter.restart', async () => {
+      const last = state.lastStart;
+      if (!last) return false;
+      for (const session of [...state.sessions]) {
+        const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((s) => s.id === session.id && (d.dispose(), r())); });
+        await vscode.debug.stopDebugging(session);
+        await Promise.race([ended, new Promise((r) => setTimeout(r, 15000))]);
+      }
+      return vscode.debug.startDebugging(last.folder, last.config, { noDebug: !!last.config.noDebug });
+    }));
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.addLaunchProfiles', async () => {
     const added = await addProfileEntries(await missingProfileEntries());
     vscode.window.showInformationMessage(added.length ? `Added to Run and Debug: ${added.join(', ')}` : 'Run and Debug has every launch profile already.');
@@ -375,7 +443,7 @@ function registerLaunch(context) {
       return vscode.debug.startDebugging(folder, configurationFor(item.file, name ?? null));
     }),
   );
-  return { provider, state, runnableProfiles, runnableProjects };
+  return { provider, state, running, onDidChangeRunning: state.changed.event, runnableProfiles, runnableProjects };
 }
 
 module.exports = { registerLaunch, readLaunchSettings, runnableProfiles, runnableProjects, urlsOf };

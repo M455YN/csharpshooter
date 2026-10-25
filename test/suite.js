@@ -426,16 +426,48 @@ async function startupChecks(api) {
     await vscode.commands.executeCommand('csharpShooter.startup.setProject', proj('WebApp'));
     const started = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((s) => (d.dispose(), r(s))); });
     const ok = await vscode.debug.startDebugging(folder, api.startup.startupEntry());
-    const session = ok ? await Promise.race([started, sleep(240000).then(() => null)]) : null;
+    let session = ok ? await Promise.race([started, sleep(240000).then(() => null)]) : null;
     expect('F5 on "Projekt startowy (CSharpShooter)" runs the startup project with its active profile',
       session?.name === 'WebApp: WebApp Development' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
       session ? `${session.type} session "${session.name}", ASPNETCORE_ENVIRONMENT=${session.configuration.env?.ASPNETCORE_ENVIRONMENT}` : 'no session');
     if (session) {
       expect('Uruchom ponownie (status bar) is live while debugging', status.restart === true, `restart ${status.restart}`);
       if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-toolbar.png'));
+      // Uruchom ponownie while it runs: the app gone before the build, built again, a new session.
+      const first = session;
+      const next = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((x) => x.id !== first.id && (d.dispose(), r(x))); });
+      api.launch.state.lastBuild = undefined;
+      await vscode.commands.executeCommand('csharpShooter.restart');
+      session = (await Promise.race([next, sleep(240000).then(() => null)])) || first;
+      expect('Uruchom ponownie while debugging: the app stopped, built again, a new session', session !== first && api.launch.state.lastBuild?.ok,
+        `session ${session === first ? '(none new)' : session.name}, build ${JSON.stringify(api.launch.state.lastBuild?.ok)}, stopped ${JSON.stringify(api.launch.state.lastStopped)}`);
       const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((x) => x.id === session.id && (d.dispose(), r())); });
       await vscode.debug.stopDebugging(session);
       await Promise.race([ended, sleep(30000)]);
+    }
+
+    // Uruchom ponownie during the build: that build stops and gives way, one start goes on.
+    {
+      let sessions = 0;
+      const counting = vscode.debug.onDidStartDebugSession(() => sessions++);
+      const firstStart = vscode.debug.startDebugging(folder, api.startup.startupEntry());
+      for (let i = 0; i < 40 && !api.launch.state.starting?.size; i++) await sleep(250);
+      await sleep(2000);
+      const building = api.launch.state.lastProgress.lines.join(' | ');
+      const next = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((x) => (d.dispose(), r(x))); });
+      api.launch.state.lastBuild = undefined;
+      await vscode.commands.executeCommand('csharpShooter.restart');
+      const firstOk = await firstStart;
+      const again = await Promise.race([next, sleep(240000).then(() => null)]);
+      await sleep(1000);
+      counting.dispose();
+      expect('Uruchom ponownie during the build: that build stops, the start goes on once', firstOk === false && again && api.launch.state.lastBuild?.ok && sessions === 1,
+        `first start ${firstOk} (was: ${building}), sessions ${sessions}, build ${JSON.stringify(api.launch.state.lastBuild?.ok)}`);
+      if (again) {
+        const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((x) => x.id === again.id && (d.dispose(), r())); });
+        await vscode.debug.stopDebugging(again);
+        await Promise.race([ended, sleep(30000)]);
+      }
     }
 
     // Ctrl+F5: no debug session; the program in a task, the browser once it listens.
@@ -449,9 +481,20 @@ async function startupChecks(api) {
     expect('Ctrl+F5 runs it without the debugger, the browser once it listens',
       run?.name === 'WebApp: WebApp Development' && debugSessions === 0 && api.launch.state.browserUrl === 'https://localhost:44308/',
       `task "${run?.name}", debug sessions ${debugSessions}, browser ${api.launch.state.browserUrl}`);
+    // Uruchom ponownie while it runs without the debugger: the program stopped, built and run again.
     if (run) {
-      const ended = new Promise((r) => { const d = vscode.tasks.onDidEndTask((e) => e.execution === run.execution && (d.dispose(), r())); });
-      run.execution.terminate();
+      api.launch.state.browserUrl = undefined;
+      api.launch.state.lastBuild = undefined;
+      await vscode.commands.executeCommand('csharpShooter.restart');
+      for (let i = 0; i < 180 && !api.launch.state.browserUrl; i++) await sleep(1000);
+      const rerun = api.launch.state.lastRunWithoutDebugging;
+      expect('Uruchom ponownie after Ctrl+F5: the program stopped, built and run again', api.launch.state.lastStopped?.length > 0 && api.launch.state.lastBuild?.ok
+        && rerun !== run && api.launch.state.browserUrl, `stopped ${JSON.stringify(api.launch.state.lastStopped)}, build ${api.launch.state.lastBuild?.ok}, new run ${rerun !== run}, browser ${api.launch.state.browserUrl}`);
+    }
+    for (const r of new Set([run, api.launch.state.lastRunWithoutDebugging].filter(Boolean))) {
+      if (!vscode.tasks.taskExecutions.includes(r.execution)) continue;
+      const ended = new Promise((res) => { const d = vscode.tasks.onDidEndTask((e) => e.execution === r.execution && (d.dispose(), res())); });
+      r.execution.terminate();
       await Promise.race([ended, sleep(30000)]);
     }
   } finally {

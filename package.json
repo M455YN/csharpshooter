@@ -317,6 +317,12 @@
         "category": "CSharpShooter"
       },
       {
+        "command": "csharpShooter.restart",
+        "title": "Uruchom ponownie",
+        "category": "CSharpShooter",
+        "icon": "$(debug-restart)"
+      },
+      {
         "command": "csharpShooter.solution.search",
         "title": "Search Solution Explorer",
         "icon": "$(search)",
@@ -818,6 +824,11 @@
         "command": "csharpShooter.findInFiles",
         "key": "ctrl+shift+f",
         "mac": "cmd+shift+f"
+      },
+      {
+        "command": "csharpShooter.restart",
+        "key": "ctrl+shift+f5",
+        "when": "!inDebugMode || debugType == 'csharpshooter'"
       }
     ],
     "languages": [

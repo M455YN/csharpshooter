@@ -42,6 +42,11 @@ function launchProgress(title, { cancellable = true } = {}) {
       shown.then(() => report(message));
     },
     done: () => finish(),
+    // As its Cancel button: what it is doing stops (a build's task ends).
+    cancel: () => {
+      tokenSource.cancel();
+      finish();
+    },
   };
   // A start that never gets as far as the browser (no profile URL, the session gone) does not leave it up for long.
   setTimeout(() => finish(), 10 * 60 * 1000).unref?.();
@@ -124,7 +129,11 @@ function followBuildLog(file, report) {
     stop() {
       clearInterval(timer);
       read();
-      fs.rmSync(file, { force: true });
+      try {
+        fs.rmSync(file, { force: true });
+      } catch {
+        // a cancelled build's MSBuild can hold it a while yet; a log left in the temp folder does no harm
+      }
     },
   };
 }

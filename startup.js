@@ -252,13 +252,14 @@ function registerStartup(context, findSolution, launch) {
   const platformItem = item('csharpShooter.platform', 57, T.platforms, 'csharpShooter.startup.pickPlatform', '', T.platforms);
   const noDebugItem = item('csharpShooter.startWithoutDebugging', 54, T.startNoDebug, 'csharpShooter.startup.startWithoutDebugging', '$(run)', `${T.startNoDebug} (Ctrl+F5)`);
   const restartItem = item('csharpShooter.restart', 53, T.restart, undefined, '$(debug-restart)', `${T.restart} (Ctrl+Shift+F5)`);
+  // Live while there is something to restart: an app under the debugger, a start still building, a run without it.
   const debugging = () => {
-    status.restart = !!vscode.debug.activeDebugSession;
-    restartItem.command = status.restart ? 'workbench.action.debug.restart' : undefined;
+    status.restart = launch.running();
+    restartItem.command = status.restart ? 'csharpShooter.restart' : undefined;
     restartItem.color = status.restart ? undefined : new vscode.ThemeColor('disabledForeground');
   };
   context.subscriptions.push(vscode.debug.onDidStartDebugSession(debugging), vscode.debug.onDidTerminateDebugSession(debugging),
-    vscode.debug.onDidChangeActiveDebugSession(debugging));
+    vscode.debug.onDidChangeActiveDebugSession(debugging), launch.onDidChangeRunning(debugging));
   debugging();
   const update = async () => {
     const now = await startup.current();
