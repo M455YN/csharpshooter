@@ -200,6 +200,7 @@ async function activate(context) {
   const taskRunner = registerTaskRunner(context, findSolution);
   const startup = registerStartup(context, findSolution, launch);
   launch.provider.startup = startup.startup;
+  solutionView.provider.startup = startup.startup;
   const markStartup = async () => solutionView.provider.setStartup(await startup.startup.project());
   startup.startup.onDidChange(markStartup);
   markStartup();

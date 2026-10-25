@@ -409,11 +409,13 @@ function registerSolutionView(context, findSolution) {
     if ((await run()) === 0 && after) await buildBindings(after, folder);
   };
   const target = (item) => item.file; // the .sln or the project file
+  // The status bar's solution configuration and platform, as the .sln maps them for a project (VS builds with them).
+  const settings = async (item) => (provider.startup ? require('./startup').buildArgs(await provider.startup.buildSettings(target(item))) : []);
   const register = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   register('csharpShooter.solution.refresh', () => provider.refresh());
-  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', () => buildTask(`build ${item.label}`, ['build', target(item)], path.dirname(target(item))), 'AfterBuild'));
-  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', () => buildTask(`rebuild ${item.label}`, ['build', '--no-incremental', target(item)], path.dirname(target(item))), 'AfterBuild'));
+  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', async () => buildTask(`build ${item.label}`, ['build', target(item), ...(await settings(item))], path.dirname(target(item))), 'AfterBuild'));
+  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', async () => buildTask(`rebuild ${item.label}`, ['build', '--no-incremental', target(item), ...(await settings(item))], path.dirname(target(item))), 'AfterBuild'));
   register('csharpShooter.solution.clean', (item) => bound(item, 'Clean', () => terminalTask(`clean ${item.label}`, `dotnet clean "${target(item)}"`, path.dirname(target(item)))));
   // Opublikuj, as VS's folder publish: a profile of the project's (Properties/PublishProfiles/*.pubxml) or a new one, then
   // dotnet publish with it. The configuration is given on the command line (the SDK does not take it from a profile, as

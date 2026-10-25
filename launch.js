@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
+const { buildArgs } = require('./startup');
 
 const TYPE = 'csharpshooter';
 
@@ -39,9 +40,10 @@ function urlsOf({ profile, iis }) {
 }
 
 /** Asks MSBuild what the build writes, so AssemblyName, OutputPath and target framework are the project's own. */
-function msbuildProperties(project, configuration, framework) {
+function msbuildProperties(project, settings, framework) {
   return new Promise((resolve, reject) => {
-    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', `-p:Configuration=${configuration}`,
+    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', `-p:Configuration=${settings.configuration}`,
+      ...buildArgs(settings).filter((a) => a.startsWith('-p:')),
       ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
       { cwd: path.dirname(project), windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
         if (error) return reject(new Error(`dotnet msbuild ${path.basename(project)}: ${stderr || stdout || error.message}`));
@@ -56,7 +58,7 @@ function msbuildProperties(project, configuration, framework) {
 
 /** Builds the project in a task the person sees, as VS builds on F5, saying in `progress` what the build is doing;
  *  resolves with whether it succeeded, and the errors it had. */
-async function build(project, configuration, framework, progress) {
+async function build(project, settings, framework, progress) {
   // Before Build bindings of the project's gulpfiles (csharpShooter.taskRunner.buildBindings), as VS runs them.
   const { buildBindings } = require('./task-runner');
   progress.report('Kompilacja rozpoczęta…');
@@ -64,7 +66,7 @@ async function build(project, configuration, framework, progress) {
   const log = buildLog();
   const task = new vscode.Task({ type: 'shell', task: `build ${path.basename(project)}` }, vscode.TaskScope.Workspace,
     `build ${path.basename(project, '.csproj')}`, 'CSharpShooter',
-    new vscode.ShellExecution('dotnet', ['build', project, '-c', configuration, ...(framework ? ['-f', framework] : []), { value: log.arg, quoting: vscode.ShellQuoting.Strong }], { cwd: path.dirname(project) }), '$msCompile');
+    new vscode.ShellExecution('dotnet', ['build', project, ...buildArgs(settings), ...(framework ? ['-f', framework] : []), { value: log.arg, quoting: vscode.ShellQuoting.Strong }], { cwd: path.dirname(project) }), '$msCompile');
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Silent, panel: vscode.TaskPanelKind.Dedicated, clear: true };
   const following = followBuildLog(log.file, progress.report);
   const execution = await vscode.tasks.executeTask(task);
@@ -150,9 +152,11 @@ class LaunchProfiles {
   }
 
   async launch(folder, config, project, progress, handOver) {
-    const configuration = config.configuration || 'Debug';
+    // The configuration launch.json names, else the solution's (the status bar's) as the .sln maps it for this project.
+    const settings = config.configuration ? { configuration: config.configuration, platform: config.platform }
+      : (await this.startup?.buildSettings(project)) || { configuration: 'Debug' };
     if (config.build !== false) {
-      const built = await build(project, configuration, config.framework, progress);
+      const built = await build(project, settings, config.framework, progress);
       this.state.lastBuild = { project, ok: built.ok };
       if (!built.ok) {
         if (!progress.token.isCancellationRequested) {
@@ -162,7 +166,7 @@ class LaunchProfiles {
       }
     }
     progress.report('Odczytywanie właściwości projektu…');
-    const props = await msbuildProperties(project, configuration, config.framework);
+    const props = await msbuildProperties(project, settings, config.framework);
     const entry = config.launchProfile ? runnableProfiles(project).find((p) => p.name === config.launchProfile) : undefined;
     if (config.launchProfile && !entry) {
       vscode.window.showErrorMessage(`No launch profile "${config.launchProfile}" in ${path.basename(project)} that runs here.`);
