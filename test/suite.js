@@ -890,6 +890,32 @@ async function publishChecks(api) {
   return results;
 }
 
+// The two Visual Studio 2026 themes: each one applies, as dark or light, over a C# file and the Solution Explorer.
+async function themeChecks() {
+  const results = [];
+  const config = vscode.workspace.getConfiguration('workbench');
+  const was = config.inspect('colorTheme').globalValue;
+  const cs = (await vscode.workspace.findFiles('WebApp/Controllers/HomeController.cs', null, 1))[0];
+  try {
+    await vscode.commands.executeCommand('workbench.view.extension.csharpShooter');
+    for (const [label, kind] of [['Visual Studio 2026 Light', vscode.ColorThemeKind.Light], ['Visual Studio 2026 Dark', vscode.ColorThemeKind.Dark]]) {
+      await config.update('colorTheme', label, vscode.ConfigurationTarget.Global);
+      for (let i = 0; i < 20 && vscode.window.activeColorTheme.kind !== kind; i++) await sleep(250);
+      results.push({ name: `${label} applies`, ok: vscode.window.activeColorTheme.kind === kind, got: [String(vscode.window.activeColorTheme.kind)] });
+      if (process.env.SCREENSHOT && cs) {
+        await vscode.window.showTextDocument(cs);
+        await sleep(5000);
+        await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, `-theme-${kind === vscode.ColorThemeKind.Dark ? 'dark' : 'light'}.png`));
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+      }
+    }
+  } finally {
+    await config.update('colorTheme', was, vscode.ConfigurationTarget.Global);
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  }
+  return results;
+}
+
 async function screenshot(file) {
   await sleep(1500);
   const script = `
@@ -999,6 +1025,12 @@ async function run() {
     for (const r of await razorTypingChecks()) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  razor typing: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
+    }
+  }
+  if (checks.themes || (!process.env.CHECKS_FILE && process.env.SKIP_THEMES !== '1')) {
+    for (const r of await themeChecks()) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  themes: ${r.name}: ${r.got.join('; ')}`);
     }
   }
   if (checks.publish || (!process.env.CHECKS_FILE && process.env.SKIP_PUBLISH !== '1')) {
