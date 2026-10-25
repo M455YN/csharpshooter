@@ -73,7 +73,9 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   `justMyCode`, `console`; `attach` takes `processId`).
 - While debugging, a `DataTable`, `DataSet`, `DataView`, an array or a collection (`List<T>`, `IEnumerable<T>`,
   `Dictionary<K, V>`…) has a magnifier beside it in Variables and Watch (and a *Wizualizator* entry in their context
-  menu), as Visual Studio's DataSet and IEnumerable visualizers: its rows in a table read from the stopped program a page
+  menu; deeper down too, a field of a field: it is read by its whole expression, the parent cast to its runtime type and
+  the member, as the debugger gives only the member's name there), as Visual Studio's DataSet and IEnumerable
+  visualizers: its rows in a table read from the stopped program a page
   (200 rows) at a time as it is scrolled (a collection's: a column per property of its element, or one *Value* column
   for numbers, strings and dates), *Tabela:* to pick a DataSet's table, *Filtruj*, sorting by a header
   (*Rosnąco*/*Malejąco*), *Kopiuj* / *Kopiuj wszystko* (tab-separated), *Eksportuj do pliku CSV...* and *Eksportuj do

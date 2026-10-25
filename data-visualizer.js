@@ -4,6 +4,7 @@
 // at a time as the table is scrolled; filtered, sorted, copied and saved as CSV here, with VS's Polish texts.
 const vscode = require('vscode');
 const { t, table } = require('./l10n');
+const { registerVariablePaths } = require('./variable-paths');
 const fs = require('fs');
 
 const PAGE = 200;
@@ -351,10 +352,13 @@ function registerDataVisualizer(context) {
     return entry;
   };
 
+  const pathOf = registerVariablePaths(context);
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.visualizeData', (arg) => {
-    // debug/variables/context and debug/watch/context give { variable: { name, evaluateName, type, ... } }.
+    // debug/variables/context and debug/watch/context give { container, variable: { name, evaluateName, type, ... } }; a
+    // member deeper than the frame's own gets its whole expression (Passenger's evaluateName is its name alone).
     const variable = arg?.variable || arg;
-    return open(variable);
+    const path = arg?.variable && pathOf(arg);
+    return open(path ? { ...variable, evaluateName: path } : variable);
   }));
   // A visualizer reads the stopped program: it says so once the program goes on (VS's infobar).
   context.subscriptions.push(vscode.debug.onDidChangeActiveStackItem((item) => {
@@ -533,7 +537,7 @@ function registerDataVisualizer(context) {
 </script></body></html>`;
   }
 
-  return { open, state, kindOf, unquote, csv, xlsx, loadAssemblies };
+  return { open, state, kindOf, unquote, csv, xlsx, loadAssemblies, pathOf };
 }
 
 module.exports = { registerDataVisualizer, kindOf, unquote };

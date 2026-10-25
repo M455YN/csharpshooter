@@ -917,6 +917,17 @@ async function visualizerChecks(api, session, frameId) {
     `${edited.said.xlsx}: ${book?.length} bytes, ${(sheet.match(/<row>/g) || []).length} rows`);
   edited.panel.dispose();
   await session.customRequest('evaluate', { expression: 'System.AppDomain.CurrentDomain.SetData("csharpshooter-test", null)', frameId, context: 'watch' });
+
+  // A collection a level down (a watch's member, as a field of a field in Variables): the magnifier reads it by the whole
+  // expression, the parent's cast to its type and the member, not by the member's name alone (Passenger's evaluateName).
+  const watch = await session.customRequest('evaluate', { expression: 'System.Tuple.Create(new System.Collections.Generic.List<int> { 1, 2, 3 })', frameId, context: 'watch' });
+  const { variables } = await session.customRequest('variables', { variablesReference: watch.variablesReference });
+  const item1 = variables.find((v) => v.name === 'Item1');
+  const nested = item1 && await vscode.commands.executeCommand('csharpShooter.visualizeData', { sessionId: session.id, container: { variablesReference: watch.variablesReference }, variable: item1 });
+  await until(() => nested?.said.count !== undefined, 30000);
+  expect('a member a level down: opened by its whole expression', nested?.said.count === 3 && nested.source.expression.includes('System.Tuple<'),
+    `Item1 (evaluateName "${item1?.evaluateName}"): ${nested?.source.expression} → ${JSON.stringify(nested?.said.count)} rows`);
+  nested?.panel.dispose();
   return results;
 }
 
