@@ -1,6 +1,7 @@
 // Solution view, after Visual Studio's Solution Explorer: the solution, its solution folders and projects, each project's
 // Dependencies and its files as VS shows them (bin/obj hidden, related files nested under the one they belong to).
 const vscode = require('vscode');
+const { t, tn, n_ } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 
@@ -150,9 +151,9 @@ class SolutionProvider {
       if (!file) return [];
       this.solution = readSolution(file);
       const count = countProjects(this.solution);
-      return this.remember(undefined, [new Item('solution', `Solution '${this.solution.name}'`, EXPANDED, {
+      return this.remember(undefined, [new Item('solution', t("Solution '{0}'", this.solution.name), EXPANDED, {
         // A filtered tree has ids of its own, so its folders open expanded whatever the user had collapsed.
-        id: this.filter ? `sln?${this.filter.gen}:${file}` : `sln:${file}`, filter: this.filter, description: `${count} project${count === 1 ? '' : 's'}`, node: this.solution, file,
+        id: this.filter ? `sln?${this.filter.gen}:${file}` : `sln:${file}`, filter: this.filter, description: tn(count, '1 project', '{0} projects'), node: this.solution, file,
         iconPath: icon('symbol-namespace', 'charts.purple'), contextValue: 'solution', tooltip: file,
       })]);
     }
@@ -175,7 +176,7 @@ class SolutionProvider {
       case 'project': {
         const dir = path.dirname(item.file);
         return [
-          ...(f ? [] : [new Item('dependencies', 'Dependencies', COLLAPSED, { id: `${item.id}#deps`, file: item.file, iconPath: icon('references', 'charts.purple') })]),
+          ...(f ? [] : [new Item('dependencies', t('Dependencies'), COLLAPSED, { id: `${item.id}#deps`, file: item.file, iconPath: icon('references', 'charts.purple') })]),
           ...this.folderChildren(dir, item.id, item.file, f),
         ];
       }
@@ -187,11 +188,11 @@ class SolutionProvider {
           return [];
         }
         const groups = [
-          ['Frameworks', project.frameworks.map((f) => ({ label: f, icon: icon('library', 'charts.purple') }))],
-          ['Projects', project.projects.map((p) => ({ label: path.basename(p, path.extname(p)), icon: icon('project', 'charts.green'), file: p }))],
-          ['Packages', project.packages.map((p) => ({ label: p.id, description: p.version, icon: icon('package', 'charts.blue') }))],
+          [n_('Frameworks'), project.frameworks.map((f) => ({ label: f, icon: icon('library', 'charts.purple') }))],
+          [n_('Projects'), project.projects.map((p) => ({ label: path.basename(p, path.extname(p)), icon: icon('project', 'charts.green'), file: p }))],
+          [n_('Packages'), project.packages.map((p) => ({ label: p.id, description: p.version, icon: icon('package', 'charts.blue') }))],
         ].filter(([, list]) => list.length);
-        return groups.map(([name, list]) => new Item('depGroup', name, COLLAPSED, { id: `${item.id}/${name}`, list, iconPath: YELLOW_FOLDER }));
+        return groups.map(([name, list]) => new Item('depGroup', t(name), COLLAPSED, { id: `${item.id}/${name}`, list, iconPath: YELLOW_FOLDER }));
       }
       case 'depGroup':
         return item.list.map((d) => new Item('dependency', d.label, NONE, {
@@ -229,7 +230,7 @@ class SolutionProvider {
       id: `proj${f ? `?${f.gen}` : ''}:${file}`, file, filter: hit ? null : f, resourceUri: vscode.Uri.file(file), tooltip: file,
       // "project", " runnable" when it can be a startup project (an Exe or a web project, as VS has it), " startup" when it is.
       contextValue: ['project', ...(runnable ? ['runnable'] : []), ...(startup ? ['startup'] : [])].join(' '),
-      description: [sdk.endsWith('.Web') ? 'web' : '', startup ? 'projekt startowy' : ''].filter(Boolean).join(' · ') || undefined,
+      description: [sdk.endsWith('.Web') ? 'web' : '', startup ? t('startup project') : ''].filter(Boolean).join(' · ') || undefined,
       iconPath: sdk.endsWith('.Web') ? icon('globe', 'charts.blue') : icon('project', 'charts.green'),
     });
   }
@@ -317,7 +318,7 @@ function isNestedUnder(item, target) {
  *  undefined when no folder is given. */
 async function newPublishProfile(projectFile, dir, taken, folder) {
   const framework = readProject(projectFile).frameworks[0] || '';
-  folder ??= await vscode.window.showInputBox({ title: 'Lokalizacja folderu', prompt: 'Podaj ścieżkę do folderu lokalnego lub sieciowego',
+  folder ??= await vscode.window.showInputBox({ title: t('Folder location'), prompt: t('Enter the path of a local or network folder'),
     value: `bin\\Release\\${framework}\\publish\\` });
   if (!folder) return undefined;
   let name = 'FolderProfile';
@@ -391,10 +392,10 @@ function registerSolutionView(context, findSolution) {
     const progress = launchProgress(name);
     const log = buildLog();
     const following = followBuildLog(log.file, progress.report);
-    progress.report('Kompilacja rozpoczęta…');
+    progress.report(t('Build started…'));
     try {
       const code = await terminalTask(name, [...args, log.arg], cwd, (execution) => progress.token.onCancellationRequested(() => execution.terminate()));
-      vscode.window.setStatusBarMessage(code === 0 ? 'Kompilacja zakończyła się powodzeniem' : 'Kompilacja nie powiodła się', 10000);
+      vscode.window.setStatusBarMessage(code === 0 ? t('Build succeeded') : t('Build failed'), 10000);
       return code;
     } finally {
       following.stop();
@@ -427,10 +428,10 @@ function registerSolutionView(context, findSolution) {
     const read = (name, tag) => new RegExp(`<${tag}>([^<]*)</${tag}>`).exec(fs.readFileSync(path.join(dir, `${name}.pubxml`), 'utf8'))?.[1];
     let profile = typeof choice === 'string' ? choice : undefined;
     if (!profile) {
-      const NEW = 'Nowy profil';
+      const NEW = t('New profile');
       const picked = choice?.folder ? NEW : (await vscode.window.showQuickPick([
         ...profiles.map((p) => ({ label: p, description: read(p, 'PublishUrl') || read(p, 'PublishDir') || '', detail: read(p, 'LastUsedBuildConfiguration') })),
-        { label: NEW, description: 'Folder' }], { title: `Opublikuj: ${item.label}`, placeHolder: 'Miejsce docelowe' }))?.label;
+        { label: NEW, description: 'Folder' }], { title: t('Publish: {0}', item.label), placeHolder: t('Target') }))?.label;
       if (!picked) return undefined;
       profile = picked === NEW ? await newPublishProfile(item.file, dir, profiles, choice?.folder) : picked;
       if (!profile) return undefined;
@@ -445,10 +446,10 @@ function registerSolutionView(context, findSolution) {
     if (code === 0) {
       await buildBindings('AfterBuild', project);
       folder = await publishDir(item.file, configuration, profile, framework);
-      vscode.window.showInformationMessage(`Publikowanie zakończyło się powodzeniem. ${folder || ''}`, 'Otwórz folder')
+      vscode.window.showInformationMessage(`${t('Publish succeeded.')} ${folder || ''}`, t('Open folder'))
         .then((b) => b && folder && vscode.env.openExternal(vscode.Uri.file(folder)));
     } else {
-      vscode.window.showErrorMessage('Publikowanie zakończyło się niepowodzeniem.');
+      vscode.window.showErrorMessage(t('Publish failed.'));
     }
     return { code, profile, folder };
   });

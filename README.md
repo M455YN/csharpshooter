@@ -92,6 +92,12 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   of taking the first item, `@`, `=`, `"` and a space in a tag open the list, and it also comes inside an attribute's
   quotes (`asp-for="Lo…"`). Enter among a tag's attributes opens it as a space does (Razor is asked as for a space on
   the new line; in markup or C#, where it answers nothing, no list opens). `.cs` files keep Roslyn's.
+- English and Polish: `csharpShooter.uiLanguage` (`auto`, `en`, `pl`) sets the language of CSharpShooter's own texts
+  (notifications, status bar, Solution Explorer, Search, Publish, the visualizer, Task Runner Explorer), the Polish ones
+  being Visual Studio's own Polish words; `auto` follows VS Code's display language. Command titles, view names and the
+  settings' descriptions always follow VS Code's display language (`package.nls.json`, `package.nls.pl.json`), as VS Code
+  localizes them. The texts are in `l10n/pl.json`; `npm run check-l10n` says whether each has its Polish. The debugger's
+  own messages (Passenger's) are in English.
 
 ## Startup project and active profile (as Visual Studio)
 

@@ -3,6 +3,7 @@
 // app listens. A launch.json entry can name them too: { "type": "csharpshooter", "request": "launch",
 // "project": "${workspaceFolder}/WebApp/WebApp.csproj", "launchProfile": "WebApp Development" }.
 const vscode = require('vscode');
+const { t } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -61,7 +62,7 @@ function msbuildProperties(project, settings, framework) {
 async function build(project, settings, framework, progress) {
   // Before Build bindings of the project's gulpfiles (csharpShooter.taskRunner.buildBindings), as VS runs them.
   const { buildBindings } = require('./task-runner');
-  progress.report('Kompilacja rozpoczęta…');
+  progress.report(t('Build started…'));
   if (!(await buildBindings('BeforeBuild', path.dirname(project)))) return { ok: false, errors: 0 };
   const log = buildLog();
   const task = new vscode.Task({ type: 'shell', task: `build ${path.basename(project)}` }, vscode.TaskScope.Workspace,
@@ -77,7 +78,7 @@ async function build(project, settings, framework, progress) {
   cancel.dispose();
   following.stop();
   const ok = exitCode === 0 && !progress.token.isCancellationRequested && (await buildBindings('AfterBuild', path.dirname(project)));
-  if (ok) progress.report(`Kompilacja zakończyła się powodzeniem${following.counts.warnings ? ` (ostrzeżenia: ${following.counts.warnings})` : ''}`);
+  if (ok) progress.report(following.counts.warnings ? t('Build succeeded (warnings: {0})', following.counts.warnings) : t('Build succeeded'));
   return { ok, errors: following.counts.errors };
 }
 
@@ -116,11 +117,11 @@ class LaunchProfiles {
     const active = vscode.window.activeTextEditor?.document.uri.fsPath.toLowerCase();
     let project = projects.find((p) => active?.startsWith(path.dirname(p).toLowerCase() + path.sep));
     project ??= projects.length === 1 ? projects[0]
-      : (await vscode.window.showQuickPick(projects.map((p) => ({ label: path.basename(p, '.csproj'), project: p })), { placeHolder: 'Project to run' }))?.project;
+      : (await vscode.window.showQuickPick(projects.map((p) => ({ label: path.basename(p, '.csproj'), project: p })), { placeHolder: t('Project to run') }))?.project;
     if (!project) return undefined;
     const profiles = runnableProfiles(project);
     const picked = profiles.length > 1
-      ? (await vscode.window.showQuickPick(profiles.map((p) => p.name), { placeHolder: 'Launch profile' }))
+      ? (await vscode.window.showQuickPick(profiles.map((p) => p.name), { placeHolder: t('Launch profile') }))
       : profiles[0]?.name;
     if (profiles.length > 1 && !picked) return undefined;
     return configurationFor(project, picked ?? null);
@@ -133,7 +134,7 @@ class LaunchProfiles {
     if (config.request === 'launch' && config.startupProject && this.startup) {
       const now = await this.startup.current();
       if (!now) {
-        vscode.window.showErrorMessage('No runnable project in this workspace.');
+        vscode.window.showErrorMessage(t('No runnable project in this workspace.'));
         return undefined;
       }
       config = { ...config, project: now.project, launchProfile: now.profile ?? null, framework: config.framework ?? now.framework,
@@ -185,17 +186,17 @@ class LaunchProfiles {
       this.state.lastBuild = { project, ok: built.ok };
       if (!built.ok) {
         if (!progress.token.isCancellationRequested) {
-          vscode.window.showErrorMessage(`Build of ${path.basename(project)} failed${built.errors ? ` (${built.errors} errors)` : ''}; see the task's terminal and Problems.`);
+          vscode.window.showErrorMessage(built.errors ? t("Build of {0} failed ({1} errors); see the task's terminal and Problems.", path.basename(project), built.errors) : t("Build of {0} failed; see the task's terminal and Problems.", path.basename(project)));
         }
         return undefined;
       }
     }
     if (progress.token.isCancellationRequested) return undefined; // a Restart came in meanwhile
-    progress.report('Odczytywanie właściwości projektu…');
+    progress.report(t('Reading the project properties…'));
     const props = await msbuildProperties(project, settings, config.framework);
     const entry = config.launchProfile ? runnableProfiles(project).find((p) => p.name === config.launchProfile) : undefined;
     if (config.launchProfile && !entry) {
-      vscode.window.showErrorMessage(`No launch profile "${config.launchProfile}" in ${path.basename(project)} that runs here.`);
+      vscode.window.showErrorMessage(t('No launch profile "{0}" in {1} that runs here.', config.launchProfile, path.basename(project)));
       return undefined;
     }
     const profile = entry?.profile || {};
@@ -206,7 +207,7 @@ class LaunchProfiles {
     // Another process on the profile's port (an earlier run left going) keeps the app from listening there, and would
     // pass for it to the browser's wait below.
     const portBusy = urls[0] && (await accepts(urls[0]));
-    if (portBusy) vscode.window.showWarningMessage(`${urls[0]} is already in use by another process; ${path.basename(project, '.csproj')} may not start there.`);
+    if (portBusy) vscode.window.showWarningMessage(t('{0} is already in use by another process; {1} may not start there.', urls[0], path.basename(project, '.csproj')));
     const resolved = {
       ...config,
       program: config.program || props.TargetPath,
@@ -224,7 +225,7 @@ class LaunchProfiles {
       await runWithoutDebugging(resolved, this.state, progress);
       return undefined;
     }
-    progress.report('Uruchamianie z debugerem…');
+    progress.report(t('Starting with the debugger…'));
     // The debug session's tracker says the rest (the wait for the port, the browser) and closes it.
     if (resolved.__browser?.base && !portBusy) {
       handOver();
@@ -247,7 +248,7 @@ async function runWithoutDebugging(config, state, progress) {
 }
 
 async function startWithoutDebugging(config, state, progress) {
-  progress.report('Uruchamianie bez debugowania…');
+  progress.report(t('Starting without debugging…'));
   const viaDotnet = /\.dll$/i.test(config.program);
   const exec = new vscode.ProcessExecution(viaDotnet ? 'dotnet' : config.program, [...(viaDotnet ? [config.program] : []), ...(config.args || [])],
     { cwd: config.cwd, env: config.env });
@@ -263,7 +264,7 @@ async function startWithoutDebugging(config, state, progress) {
   for (let i = 0; i < 300 && vscode.tasks.taskExecutions.includes(execution) && !progress.token.isCancellationRequested; i++) {
     if (await accepts(browser.base)) {
       const url = `${browser.base.replace(/\/$/, '')}/${browser.path.replace(/^\//, '')}`;
-      progress.report('Otwieranie przeglądarki…');
+      progress.report(t('Opening the browser…'));
       state.browserUrl = url;
       if (!process.env.CSHARPSHOOTER_NO_BROWSER) vscode.env.openExternal(vscode.Uri.parse(url));
       return;
@@ -294,7 +295,7 @@ $p | ForEach-Object { Wait-Process -Id $_.ProcessId -Timeout 15 -ErrorAction Sil
   return pids;
 }
 
-const listeningMessage = (url) => `Czekanie, aż aplikacja zacznie nasłuchiwać (${url})…`;
+const listeningMessage = (url) => t('Waiting for the app to listen ({0})…', url);
 
 /** Whether something accepts connections at a URL's host and port. */
 function accepts(url) {
@@ -326,7 +327,7 @@ function browserOpener(state) {
         opened = true;
         clearInterval(polling);
         const url = `${base.replace(/\/$/, '')}/${browser.path.replace(/^\//, '')}`;
-        progress?.report('Otwieranie przeglądarki…');
+        progress?.report(t('Opening the browser…'));
         progress?.done();
         state.browserUrl = url;
         if (!process.env.CSHARPSHOOTER_NO_BROWSER) vscode.env.openExternal(vscode.Uri.parse(url));
@@ -393,10 +394,10 @@ async function offerProfileEntries(context) {
   if (mode !== 'always') {
     const names = missing.map((m) => m.entry.name);
     const answer = await vscode.window.showInformationMessage(
-      `Add the launch profiles of launchSettings.json to Run and Debug (.vscode/launch.json)? ${names.slice(0, 4).join(', ')}${names.length > 4 ? ', …' : ''}`,
-      'Add', 'Not now', 'Never');
-    if (answer === 'Never') await context.workspaceState.update('csharpShooter.launchProfilesDeclined', true);
-    if (answer !== 'Add') return;
+      t('Add the launch profiles of launchSettings.json to Run and Debug (.vscode/launch.json)? {0}', `${names.slice(0, 4).join(', ')}${names.length > 4 ? ', …' : ''}`),
+      t('Add'), t('Not now'), t('Never'));
+    if (answer === t('Never')) await context.workspaceState.update('csharpShooter.launchProfilesDeclined', true);
+    if (answer !== t('Add')) return;
   }
   await addProfileEntries(missing);
 }
@@ -424,7 +425,7 @@ function registerLaunch(context) {
     }));
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.addLaunchProfiles', async () => {
     const added = await addProfileEntries(await missingProfileEntries());
-    vscode.window.showInformationMessage(added.length ? `Added to Run and Debug: ${added.join(', ')}` : 'Run and Debug has every launch profile already.');
+    vscode.window.showInformationMessage(added.length ? t('Added to Run and Debug: {0}', added.join(', ')) : t('Run and Debug has every launch profile already.'));
     return added;
   }));
   offerProfileEntries(context);
@@ -437,7 +438,7 @@ function registerLaunch(context) {
     // Solution Explorer → project → Debug: its profiles to pick from, as VS's start button's list.
     vscode.commands.registerCommand('csharpShooter.solution.debugProject', async (item, profileName) => {
       const profiles = runnableProfiles(item.file);
-      const name = profileName ?? (profiles.length > 1 ? await vscode.window.showQuickPick(profiles.map((p) => p.name), { placeHolder: 'Launch profile' }) : profiles[0]?.name);
+      const name = profileName ?? (profiles.length > 1 ? await vscode.window.showQuickPick(profiles.map((p) => p.name), { placeHolder: t('Launch profile') }) : profiles[0]?.name);
       if (profiles.length > 1 && !name) return false;
       const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(item.file));
       return vscode.debug.startDebugging(folder, configurationFor(item.file, name ?? null));

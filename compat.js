@@ -1,6 +1,7 @@
 // F5 on configurations written for Microsoft's debuggers: "coreclr" (the C# extension's vsdbg) and "dotnet" (C# Dev Kit)
 // run on CSharpShooter's debugger instead, when the extension that owns the type is not there to run them.
 const vscode = require('vscode');
+const { t } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { runnableProfiles, urlsOf } = require('./launch');
@@ -42,7 +43,7 @@ function coreclrProfile(config) {
 
 function fromCoreclr(config, output) {
   if (config.pipeTransport) {
-    vscode.window.showErrorMessage(`"${config.name}" debugs over pipeTransport (a remote machine or container), which CSharpShooter's debugger does not do.`);
+    vscode.window.showErrorMessage(t("\"{0}\" debugs over pipeTransport (a remote machine or container), which CSharpShooter's debugger does not do.", config.name));
     return undefined;
   }
   const ignored = UNSUPPORTED.filter((k) => k in config);

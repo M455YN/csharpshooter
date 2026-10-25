@@ -2,24 +2,25 @@
 // the tree, and the gulpfile's bindings (the "/// <binding ... />" line VS writes): Project Open runs as the solution
 // opens, Before Build, After Build and Clean around CSharpShooter's builds when csharpShooter.taskRunner.buildBindings is on.
 const vscode = require('vscode');
+const { t, n_, table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 
-// Labels as Visual Studio's Polish Task Runner Explorer has them (its Resources.pl.resources).
-const T = {
-  view: 'Eksplorator modułu uruchamiającego zadania',
-  tasks: 'Zadania',
-  bindings: 'Powiązania',
-  noTasks: '(Nie odnaleziono zadań)',
-  running: 'uruchomione',
-  started: (task) => `Trwa uruchamianie zadania „${task}” przez eksploratora modułu uruchamiającego zadania...`,
-  ended: 'Zadanie zakończone',
-  exited: (task, code) => `Zadanie ${task} zakończone z kodem zakończenia ${code}`,
-  listFailed: (file) => `Nie można uruchomić elementu „${file}”...`,
-  leftToTasksJson: (task, label) => `Zadanie ${task} uruchamia już tasks.json przy otwarciu folderu („${label}”), więc powiązanie Otwarcie projektu je pomija.`,
-};
-const BINDINGS = [['BeforeBuild', 'Przed kompilacją'], ['AfterBuild', 'Po kompilacji'], ['Clean', 'Oczyszczanie'], ['ProjectOpened', 'Otwarcie projektu']];
+// Labels as Visual Studio's Task Runner Explorer has them (its Resources and Resources.pl), in English and Polish.
+const T = table({
+  view: 'Task Runner Explorer',
+  tasks: 'Tasks',
+  bindings: 'Bindings',
+  noTasks: '(No tasks found)',
+  running: 'running',
+  started: 'Task Runner Explorer is starting the task "{0}"...',
+  ended: 'Task ended',
+  exited: 'Task {0} exited with exit code {1}',
+  listFailed: 'Failed to run "{0}"...',
+  leftToTasksJson: 'tasks.json already starts {0} as the folder opens ("{1}"), so the Project Open binding leaves it out.',
+});
+const BINDINGS = [['BeforeBuild', n_('Before Build')], ['AfterBuild', n_('After Build')], ['Clean', n_('Clean')], ['ProjectOpened', n_('Project Open')]];
 const BINDING_LINE = /^(\uFEFF?)\/\/\/\s*<binding\b([^>]*?)\/>[^\r\n]*(\r?\n|$)/;
 const ATTRIBUTE = /(\w+)\s*=\s*'([^']*)'/g;
 
@@ -179,7 +180,7 @@ class TaskRunner {
     }
     if (node.kind === 'bindingsGroup') {
       const bound = readBindings(fs.readFileSync(node.file, 'utf8'));
-      return BINDINGS.map(([name, label]) => new Node('binding', `${label} (${(bound[name] || []).length})`, (bound[name] || []).length ? EXPANDED : NONE, {
+      return BINDINGS.map(([name, label]) => new Node('binding', `${t(label)} (${(bound[name] || []).length})`, (bound[name] || []).length ? EXPANDED : NONE, {
         id: `${node.id}/${name}`, file: node.file, binding: name, tasks: bound[name] || [], iconPath: icon('symbol-event'),
       }));
     }
