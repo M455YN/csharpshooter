@@ -71,12 +71,17 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   On a slow machine that is where C# help, F12 and Razor are until then.
 - Debug with a `launch.json` entry of type `csharpshooter` (`program`, `args`, `cwd`, `env`, `stopAtEntry`,
   `justMyCode`, `console`; `attach` takes `processId`).
-- While debugging, a `DataTable`, `DataSet` or `DataView` has a magnifier beside it in Variables and Watch (and a
-  *Wizualizator DataTable* entry in their context menu), as Visual Studio's DataSet visualizer: its rows in a table read
-  from the stopped program a page (200 rows) at a time as it is scrolled, *Tabela:* to pick a DataSet's table,
-  *Filtruj*, sorting by a header (*Rosnąco*/*Malejąco*), *Kopiuj* / *Kopiuj wszystko* (tab-separated, for Excel) and
-  *Eksportuj do pliku CSV...*. It evaluates C# in the frame (one LINQ expression a page, row by row where that fails) and
-  loads System.Linq and System.Data.Common into the program first if it has not. No editing of cells (VS has it).
+- While debugging, a `DataTable`, `DataSet`, `DataView`, an array or a collection (`List<T>`, `IEnumerable<T>`,
+  `Dictionary<K, V>`…) has a magnifier beside it in Variables and Watch (and a *Wizualizator* entry in their context
+  menu), as Visual Studio's DataSet and IEnumerable visualizers: its rows in a table read from the stopped program a page
+  (200 rows) at a time as it is scrolled (a collection's: a column per property of its element, or one *Value* column
+  for numbers, strings and dates), *Tabela:* to pick a DataSet's table, *Filtruj*, sorting by a header
+  (*Rosnąco*/*Malejąco*), *Kopiuj* / *Kopiuj wszystko* (tab-separated), *Eksportuj do pliku CSV...* and *Eksportuj do
+  programu Excel...* (an .xlsx, numbers as numbers, opened with what opens .xlsx). A DataTable's cell is edited as in VS:
+  double-click, Enter sets it in the program (converted to the column's type; empty is DBNull), a value the column cannot
+  take is refused with the program's error. It evaluates C# in the frame (one LINQ expression a page, row by row where
+  that fails) and loads System.Linq and System.Data.Common into the program first if it has not. Not like VS (yet): a
+  collection's cells are not edited, and a property holding an object shows its text rather than expanding.
 - While debugging, an EF Core query (a `DbSet`, a LINQ query over one) opened in Variables or a watch shows a `SQL` row:
   the SQL it would run, read only as it is opened.
 - `csharpShooter.razorViewsInDesignTime` (on by default) gives the server's Razor every `.cshtml` even when a project

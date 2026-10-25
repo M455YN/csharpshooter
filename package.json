@@ -321,7 +321,7 @@
       },
       {
         "command": "csharpShooter.visualizeData",
-        "title": "Wizualizator DataTable",
+        "title": "Wizualizator (DataTable, DataSet, IEnumerable)",
         "icon": "$(search)",
         "category": "CSharpShooter"
       }
@@ -593,24 +593,24 @@
       "debug/variables/context": [
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "inline"
         },
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "navigation"
         }
       ],
       "debug/watch/context": [
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "inline"
         },
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$/",
+          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "navigation"
         }
       ]
