@@ -626,9 +626,6 @@ async function searchEverywhereChecks(api) {
 // list stays open through an attribute's '-', its item goes in; a tag helper's own attributes; asp-for's value; '@'.
 // Nothing is saved: each file is reverted.
 async function razorTypingChecks() {
-  // shortcut: a settle for the window's own start-up (its Chat, its first file opened) before keys are typed, which took
-  // the focus from them on a fresh window; a check of the focus itself would be the upgrade.
-  await sleep(8000);
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
   const labels = (list) => (list?.items || []).map((i) => (typeof i.label === 'string' ? i.label : i.label.label));
@@ -671,7 +668,6 @@ async function razorTypingChecks() {
     `asp-for commits on: ${JSON.stringify(aspFor?.commitCharacters)}`);
   await type('asp-f');
   const typed = doc.lineAt(line).text.trim();
-  if (process.env.SCREENSHOT && typed !== '<input asp-f') await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-typing-lost.png'));
   await accept();
   const taken = doc.lineAt(line).text.trim();
   expect('typing <input asp-f: the list stays open through "-", asp-for goes in', typed === '<input asp-f' && /^<input asp-for/.test(taken), `typed: ${typed} → ${taken}`);
