@@ -17,6 +17,7 @@ const { registerTaskRunner } = require('./task-runner');
 const { registerStartup } = require('./startup');
 const { launchProgress } = require('./build-progress');
 const { readSolution } = require('./solution');
+const { TranslatingAdapter } = require('./debug-l10n');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
@@ -178,7 +179,7 @@ class DebugAdapterFactory {
   createDebugAdapterDescriptor() {
     const exe = bundled(this.context, setting('debuggerPath'), 'debugger', process.platform === 'win32' ? 'Passenger.DebugAdapter.exe' : 'Passenger.DebugAdapter');
     if (!fs.existsSync(exe)) throw new Error(t('Debug adapter not found: {0}', exe));
-    return new vscode.DebugAdapterExecutable(exe, ['--interpreter=vscode']);
+    return new vscode.DebugAdapterInlineImplementation(new TranslatingAdapter(exe, ['--interpreter=vscode']));
   }
 }
 
