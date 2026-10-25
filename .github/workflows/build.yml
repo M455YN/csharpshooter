@@ -1,0 +1,52 @@
+# Builds the extension as it ships: the C# language server (Microsoft's roslyn-language-server package from nuget.org),
+# the debugger (Passenger built from source with debugger-port/net10.patch for .NET 10), then the .vsix with both inside,
+# kept as the run's artifact.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      server-version:
+        description: roslyn-language-server version (nuget.org)
+        default: 5.11.0
+
+jobs:
+  vsix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Passenger's port builds with the .NET 10 SDK (global.json: 10.0.100, latest feature band).
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install
+        run: npm ci
+
+      - name: Texts (each English one with its Polish)
+        run: npm run check-l10n
+
+      - name: Server (roslyn-language-server, win-x64)
+        run: node scripts/fetch-server.js ${{ inputs.server-version || '5.11.0' }} win-x64
+
+      - name: Debugger (Passenger for .NET 10, win-x64)
+        shell: pwsh
+        run: ./scripts/build-debugger.ps1 -Runtime win-x64
+
+      - name: Package
+        run: npm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: csharpshooter-win32-x64
+          path: '*.vsix'
+          if-no-files-found: error

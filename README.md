@@ -43,6 +43,11 @@ since the server and the debugger in it are built for Windows x64; for another s
 `node scripts/fetch-server.js 5.11.0 <rid>` and `scripts/build-debugger.ps1 -Runtime <rid>`, and change `--target` in
 `package.json`'s `package` script.
 
+GitHub Actions does the same on every push to `main`, every pull request and on demand (*Actions → Build → Run
+workflow*, with another server version if wanted): `.github/workflows/build.yml` on `windows-latest` installs Node 22
+and the .NET 10 SDK, checks the texts (`npm run check-l10n`), downloads the server, builds the debugger from Passenger's
+source with the port's patch, packages the `.vsix` and keeps it as the run's artifact (`csharpshooter-win32-x64`).
+
 Install it in VSCodium:
 
 ```bash
@@ -312,3 +317,7 @@ their place.
 - HTML help inside `.cshtml` (HTML element/attribute completion, HTML formatting): Razor asks the client for it, and this
   extension answers empty. Tag helpers, components and C# come from Razor itself and work.
 - Hot Reload (Passenger's `applyChanges` request), test explorer, solution view, NuGet: none.
+- *Add to Watch* and *Copy as Expression* on a member deeper than the frame's own (a field of a field) give the member's
+  name alone, Passenger's `evaluateName` there, which the frame does not know. The magnifier builds the whole expression
+  itself (`variable-paths.js`); the fix is to rewrite `evaluateName` in `variables` responses with it, in the inline
+  adapter (`debug-l10n.js`).
