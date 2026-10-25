@@ -492,4 +492,4 @@ function registerSolutionView(context, findSolution) {
   return { provider, view, findItem: (p) => findItem(provider, p) };
 }
 
-module.exports = { registerSolutionView, readSolution, readProject, nestingParents };
+module.exports = { registerSolutionView, readSolution, readProject, nestingParents, newPublishProfile };

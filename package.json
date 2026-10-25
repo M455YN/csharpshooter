@@ -328,6 +328,11 @@
       },
       {
         "command": "csharpShooter.solution.publish",
+        "title": "Opublikuj (profil)",
+        "category": "Solution"
+      },
+      {
+        "command": "csharpShooter.solution.publishPage",
         "title": "Opublikuj...",
         "category": "Solution"
       }
@@ -387,7 +392,7 @@
           "group": "1_build@3"
         },
         {
-          "command": "csharpShooter.solution.publish",
+          "command": "csharpShooter.solution.publishPage",
           "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
           "group": "1_build@4"
         },
@@ -572,6 +577,10 @@
         },
         {
           "command": "csharpShooter.solution.publish",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.publishPage",
           "when": "false"
         }
       ],
