@@ -90,7 +90,8 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
 - `.cshtml` and `.razor` open as `aspnetcorerazor` (Razor's grammar), as Visual Studio and Passenger open them, so Razor's
   own completion answers there, not C#'s: `-` in `asp-for` or a tag helper's `icon-name` goes on typing the name instead
   of taking the first item, `@`, `=`, `"` and a space in a tag open the list, and it also comes inside an attribute's
-  quotes (`asp-for="Lo…"`). `.cs` files keep Roslyn's.
+  quotes (`asp-for="Lo…"`). Enter among a tag's attributes opens it as a space does (Razor is asked as for a space on
+  the new line; in markup or C#, where it answers nothing, no list opens). `.cs` files keep Roslyn's.
 
 ## Startup project and active profile (as Visual Studio)
 

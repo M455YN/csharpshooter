@@ -8,6 +8,7 @@ const { registerSolutionView } = require('./solution');
 const { registerSolutionSearch } = require('./solution-search');
 const { registerSearchEverywhere } = require('./search-everywhere');
 const { registerDataVisualizer } = require('./data-visualizer');
+const { registerRazorEnter } = require('./razor-enter');
 const { registerPublishPage } = require('./publish-page');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
@@ -194,6 +195,7 @@ async function activate(context) {
   solutionView.search = registerSolutionSearch(context, findSolution, solutionView);
   const searchEverywhere = registerSearchEverywhere(context, solutionView);
   const dataVisualizer = registerDataVisualizer(context);
+  registerRazorEnter(context);
   const publishPage = registerPublishPage(context, require('./solution').newPublishProfile);
   const launch = registerLaunch(context);
   registerCompat(context, output, launch.provider);

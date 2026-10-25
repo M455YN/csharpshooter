@@ -715,6 +715,27 @@ async function razorTypingChecks() {
     `${own.filter((o) => /icon|title|visible/.test(o)).join(', ')} | ${ownLine}`);
   await revert();
 
+  // Enter at the end of a line, as a person presses it, then what the list took (nothing when none opened).
+  const enterAfter = async (file, needle) => {
+    const doc = await vscode.workspace.openTextDocument(path.resolve(root(), file));
+    const editor = await vscode.window.showTextDocument(doc);
+    const end = doc.lineAt(doc.positionAt(typeof needle === 'string' ? doc.getText().indexOf(needle) : doc.getText().search(needle)).line).range.end;
+    editor.selection = new vscode.Selection(end, end);
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    await sleep(300);
+    await vscode.commands.executeCommand('type', { text: '\n' });
+    await accept();
+    const got = doc.lineAt(end.line + 1).text.trim();
+    await revert();
+    return got;
+  };
+  // Enter among a tag helper's attributes (its select a multi-line @(@"...") string): the attributes, as after a space.
+  const coachGrid = await enterAfter('WebApp/Views/Employee/Coach.cshtml', /row-number-p="true"\r?\n\s*relative-directory-path="@AttributeDirectory"\r?\n\s*select="@\(@"\r?\n--declare @status/);
+  expect("Enter among a tag's attributes opens Razor's list of them", /^[a-z][a-z-]*(="")?$/.test(coachGrid) && coachGrid !== 'relative-directory-path', coachGrid || '(no list)');
+  const markup = await enterAfter(login, '<div class="input-group">');
+  const code = await enterAfter('WebApp/Views/Employee/Coach.cshtml', 'string control = "coach-info-grid";');
+  expect('Enter in markup or in C# opens nothing', markup === '' && code === '', `markup: ${markup || '(nothing)'}, C#: ${code || '(nothing)'}`);
+
   // '@' in markup: Razor's directives and the C# (a trigger character of Razor's, not of C#'s).
   ({ doc, editor, line } = await freshLine(login, '<input asp-for'));
   await type('@');
