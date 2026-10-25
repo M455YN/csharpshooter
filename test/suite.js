@@ -104,6 +104,8 @@ async function debugCheck(d) {
     const top = stack.stackFrames[0];
     if (!top) return { ok: false, got: [`stopped (${body.reason}) on thread ${body.threadId} with no frames`] };
     const value = await session.customRequest('evaluate', { expression: d.evaluate, frameId: top.id, context: 'watch' });
+    // The debugger's own message in the UI's language (debug-l10n.js), Polish while the checks run.
+    const unknown = await session.customRequest('evaluate', { expression: 'noSuchName_', frameId: top.id, context: 'watch' });
     // d.expectChild: a row the value shows when opened (EF Core's SQL of a query), a lazy row's value read as VS Code reads it.
     let children = [];
     if (d.expectChild && value.variablesReference) {
@@ -122,9 +124,9 @@ async function debugCheck(d) {
     await Promise.race([ended, sleep(30000)]);
     const at = `${path.basename(top.source?.path || '?')}:${top.line}`;
     const ok = path.basename(top.source?.path || '') === path.basename(d.breakpoint.file) && top.line === pos.line + 1 && (!d.expectOutput || output !== null)
-      && (!d.expectValue || value.result.includes(d.expectValue))
+      && (!d.expectValue || value.result.includes(d.expectValue)) && unknown.result.startsWith('błąd: ')
       && (!d.expectChild || children.some((c) => c.includes(d.expectChild)));
-    return { ok, got: [`${session.type} session`, `stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`,
+    return { ok, got: [`${session.type} session`, `stopped (${body.reason}) at ${at} in ${top.name}`, `${d.evaluate} = ${value.result}`, `noSuchName_ = ${unknown.result.slice(0, 80)}`,
       ...(d.expectChild ? [`opened: ${children.find((c) => c.includes(d.expectChild)) || children.slice(0, 5).join(' | ')}`] : []),
       output ? `program ${output.category}: ${output.output.trim().slice(0, 80)}` : output === null ? 'no program output within 60 s' : 'output not checked'] };
   } finally {

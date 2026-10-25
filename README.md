@@ -97,7 +97,9 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   being Visual Studio's own Polish words; `auto` follows VS Code's display language. Command titles, view names and the
   settings' descriptions always follow VS Code's display language (`package.nls.json`, `package.nls.pl.json`), as VS Code
   localizes them. The texts are in `l10n/pl.json`; `npm run check-l10n` says whether each has its Polish. The debugger's
-  own messages (Passenger's) are in English.
+  messages a user sees (a launch or attach that fails, a breakpoint that will not be hit, the Debug Console's lines,
+  failed evaluations, data breakpoints) follow it too: the adapter runs inline and `debug-l10n.js` matches Passenger's
+  English texts as they pass; its log and the compiler's own diagnostics stay English.
 
 ## Startup project and active profile (as Visual Studio)
 
