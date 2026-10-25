@@ -20,6 +20,10 @@ const T = {
   debugProperties: (project) => `Właściwości debugowania ${project}`,
   pickProject: 'Projekt startowy',
   noProfile: 'Brak skonfigurowanych aktywnych profilów uruchamiania dla tego projektu.',
+  configurations: 'Konfiguracje rozwiązania',
+  platforms: 'Platformy rozwiązania',
+  restart: 'Uruchom ponownie',
+  saveAll: 'Zapisz wszystko',
 };
 
 const projectName = (file) => path.basename(file, path.extname(file));
@@ -73,6 +77,39 @@ function writeUserProperty(project, name, value) {
   fs.writeFileSync(file, ['\uFEFF<?xml version="1.0" encoding="utf-8"?>',
     '<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">',
     '  <PropertyGroup>', `    <${name}>${value}</${name}>`, '  </PropertyGroup>', '</Project>', ''].join(eol));
+}
+
+/** The solution's configurations and platforms, as its Configuration Manager lists them: the .sln's
+ *  SolutionConfigurationPlatforms ("Debug|Any CPU = Debug|Any CPU"), an .slnx's <BuildType>/<Platform>, else VS's defaults. */
+function solutionConfigurations(solution) {
+  const text = solution && fs.existsSync(solution) ? fs.readFileSync(solution, 'utf8') : '';
+  let pairs = [...(/GlobalSection\(SolutionConfigurationPlatforms\)[\s\S]*?EndGlobalSection/.exec(text)?.[0] || '').matchAll(/^\s*([^|=\r\n]+)\|([^=\r\n]+?)\s*=/gm)]
+    .map(([, c, p]) => [c.trim(), p.trim()]);
+  if (!pairs.length && /\.slnx$/i.test(solution || '')) {
+    const names = (tag) => [...text.matchAll(new RegExp(`<${tag} Name="([^"]+)"`, 'g'))].map((m) => m[1]);
+    const cs = names('BuildType');
+    const ps = names('Platform');
+    pairs = (cs.length ? cs : ['Debug', 'Release']).flatMap((c) => (ps.length ? ps : ['Any CPU']).map((p) => [c, p]));
+  }
+  if (!pairs.length) pairs = [['Debug', 'Any CPU'], ['Release', 'Any CPU']];
+  return { configurations: [...new Set(pairs.map((p) => p[0]))], platforms: [...new Set(pairs.map((p) => p[1]))] };
+}
+
+/** What a solution configuration builds a project as: its .sln's "{guid}.<cfg>|<platform>.ActiveCfg = Debug|Any CPU",
+ *  as VS maps it (a solution's "debug app" can build a project as Debug); the solution's own names where there is none. */
+function projectConfiguration(solution, project, configuration, platform) {
+  const text = solution && /\.sln$/i.test(solution) && fs.existsSync(solution) ? fs.readFileSync(solution, 'utf8') : '';
+  const rel = path.relative(path.dirname(solution || ''), project).toLowerCase();
+  const guid = [...text.matchAll(/Project\("\{[^}]+\}"\)\s*=\s*"[^"]+",\s*"([^"]+)",\s*"\{([^}]+)\}"/g)]
+    .find(([, p]) => p.replace(/\\/g, path.sep).toLowerCase() === rel)?.[2];
+  const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const mapped = guid && new RegExp(`\\{${guid}\\}\\.${esc(configuration)}\\|${esc(platform)}\\.ActiveCfg\\s*=\\s*([^|\\r\\n]+)\\|([^\\r\\n]+)`, 'i').exec(text);
+  return mapped ? { configuration: mapped[1].trim(), platform: mapped[2].trim() } : { configuration, platform };
+}
+
+/** dotnet's arguments for a configuration and platform: -c, and the platform when it is not MSBuild's default (Any CPU). */
+function buildArgs({ configuration, platform }) {
+  return ['-c', configuration, ...(platform && !/^any\s?cpu$/i.test(platform) ? [`-p:Platform=${platform}`] : [])];
 }
 
 function frameworksOf(project) {
@@ -149,6 +186,31 @@ class Startup {
     this.changed.fire();
   }
 
+  /** The solution's configuration and platform, as VS's toolbar has them (kept per workspace): Debug and the first
+   *  platform until one is chosen. */
+  async solutionSettings() {
+    const solution = await this.findSolution();
+    const { configurations, platforms } = solutionConfigurations(solution);
+    const stored = this.context.workspaceState.get('csharpShooter.configuration') || {};
+    return {
+      solution, configurations, platforms,
+      configuration: configurations.includes(stored.configuration) ? stored.configuration : configurations.find((c) => c === 'Debug') || configurations[0],
+      platform: platforms.includes(stored.platform) ? stored.platform : platforms[0],
+    };
+  }
+
+  async setSolutionSettings(change) {
+    const stored = this.context.workspaceState.get('csharpShooter.configuration') || {};
+    await this.context.workspaceState.update('csharpShooter.configuration', { ...stored, ...change });
+    this.changed.fire();
+  }
+
+  /** What a build of the solution, or of one of its projects, is given: the solution's choice, mapped for a project. */
+  async buildSettings(target) {
+    const { solution, configuration, platform } = await this.solutionSettings();
+    return /\.slnx?$/i.test(target) ? { configuration, platform } : projectConfiguration(solution, target, configuration, platform);
+  }
+
   /** What F5 on the startup entry runs now. */
   async current() {
     const project = await this.project();
@@ -169,21 +231,49 @@ function registerStartup(context, findSolution, launch) {
 
   // The status bar, as VS's toolbar: the startup project (click: choose another), and the start button with the active
   // profile's name (click: its menu of start, start without debugging, profiles, framework, debug properties).
-  const projectItem = vscode.window.createStatusBarItem('csharpShooter.startupProject', vscode.StatusBarAlignment.Left, 50);
+  const projectItem = vscode.window.createStatusBarItem('csharpShooter.startupProject', vscode.StatusBarAlignment.Left, 56);
   projectItem.name = T.pickProject;
   projectItem.command = 'csharpShooter.startup.pickProject';
-  const startItem = vscode.window.createStatusBarItem('csharpShooter.startupProfile', vscode.StatusBarAlignment.Left, 49);
+  const startItem = vscode.window.createStatusBarItem('csharpShooter.startupProfile', vscode.StatusBarAlignment.Left, 55);
   startItem.name = T.start;
   startItem.command = 'csharpShooter.startup.menu';
   context.subscriptions.push(projectItem, startItem);
-  const status = { project: '', start: '' };
+  const status = { project: '', start: '', configuration: '', platform: '', restart: false };
+  // Around them, as on VS's standard toolbar: Zapisz wszystko, the solution's configuration and platform, then Uruchom bez
+  // debugowania and Uruchom ponownie (grey while nothing is being debugged, as VS greys it).
+  const item = (id, priority, name, command, text, tooltip) => {
+    const it = vscode.window.createStatusBarItem(id, vscode.StatusBarAlignment.Left, priority);
+    Object.assign(it, { name, command, text, tooltip });
+    context.subscriptions.push(it);
+    return it;
+  };
+  const saveAllItem = item('csharpShooter.saveAll', 59, T.saveAll, 'workbench.action.files.saveAll', '$(save-all)', `${T.saveAll} (Ctrl+K S)`);
+  const configurationItem = item('csharpShooter.configuration', 58, T.configurations, 'csharpShooter.startup.pickConfiguration', '', T.configurations);
+  const platformItem = item('csharpShooter.platform', 57, T.platforms, 'csharpShooter.startup.pickPlatform', '', T.platforms);
+  const noDebugItem = item('csharpShooter.startWithoutDebugging', 54, T.startNoDebug, 'csharpShooter.startup.startWithoutDebugging', '$(run)', `${T.startNoDebug} (Ctrl+F5)`);
+  const restartItem = item('csharpShooter.restart', 53, T.restart, undefined, '$(debug-restart)', `${T.restart} (Ctrl+Shift+F5)`);
+  const debugging = () => {
+    status.restart = !!vscode.debug.activeDebugSession;
+    restartItem.command = status.restart ? 'workbench.action.debug.restart' : undefined;
+    restartItem.color = status.restart ? undefined : new vscode.ThemeColor('disabledForeground');
+  };
+  context.subscriptions.push(vscode.debug.onDidStartDebugSession(debugging), vscode.debug.onDidTerminateDebugSession(debugging),
+    vscode.debug.onDidChangeActiveDebugSession(debugging));
+  debugging();
   const update = async () => {
     const now = await startup.current();
+    const settings = await startup.solutionSettings();
+    status.configuration = settings.configuration;
+    status.platform = settings.platform;
+    configurationItem.text = `${settings.configuration} $(chevron-down)`;
+    platformItem.text = `${settings.platform} $(chevron-down)`;
+    for (const it of [saveAllItem, configurationItem, platformItem]) it.show();
     if (!now) {
-      projectItem.hide();
-      startItem.hide();
+      for (const it of [projectItem, startItem, noDebugItem, restartItem]) it.hide();
       return;
     }
+    noDebugItem.show();
+    restartItem.show();
     status.project = projectItem.text = `$(project) ${projectName(now.project)}`;
     projectItem.tooltip = `${T.pickProject}: ${now.project}`;
     status.start = startItem.text = `$(debug-start) ${now.profile ?? projectName(now.project)}${now.framework ? ` (${now.framework})` : ''}`;
@@ -212,6 +302,14 @@ function registerStartup(context, findSolution, launch) {
     })), { placeHolder: T.pickProject });
     if (picked) await startup.setProject(picked.project);
   });
+  const pickSetting = async (key, list, title) => {
+    const settings = await startup.solutionSettings();
+    const picked = await vscode.window.showQuickPick(settings[list].map((v) => ({ label: `${v === settings[key] ? '$(check) ' : '$(blank) '}${v}`, value: v })), { placeHolder: title });
+    if (picked) await startup.setSolutionSettings({ [key]: picked.value });
+  };
+  // `value` (the tests'): set without asking.
+  register('csharpShooter.startup.pickConfiguration', (value) => (typeof value === 'string' ? startup.setSolutionSettings({ configuration: value }) : pickSetting('configuration', 'configurations', T.configurations)));
+  register('csharpShooter.startup.pickPlatform', (value) => (typeof value === 'string' ? startup.setSolutionSettings({ platform: value }) : pickSetting('platform', 'platforms', T.platforms)));
   register('csharpShooter.startup.selectProfile', async (project, name) => startup.setProfile(project, name));
   register('csharpShooter.startup.start', () => start(false));
   register('csharpShooter.startup.startWithoutDebugging', () => start(true));
@@ -242,4 +340,4 @@ function registerStartup(context, findSolution, launch) {
   return { startup, status, entryName: ENTRY_NAME, startupEntry, readUserProperty, startupFromSuo };
 }
 
-module.exports = { registerStartup, startupEntry, ENTRY_NAME, readUserProperty, writeUserProperty, startupFromSuo };
+module.exports = { registerStartup, startupEntry, ENTRY_NAME, readUserProperty, writeUserProperty, startupFromSuo, solutionConfigurations, projectConfiguration, buildArgs };

@@ -389,6 +389,21 @@ async function startupChecks(api) {
     expect('status bar: startup project and the start button with its profile', status.project.includes('WebApp') && status.start.includes('WebApp Development'),
       `${status.project} | ${status.start}`);
 
+    expect("status bar as VS's toolbar: the solution's configuration and platform, restart grey while not debugging",
+      status.configuration === 'Debug' && status.platform === 'Any CPU' && status.restart === false, `${status.configuration} | ${status.platform} | restart ${status.restart}`);
+    // A solution configuration builds each project as the .sln maps it; Release is passed to dotnet as -c Release.
+    const { configurations } = await startup.solutionSettings();
+    await vscode.commands.executeCommand('csharpShooter.startup.pickConfiguration', 'Release');
+    await sleep(500);
+    const mapped = await startup.buildSettings(proj('WebApp'));
+    const odd = configurations.find((c) => !['Debug', 'Release'].includes(c));
+    await vscode.commands.executeCommand('csharpShooter.startup.pickConfiguration', odd || 'Debug');
+    const oddMapped = await startup.buildSettings(proj('WebApp'));
+    await vscode.commands.executeCommand('csharpShooter.startup.pickConfiguration', 'Debug');
+    await sleep(500);
+    expect('Konfiguracje rozwiązania: the choice shows and maps to each project as the .sln says',
+      mapped.configuration === 'Release' && (!odd || ['Debug', 'Release'].includes(oddMapped.configuration)) && status.configuration === 'Debug',
+      `Release -> ${JSON.stringify(mapped)}, ${odd} -> ${JSON.stringify(oddMapped)}, now ${status.configuration}`);
     const rows = async () => (await api.solutionView.provider.getChildren((await api.solutionView.provider.getChildren())[0]));
     const marks = async () => (await rows()).map((r) => `${label(r)}[${r.contextValue}]${r.description ? ` (${r.description})` : ''}`).join(', ');
     let shown = await marks();
@@ -416,6 +431,8 @@ async function startupChecks(api) {
       session?.name === 'WebApp: WebApp Development' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
       session ? `${session.type} session "${session.name}", ASPNETCORE_ENVIRONMENT=${session.configuration.env?.ASPNETCORE_ENVIRONMENT}` : 'no session');
     if (session) {
+      expect('Uruchom ponownie (status bar) is live while debugging', status.restart === true, `restart ${status.restart}`);
+      if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-toolbar.png'));
       const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((x) => x.id === session.id && (d.dispose(), r())); });
       await vscode.debug.stopDebugging(session);
       await Promise.race([ended, sleep(30000)]);

@@ -304,6 +304,16 @@
         "icon": "$(run)"
       },
       {
+        "command": "csharpShooter.startup.pickConfiguration",
+        "title": "Konfiguracje rozwiązania...",
+        "category": "CSharpShooter"
+      },
+      {
+        "command": "csharpShooter.startup.pickPlatform",
+        "title": "Platformy rozwiązania...",
+        "category": "CSharpShooter"
+      },
+      {
         "command": "csharpShooter.solution.search",
         "title": "Search Solution Explorer",
         "icon": "$(search)",
