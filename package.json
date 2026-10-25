@@ -3,7 +3,10 @@
   "displayName": "CSharpShooter",
   "description": "C# and Razor (.cshtml/.razor) for VSCodium: IntelliSense, go to definition and tag helpers from Microsoft's roslyn-language-server, a Solution Explorer, F5 on launch profiles, and a bundled MIT-licensed .NET debugger.",
   "version": "0.0.3",
-  "publisher": "local",
+  "publisher": "M455YN",
+  "author": {
+    "name": "Mateusz Afelt"
+  },
   "icon": "media/icon.png",
   "license": "MIT",
   "engines": {

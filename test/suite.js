@@ -632,7 +632,7 @@ async function searchEverywhereChecks(api) {
   // ⤢ in the Solution Explorer's box, and the search icon on its title: the same query in this panel.
   await api.solutionView.search.fullscreen('HomeController');
   for (let i = 0; i < 40 && state.last?.query !== 'HomeController'; i++) await sleep(250);
-  const icon = vscode.extensions.getExtension('local.csharpshooter').packageJSON.contributes.menus['view/title'].find((m) => m.command === 'csharpShooter.searchEverywhere');
+  const icon = vscode.extensions.getExtension('M455YN.csharpshooter').packageJSON.contributes.menus['view/title'].find((m) => m.command === 'csharpShooter.searchEverywhere');
   expect('the Solution Explorer box (⤢) and title open it with their query', state.last?.query === 'HomeController' && state.last.groups.files?.length > 0 && icon?.when.includes('csharpShooter.solution'),
     `"${state.last?.query}" ${state.last?.summary}; title icon: ${icon?.when}`);
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
@@ -774,7 +774,7 @@ async function visualizerChecks(api, session, frameId) {
   // At Program.Main the program has not loaded these yet; the visualizer loads System.Linq and System.Data.Common itself.
   await viz.loadAssemblies(session, frameId, ['System.Data.Common', 'System.Linq', 'Contoso.Core']);
   const type = await typeOf(table);
-  const when = vscode.extensions.getExtension('local.csharpshooter').packageJSON.contributes.menus['debug/variables/context'].find((m) => m.command === 'csharpShooter.visualizeData').when;
+  const when = vscode.extensions.getExtension('M455YN.csharpshooter').packageJSON.contributes.menus['debug/variables/context'].find((m) => m.command === 'csharpShooter.visualizeData').when;
   const typeTest = new RegExp(/variableType =~ \/(.*)\/$/.exec(when)[1]);
   expect('the magnifier is offered for the type the debugger reports', viz.kindOf(type) === 'DataTable' && typeTest.test(type) && !typeTest.test('System.Data.DataTableReader'), `${type}; ${when}`);
 
@@ -1032,7 +1032,7 @@ async function launchChecks(api, profileName) {
 }
 
 async function run() {
-  const ext = vscode.extensions.getExtension('local.csharpshooter');
+  const ext = vscode.extensions.getExtension('M455YN.csharpshooter');
   const api = await ext.activate();
   const t0 = Date.now();
   if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-loading.png'));
