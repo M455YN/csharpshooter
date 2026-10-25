@@ -855,6 +855,38 @@ async function publishChecks(api) {
     if (!hadFolder && fs.existsSync(profiles) && !fs.readdirSync(profiles).length) fs.rmdirSync(profiles);
     fs.rmSync(target, { recursive: true, force: true });
   }
+  // The Publish page, as VS's: a new profile from it, its settings saved to the .pubxml, Publish from it, then More
+  // actions' Rename and Delete. The same library; nothing of it left afterwards.
+  const pageTarget = fs.mkdtempSync(path.join(require('os').tmpdir(), 'csharpshooter-page-'));
+  const hadPageFolder = fs.existsSync(profiles);
+  const page = api.publishPage.open(web);
+  try {
+    await page.request({ type: 'new', folder: pageTarget });
+    const madeName = fs.readdirSync(profiles).find((f) => f.endsWith('.pubxml') && !before.includes(f))?.replace(/\.pubxml$/, '');
+    const settings = api.publishPage.readProfile(web.file, madeName);
+    await page.request({ type: 'select', profile: madeName });
+    await page.request({ type: 'save', settings: { ...settings, configuration: 'Debug', deleteExisting: true } });
+    const saved = api.publishPage.readProfile(web.file, madeName);
+    await page.request({ type: 'publish' });
+    const published = api.publishPage.state.last;
+    expect('the Publish page: New profile, its settings saved, Publish', saved.configuration === 'Debug' && saved.deleteExisting && published?.code === 0
+      && fs.existsSync(path.join(pageTarget, 'Contoso.Excel.dll')) && path.resolve(published.folder).toLowerCase() === path.resolve(pageTarget).toLowerCase(),
+      `${madeName}: ${JSON.stringify(saved)}; published: ${JSON.stringify(published)}`);
+    if (process.env.SCREENSHOT) {
+      await sleep(1500);
+      await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-publish-page.png'));
+    }
+    await page.request({ type: 'rename', to: 'ShooterRenamed' });
+    const renamed = fs.existsSync(path.join(profiles, 'ShooterRenamed.pubxml')) && !fs.existsSync(path.join(profiles, `${madeName}.pubxml`));
+    await page.request({ type: 'delete', confirmed: true });
+    const deleted = !fs.existsSync(path.join(profiles, 'ShooterRenamed.pubxml'));
+    expect("More actions: Rename and Delete, the profile's file renamed and removed", renamed && deleted, `renamed: ${renamed}, deleted: ${deleted}`);
+  } finally {
+    page.dispose();
+    for (const f of fs.existsSync(profiles) ? fs.readdirSync(profiles) : []) if (!before.includes(f)) fs.rmSync(path.join(profiles, f), { force: true });
+    if (!hadPageFolder && fs.existsSync(profiles) && !fs.readdirSync(profiles).length) fs.rmdirSync(profiles);
+    fs.rmSync(pageTarget, { recursive: true, force: true });
+  }
   return results;
 }
 
