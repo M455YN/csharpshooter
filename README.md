@@ -165,6 +165,9 @@ debugger when the extension that owns the type is not installed or is disabled (
 
 ## Solution Explorer
 
+With a solution in the workspace the side bar opens on it, as VS opens on its Solution Explorer. Its icon comes after
+VS Code's own (an extension cannot put it first); dragged above the Explorer once, it stays there.
+
 A tab of its own in the activity bar, after Visual Studio's Solution Explorer, in its colours (purple solution, green
 C# projects, blue web projects and packages, yellow folders): the solution (`.sln` or `.slnx`) with its solution
 folders and projects; each project with **Dependencies** (frameworks, project references, packages, read from the

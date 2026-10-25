@@ -1045,6 +1045,10 @@ async function run() {
     && /^Rozwiązanie WebApp wczytane w \d+ s/.test(said[said.length - 1]);
   lines.push(`${loadingOk ? 'PASS' : 'FAIL'}  loading: the bottom right says it until the projects are loaded: ${[...new Set(said.map((l) => l.replace(/\d+ s$/, 'N s')))].join(' | ')}`);
   let failedLoading = loadingOk ? 0 : 1;
+  // The side bar opened on the Solution Explorer, the workspace having a solution.
+  const shown = api.solutionView.view.visible;
+  lines.push(`${shown ? 'PASS' : 'FAIL'}  startup: the Solution Explorer is what the side bar shows: visible ${shown}`);
+  failedLoading += shown ? 0 : 1;
   const checks = process.env.CHECKS_FILE ? JSON.parse(fs.readFileSync(process.env.CHECKS_FILE, 'utf8')) : { checks: defaultChecks, debug: defaultDebug };
   let failed = failedLoading;
   const deadline = Date.now() + 180000;
