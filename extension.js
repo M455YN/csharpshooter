@@ -1,6 +1,6 @@
 // C# and Razor through Microsoft's roslyn-language-server, debugging through Passenger's debug adapter.
 const vscode = require('vscode');
-const { t, tn } = require('./l10n');
+const { t, tn, n_ } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -247,6 +247,57 @@ async function peekReferences(uri, position) {
   return locations; // for the tests
 }
 
+// Roslyn's names of a Fix All's scopes, as VS's lightbulb lists them.
+const fixAllScopes = { Document: n_('Document'), Project: n_('Project'), Solution: n_('Solution'),
+  ContainingMember: n_('Containing Member'), ContainingType: n_('Containing Type') };
+
+/** A code action's Fix All: Roslyn sends this client command with the action's data, and the scope is asked for as VS
+ *  asks in the lightbulb's submenu (scope given: the tests). The server then makes the fix over that scope. */
+async function fixAllCodeAction(data, scope) {
+  if (!client) return;
+  scope ??= (await vscode.window.showQuickPick(data.FixAllFlavors.map((f) => ({ label: fixAllScopes[f] ? t(fixAllScopes[f]) : f, flavor: f })),
+    { placeHolder: t('Fix all occurrences in:') }))?.flavor;
+  if (!scope) return;
+  return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Fix all occurrences in:') + ' ' + t(fixAllScopes[scope] || scope), cancellable: true },
+    async (_, token) => applyCodeAction(await client.sendRequest('codeAction/resolveFixAll', { title: data.UniqueIdentifier, data, scope }, token)));
+}
+
+/** A code action with actions under it (VS's submenu, e.g. the ways to suppress a warning): the one picked is resolved and
+ *  applied (picked given: the tests, by title). */
+async function nestedCodeAction(data, picked) {
+  if (!client) return;
+  const actions = data.NestedCodeActions || [];
+  const action = picked !== undefined ? actions.find((a) => a.title === picked)
+    : (await vscode.window.showQuickPick(actions.map((a) => ({ label: a.title, action: a })), { placeHolder: data.CodeActionPath?.at(-1) }))?.action;
+  if (!action) return;
+  if (action.command) return vscode.commands.executeCommand(action.command.command, ...(action.command.arguments || []));
+  return applyCodeAction(await client.sendRequest('codeAction/resolve', action));
+}
+
+async function applyCodeAction(action) {
+  if (action?.edit && !(await vscode.workspace.applyEdit(await client.protocol2CodeConverter.asWorkspaceEdit(action.edit)))) {
+    throw new Error(t('The changes of "{0}" could not be applied.', action.title));
+  }
+  if (action?.command) await vscode.commands.executeCommand(action.command.command, ...(action.command.arguments || []));
+  return action; // for the tests
+}
+
+/** A completion item that is more than an insert (override, partial method, snippet): Roslyn hands its edit over as this
+ *  client command, with whether it is a snippet and the offset the caret goes to. */
+async function completionComplexEdit(textDocument, textEdit, isSnippet, newOffset) {
+  const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(textDocument.uri));
+  const range = doc.validateRange(new vscode.Range(textEdit.range.start.line, textEdit.range.start.character, textEdit.range.end.line, textEdit.range.end.character));
+  if (isSnippet) return (await vscode.window.showTextDocument(doc)).insertSnippet(new vscode.SnippetString(textEdit.newText), range);
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(doc.uri, range, textEdit.newText);
+  if (!(await vscode.workspace.applyEdit(edit))) return false;
+  if (newOffset >= 0) {
+    const at = doc.positionAt(newOffset);
+    (await vscode.window.showTextDocument(doc)).selection = new vscode.Selection(at, at);
+  }
+  return true;
+}
+
 async function stopServer() {
   if (client && client.state !== State.Stopped) await client.stop();
   client = undefined;
@@ -268,6 +319,9 @@ async function activate(context) {
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.showOutput', () => output.show()));
   context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('csharpshooter', new DebugAdapterFactory(context)));
   context.subscriptions.push(vscode.commands.registerCommand('roslyn.client.peekReferences', peekReferences));
+  context.subscriptions.push(vscode.commands.registerCommand('roslyn.client.fixAllCodeAction', fixAllCodeAction));
+  context.subscriptions.push(vscode.commands.registerCommand('roslyn.client.nestedCodeAction', nestedCodeAction));
+  context.subscriptions.push(vscode.commands.registerCommand('roslyn.client.completionComplexEdit', completionComplexEdit));
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.restartServer', async () => {
     await stopServer();
     await startServer(context);
