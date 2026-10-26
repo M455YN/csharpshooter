@@ -20,7 +20,7 @@ async function listSources(folder, enabled) {
     const m = /^\s*\d+\.\s+(.+?)\s+\[[^\]]+\]\s*$/.exec(said[i]);
     if (m && said[i + 1]) named.push({ name: m[1], url: said[i + 1].trim() });
   }
-  return enabled.map((url) => ({ url, name: named.find((n) => sameSource(n.url, url))?.name || url }));
+  return enabled ? enabled.map((url) => ({ url, name: named.find((n) => sameSource(n.url, url))?.name || url })) : named;
 }
 
 // ---- local folders: .nupkg files, flat (x.1.0.0.nupkg) or as NuGet lays them out (x/1.0.0/x.1.0.0.nupkg, x.nuspec beside it)
@@ -248,26 +248,50 @@ async function readmeOf(details) {
   }
 }
 
-// ---- package source mapping
+// ---- nuget.config: the sources and the package source mapping
 
-/** The nuget.config files in effect for a folder, nearest first, and the package source mapping they make:
- *  { files, mapping: Map(source name -> [patterns]), file (the one that holds the mapping) }. */
-async function readMapping(folder) {
+const attr = (tag, name) => unxml(new RegExp(`\\b${name}="([^"]*)"`, 'i').exec(tag)?.[1]);
+
+/** The nuget.config files in effect for a folder (nearest first, as dotnet nuget config paths lists them), the enabled
+ *  sources they make ({ name, url }, a folder's path made absolute against its config) and their package source mapping
+ *  ({ mapping: Map(source name -> [patterns]), file: the nearest config with a mapping }). NuGet reads the farthest first;
+ *  a nearer one adds, replaces or <clear />s. Read here rather than by dotnet nuget list source, which takes seconds. */
+async function readConfigs(folder) {
   const files = (await dotnet(['nuget', 'config', 'paths'], folder)).split(/\r?\n/).map((l) => l.trim()).filter((l) => l && fs.existsSync(l));
+  const sources = new Map(); // key -> address
+  const disabled = new Set();
   const mapping = new Map();
   let file;
-  for (const config of files) {
+  for (const config of [...files].reverse()) {
     const xml = fs.readFileSync(config, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
-    const section = /<packageSourceMapping>([\s\S]*?)<\/packageSourceMapping>/i.exec(xml)?.[1];
-    if (section === undefined) continue;
-    file ||= config;
-    if (/<clear\s*\/>/i.test(section)) mapping.clear();
-    for (const m of section.matchAll(/<packageSource\b[^>]*key="([^"]+)"[^>]*>([\s\S]*?)<\/packageSource>/gi)) {
+    const section = (name) => new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, 'i').exec(xml)?.[1];
+    for (const m of (section('packageSources') || '').matchAll(/<(clear|add|remove)\b([^>]*)>/gi)) {
+      const key = attr(m[2], 'key');
+      if (m[1].toLowerCase() === 'clear') sources.clear();
+      else if (m[1].toLowerCase() === 'remove') sources.delete(key);
+      else if (key && attr(m[2], 'value')) {
+        const value = attr(m[2], 'value');
+        sources.set(key, /^https?:/i.test(value) ? value : path.resolve(path.dirname(config), value.replace(/%([^%]+)%/g, (all, v) => process.env[v] ?? all)));
+      }
+    }
+    for (const m of (section('disabledPackageSources') || '').matchAll(/<(clear|add)\b([^>]*)>/gi)) {
+      if (m[1].toLowerCase() === 'clear') disabled.clear();
+      else if (/^true$/i.test(attr(m[2], 'value'))) disabled.add(attr(m[2], 'key'));
+      else disabled.delete(attr(m[2], 'key'));
+    }
+    const mapped = section('packageSourceMapping');
+    if (mapped === undefined) continue;
+    file = config;
+    if (/<clear\s*\/>/i.test(mapped)) mapping.clear();
+    for (const m of mapped.matchAll(/<packageSource\b[^>]*key="([^"]+)"[^>]*>([\s\S]*?)<\/packageSource>/gi)) {
       const patterns = [...m[2].matchAll(/<package\b[^>]*pattern="([^"]+)"/gi)].map((p) => p[1]);
       mapping.set(m[1], [...(mapping.get(m[1]) || []), ...patterns]);
     }
   }
-  return { files, mapping, file, on: [...mapping.values()].some((p) => p.length) };
+  return {
+    files, file, mapping, on: [...mapping.values()].some((p) => p.length),
+    sources: [...sources].filter(([key]) => !disabled.has(key)).map(([name, url]) => ({ name, url })),
+  };
 }
 
 /** The sources a package id is mapped to: the longest matching pattern wins, as NuGet matches them ("Contoso.*", "*"). */
@@ -301,4 +325,4 @@ function addMapping(file, sourceName, id) {
   fs.writeFileSync(file, xml);
 }
 
-module.exports = { listSources, search, searchAll, versionsOf, readmeOf, readMapping, mappedSources, addMapping, isFolder, folderIndexes, zipEntries, readNuspec };
+module.exports = { listSources, search, searchAll, versionsOf, readmeOf, readConfigs, mappedSources, addMapping, isFolder, folderIndexes, zipEntries, readNuspec };
