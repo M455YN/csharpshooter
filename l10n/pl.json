@@ -408,5 +408,11 @@
   "Another program has the project file open; trying again ({0})...": "Plik projektu jest otwarty w innym programie; ponowna próba ({0})...",
   "Nothing was changed.": "Niczego nie zmieniono.",
   "Choose one package source: the package is mapped to the source it is installed from.": "Wybierz jedno źródło pakietów: pakiet zostanie zmapowany na źródło, z którego jest instalowany.",
-  "This package source has neither a search service nor packages in its folder.": "To źródło pakietów nie ma usługi wyszukiwania ani pakietów w swoim folderze."
+  "This package source has neither a search service nor packages in its folder.": "To źródło pakietów nie ma usługi wyszukiwania ani pakietów w swoim folderze.",
+  "Document": "Dokument",
+  "Solution": "Rozwiązanie",
+  "Containing Member": "Zawierający element członkowski",
+  "Containing Type": "Zawierający typ",
+  "Fix all occurrences in:": "Napraw wszystkie wystąpienia w:",
+  "The changes of \"{0}\" could not be applied.": "Nie można zastosować zmian akcji „{0}”."
 }
