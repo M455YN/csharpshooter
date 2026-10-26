@@ -1096,6 +1096,32 @@ async function launchChecks(api, profileName) {
   return results;
 }
 
+// Roslyn's References CodeLens above a member, clicked: its client command roslyn.client.peekReferences opens the
+// references in a peek, as many as the lens counts.
+async function referencesLensChecks() {
+  const { doc, pos } = await position('Contoso.Core/Authorization/RightsChecker.cs', 'bool CheckRightsExpr(', 5);
+  await vscode.window.showTextDocument(doc);
+  let lens;
+  for (let i = 0; i < 20 && !lens; i++) {
+    const lenses = (await vscode.commands.executeCommand('vscode.executeCodeLensProvider', doc.uri, 100)) || [];
+    lens = lenses.find((l) => l.range.start.line === pos.line && l.command?.command === 'roslyn.client.peekReferences');
+    if (!lens) await sleep(3000);
+  }
+  if (!lens) return [{ name: 'References lens on CheckRightsExpr', ok: false, got: ['no lens with roslyn.client.peekReferences on its line'] }];
+  const count = Number(/\d+/.exec(lens.command.title)?.[0]);
+  let shown, error;
+  try {
+    shown = await vscode.commands.executeCommand(lens.command.command, ...lens.command.arguments);
+  } catch (e) {
+    error = e.message;
+  }
+  await vscode.commands.executeCommand('closeReferenceSearch');
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  const ok = !error && count > 0 && shown?.length === count && shown.every((l) => l.uri && !(l.uri.fsPath === doc.uri.fsPath && l.range.start.line === pos.line));
+  return [{ name: `clicking "${lens.command.title}" peeks the references`, ok,
+    got: error ? [error] : [`${shown?.length} in the peek`, ...(shown || []).slice(0, 3).map((l) => `${path.basename(l.uri.fsPath)}:${l.range.start.line + 1}`)] }];
+}
+
 async function run() {
   const ext = vscode.extensions.getExtension('M455YN.csharpshooter');
   const api = await ext.activate();
@@ -1134,6 +1160,12 @@ async function run() {
     const r = await check(c, deadline);
     failed += r.ok ? 0 : 1;
     lines.push(`${r.ok ? 'PASS' : 'FAIL'}  ${c.name}: ${r.got.slice(0, 8).join(', ').slice(0, 200) || '(nothing)'}`);
+  }
+  if (checks.references || (!process.env.CHECKS_FILE && process.env.SKIP_REFERENCES !== '1')) {
+    for (const r of await referencesLensChecks()) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  CodeLens: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
   }
   if (checks.solution !== false && (!process.env.CHECKS_FILE || checks.solution)) {
     for (const r of await solutionChecks(api.solutionView)) {

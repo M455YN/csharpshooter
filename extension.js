@@ -211,6 +211,17 @@ function recolourViews() {
     { provideDocumentRangeSemanticTokens: () => null }, new vscode.SemanticTokensLegend([])).dispose();
 }
 
+/** Roslyn's References CodeLens runs this client command with the document and the member's start (the C# extension
+ *  registers it); the references open in a peek under the lens, as VS opens its list there. The declaration is left
+ *  out, as in the lens's count. */
+async function peekReferences(uri, position) {
+  if (!client) return;
+  const found = await client.sendRequest('textDocument/references', { textDocument: { uri }, position, context: { includeDeclaration: false } });
+  const locations = await client.protocol2CodeConverter.asReferences(found || []);
+  await vscode.commands.executeCommand('editor.action.showReferences', vscode.Uri.parse(uri), client.protocol2CodeConverter.asPosition(position), locations);
+  return locations; // for the tests
+}
+
 async function stopServer() {
   if (client && client.state !== State.Stopped) await client.stop();
   client = undefined;
@@ -231,6 +242,7 @@ async function activate(context) {
   context.subscriptions.push(output);
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.showOutput', () => output.show()));
   context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('csharpshooter', new DebugAdapterFactory(context)));
+  context.subscriptions.push(vscode.commands.registerCommand('roslyn.client.peekReferences', peekReferences));
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.restartServer', async () => {
     await stopServer();
     await startServer(context);
