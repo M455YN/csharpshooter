@@ -41,6 +41,9 @@ jobs:
       - name: Configuration Manager (.sln and .slnx as vs-solutionpersistence writes them)
         run: node test/solution-config.js
 
+      - name: Properties window (file, folder and project rules; project-file edits)
+        run: node test/item-properties.js
+
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js ${{ inputs.server-version || '5.11.0' }} win-x64
 

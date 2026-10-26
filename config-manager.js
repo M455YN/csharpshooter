@@ -10,6 +10,7 @@ const { execFile } = require('child_process');
 const { table } = require('./l10n');
 const config = require('./solution-config');
 const r = require('./property-rules');
+const { writeFileWhenFree } = require('./write-file');
 
 // VS's own words for these (msenvui.dll), in English and Polish (l10n/pl.json).
 const T = table({
@@ -125,13 +126,13 @@ function registerConfigurationManager(context, findSolution, startup) {
     };
     const save = (model) => {
       const text = config.write(model);
-      if (text !== model.text) fs.writeFileSync(model.file, text);
+      if (text !== model.text) writeFileWhenFree(model.file, text);
       startup.changed.fire(); // the status bar's lists
     };
     const editProject = (project, change) => {
       const text = fs.readFileSync(project.file, 'utf8');
       const next = change(text);
-      if (next !== text) fs.writeFileSync(project.file, next);
+      if (next !== text) writeFileWhenFree(project.file, next);
     };
     const property = (kind) => (kind === 'buildTypes' ? 'Configurations' : 'Platforms');
     const dimension = (kind) => (kind === 'buildTypes' ? 'buildType' : 'platform');

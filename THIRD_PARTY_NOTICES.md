@@ -39,10 +39,11 @@ Microsoft's `roslyn-language-server` package from nuget.org, under MIT, with its
 `Microsoft.VisualStudio.Telemetry` and `Microsoft.VisualStudio.Utilities.Internal`, under Microsoft's Visual Studio
 licence terms; Razor's support loads them, and the server runs with `--telemetryLevel off`.
 
-## The project Properties page's rules (`rules/`, `rules/pl/`)
+## The project Properties page's and Properties window's rules (`rules/`, `rules/pl/`)
 
 The XAML rules of the .NET project system's property pages ([dotnet/project-system](https://github.com/dotnet/project-system),
-`src/Microsoft.VisualStudio.ProjectSystem.Managed/ProjectSystem/Rules/PropertyPages`), unchanged, with the Polish ones Visual
+`src/Microsoft.VisualStudio.ProjectSystem.Managed/ProjectSystem/Rules/PropertyPages`, and its BrowseObject, Folder and
+ProjectItemsSchema rules, `Rules/Items` and `Rules/GeneralBrowseObject.xaml`), unchanged, with the Polish ones Visual
 Studio 2026 ships made from them; `property-rules.js` follows what its intercepting value providers do. MIT License,
 Copyright (c) .NET Foundation and Contributors; the licence text is the MIT one above.
 

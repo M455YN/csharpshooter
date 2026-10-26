@@ -249,6 +249,17 @@ like VS (yet): a property the project file does not set shows its evaluated valu
 is set, e.g. `$(MSBuildProjectName)`); the Debug page's launch profiles, `.resx` and `.settings` open as files; the startup
 object list is not filled from the code.
 
+**Właściwości** under the Solution Explorer (F4 there with Visual Studio's keys, or *Okno właściwości* in the command
+palette) is VS 2026's Properties window for what is selected: a file's *Akcja kompilacji*, *Kopiuj do katalogu
+wyjściowego*, *Narzędzie niestandardowe*, *Przestrzeń nazw narzędzia niestandardowego*, *Nazwa pliku* and *Pełna ścieżka*;
+a folder's and a project's own rows. They come from the project system's BrowseObject rules (`rules/`, VS's Polish in
+`rules/pl/`), the build actions from its `ProjectItemsSchema` (*Brak*, *Zawartość*, *Kompilator C#*…), the values from
+MSBuild's items. *Według kategorii* or *Alfabetycznie*, with the selected property's name and description at the bottom. A
+change is written to the project file as VS writes it: a file the SDK's globs include gets `<None Update="x">` for its
+metadata, `<None Remove="x" />` with `<Content Include="x" />` for another build action (its metadata moving along), and
+going back takes them out again; a file the project includes itself is changed in place. Not like VS (yet): an item type
+with no BrowseObject rule of its own (AdditionalFiles) shows None's rows; the solution has none.
+
 **Menedżer konfiguracji...** (the solution's menu, or the end of the status bar's configuration and platform lists) opens
 VS's Configuration Manager in an editor tab, with VS's own texts (msenvui.dll): *Aktywne konfiguracje rozwiązania* and
 *Aktywne platformy rozwiązania* (the status bar's), then *Konteksty projektu*: each project's *Konfiguracja*, *Platforma*,
@@ -403,7 +414,7 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_NUGET`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES`, `SKIP_PROPERTIES`, `SKIP_CONFIGURATION_MANAGER` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_NUGET`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES`, `SKIP_PROPERTIES`, `SKIP_PROPERTIES_WINDOW`, `SKIP_CONFIGURATION_MANAGER` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.

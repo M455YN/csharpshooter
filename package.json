@@ -146,6 +146,12 @@
           "initialSize": 12
         },
         {
+          "type": "webview",
+          "id": "csharpShooter.propertiesWindow",
+          "name": "%view.propertiesWindow%",
+          "initialSize": 8
+        },
+        {
           "id": "csharpShooter.taskRunner",
           "name": "%view.taskRunner%",
           "icon": "$(checklist)",
@@ -391,6 +397,11 @@
         "title": "%command.solution.properties%",
         "category": "%category.Solution%",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "csharpShooter.propertiesWindow.show",
+        "title": "%command.propertiesWindow.show%",
+        "category": "%category.Solution%"
       },
       {
         "command": "csharpShooter.configurationManager",
@@ -1167,6 +1178,11 @@
         "command": "csharpShooter.restart",
         "key": "ctrl+shift+f5",
         "when": "!inDebugMode || debugType == 'csharpshooter'"
+      },
+      {
+        "key": "f4",
+        "command": "csharpShooter.propertiesWindow.show",
+        "when": "focusedView == 'csharpShooter.solution' && config.csharpShooter.visualStudioKeybindings"
       },
       {
         "key": "alt+enter",
