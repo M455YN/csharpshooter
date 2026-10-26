@@ -79,5 +79,6 @@
   "debugger.startupProject": "Uruchom projekt startowy (pasek stanu, Solution Explorer: Ustaw jako projekt startowy) z jego aktywnym profilem uruchamiania (ActiveDebugProfile w jego .csproj.user, jak trzyma go Visual Studio), jak F5 w VS.",
   "debugger.framework": "Platforma docelowa projektu z wieloma platformami (ActiveDebugFramework z jego .csproj.user dla projektu startowego).",
   "debugger.snippet0": ".NET: projekt startowy (CSharpShooter)",
-  "debugger.snippet1": ".NET: uruchom profil projektu (CSharpShooter)"
+  "debugger.snippet1": ".NET: uruchom profil projektu (CSharpShooter)",
+  "config.visualStudioKeybindings": "Skróty klawiszowe Visual Studio, jak ma je mapa klawiszy Visual Studio od Microsoftu (Ctrl+Shift+B kompilacja, F9/Ctrl+Shift+F9 punkty przerwania, Ctrl+F10 uruchom do kursora, Ctrl+K Ctrl+D formatuj, Ctrl+R Ctrl+R zmień nazwę, Ctrl+- / Ctrl+Shift+- wstecz i dalej, Ctrl+L wytnij wiersz...), z Ctrl+, i Ctrl+T na Wyszukaj CSharpShooter, Ctrl+Shift+F na jego Znajdź w plikach i Ctrl+Alt+L na jego Solution Explorer. Wyłączone: własne skróty VS Code."
 }

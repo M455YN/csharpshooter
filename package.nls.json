@@ -79,5 +79,6 @@
   "debugger.startupProject": "Run the startup project (status bar, Solution Explorer: Set as Startup Project) with its active launch profile (its .csproj.user's ActiveDebugProfile, as Visual Studio keeps it), as VS's F5.",
   "debugger.framework": "Target framework of a multi-targeted project (its .csproj.user's ActiveDebugFramework for the startup project).",
   "debugger.snippet0": ".NET: startup project (CSharpShooter)",
-  "debugger.snippet1": ".NET: launch a project's profile (CSharpShooter)"
+  "debugger.snippet1": ".NET: launch a project's profile (CSharpShooter)",
+  "config.visualStudioKeybindings": "Visual Studio's keys, as Microsoft's Visual Studio Keymap has them (Ctrl+Shift+B build, F9/Ctrl+Shift+F9 breakpoints, Ctrl+F10 run to cursor, Ctrl+K Ctrl+D format, Ctrl+R Ctrl+R rename, Ctrl+- / Ctrl+Shift+- back and forward, Ctrl+L cut line...), with Ctrl+, and Ctrl+T on CSharpShooter's Search, Ctrl+Shift+F on its Find in Files and Ctrl+Alt+L on its Solution Explorer. Off: VS Code's own keys."
 }

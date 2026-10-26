@@ -100,6 +100,12 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   of taking the first item, `@`, `=`, `"` and a space in a tag open the list, and it also comes inside an attribute's
   quotes (`asp-for="Lo…"`). Enter among a tag's attributes opens it as a space does (Razor is asked as for a space on
   the new line; in markup or C#, where it answers nothing, no list opens). `.cs` files keep Roslyn's.
+- Visual Studio's keys, on by default (`csharpShooter.visualStudioKeybindings`; off gives VS Code's own back): the 51 of
+  Microsoft's [Visual Studio Keymap](https://github.com/microsoft/vscode-vs-keybindings) 0.2.1 (Ctrl+Shift+B, Ctrl+B,
+  Ctrl+Shift+F9, Ctrl+F10, Ctrl+K Ctrl+D, Ctrl+R Ctrl+R, Ctrl+L, Ctrl+Shift+L, Ctrl+-, Ctrl+Shift+-, Ctrl+W, Ctrl+Shift+S,
+  Shift+Alt+arrows for a column selection...), with VS's *Go To All* (Ctrl+, and Ctrl+T) on CSharpShooter's Search, Find in
+  Files (Ctrl+Shift+F) on its own and *Solution Explorer* (Ctrl+Alt+L) on its tree. Ctrl+Shift+F5 in a CSharpShooter
+  session is its own Restart, not VS Code's. A person's own keybindings.json still wins over all of these.
 - English and Polish: `csharpShooter.uiLanguage` (`auto`, `en`, `pl`) sets the language of CSharpShooter's own texts
   (notifications, status bar, Solution Explorer, Search, Publish, the visualizer, Task Runner Explorer), the Polish ones
   being Visual Studio's own Polish words; `auto` follows VS Code's display language. Command titles, view names and the
@@ -309,8 +315,8 @@ text; ⤢ in the Solution Explorer's box with its query) in one editor tab, laid
   plików: N* (or the count per filter), *Niekompletne wyniki* when cut at 5 000 lines or 500 items; *Ostatnie zapytania*
   when the box is empty.
 
-Not like VS (yet): no replace, no syntax colours in the preview, no *Zaznaczenie* scope; Ctrl+T and Ctrl+Shift+F take
-VS Code's Go to Symbol in Workspace and Search (rebind them in Keyboard Shortcuts to have those back).
+Not like VS (yet): no replace, no syntax colours in the preview, no *Zaznaczenie* scope. Ctrl+T and Ctrl+Shift+F take
+VS Code's Go to Symbol in Workspace and Search while `csharpShooter.visualStudioKeybindings` is on (below).
 
 ## Visual Studio 2026 look
 
