@@ -1195,6 +1195,53 @@ async function launchChecks(api, profileName) {
   return results;
 }
 
+// F5 with nothing changed starts with no build, as Passenger 0.2.1 does: Ctrl+F5 once (building or not), again (up to
+// date, its properties not read again), and after a source file's time changes (built); then once more while a dotnet build
+// of it runs in a task of its own, which it waits out.
+async function upToDateChecks(api, projectPath) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const folder = vscode.workspace.workspaceFolders[0];
+  const project = path.join(folder.uri.fsPath, projectPath);
+  const config = { type: 'csharpshooter', request: 'launch', name: `${path.basename(project, '.csproj')}: up to date`, project, launchProfile: null, launchBrowser: false };
+  const ended = (execution) => new Promise((res) => { const d = vscode.tasks.onDidEndTask((e) => e.execution === execution && (d.dispose(), res())); });
+  const start = async () => {
+    api.launch.state.lastBuild = undefined;
+    const t0 = Date.now();
+    await vscode.debug.startDebugging(folder, config, { noDebug: true });
+    const seconds = ((Date.now() - t0) / 1000).toFixed(1);
+    const run = api.launch.state.lastRunWithoutDebugging;
+    if (run && vscode.tasks.taskExecutions.includes(run.execution)) {
+      const end = ended(run.execution);
+      run.execution.terminate();
+      await Promise.race([end, sleep(30000)]);
+    }
+    return { build: api.launch.state.lastBuild, lines: [...new Set(api.launch.state.lastProgress?.lines || [])], seconds };
+  };
+  const first = await start();
+  expect('a first start builds, or finds its last build here standing', first.build?.ok, `${JSON.stringify(first.build)} in ${first.seconds} s`);
+  const again = await start();
+  expect('again with nothing changed: no build, "aktualne", no properties read', again.build?.ok && again.build.upToDate
+    && again.lines.some((l) => l.startsWith('Kompilacja: aktualne')) && !again.lines.some((l) => l.startsWith('Odczytywanie właściwości projektu')),
+  `${JSON.stringify(again.build)} in ${again.seconds} s: ${again.lines.join(' | ')}`);
+  const source = (await vscode.workspace.findFiles(new vscode.RelativePattern(path.dirname(project), '**/*.cs'), '**/{bin,obj}/**', 1))[0].fsPath;
+  const touched = new Date();
+  fs.utimesSync(source, touched, touched);
+  const changed = await start();
+  expect(`after ${path.basename(source)}'s time changed: built`, changed.build?.ok && !changed.build.upToDate, `${JSON.stringify(changed.build)} in ${changed.seconds} s`);
+  // A build under way (as the Solution Explorer's or tasks.json's): the start waits for it, then checks.
+  const task = new vscode.Task({ type: 'shell', task: 'up-to-date check build' }, vscode.TaskScope.Workspace, 'up-to-date check build', 'tests',
+    new vscode.ShellExecution('dotnet', ['build', project], { cwd: path.dirname(project) }));
+  const building = await vscode.tasks.executeTask(task);
+  const buildEnded = ended(building);
+  let endedFirst = false;
+  buildEnded.then(() => (endedFirst = !api.launch.state.lastBuild));
+  const waited = await start();
+  expect('a start while a dotnet build runs waits for it, then starts', endedFirst && waited.build?.ok && waited.lines[0]?.startsWith('Oczekiwanie na zakończenie trwającej kompilacji'),
+    `build ended first ${endedFirst}, ${JSON.stringify(waited.build)}: ${waited.lines.join(' | ')}`);
+  return results;
+}
+
 // Roslyn's References CodeLens above a member, clicked: its client command roslyn.client.peekReferences opens the
 // references in a peek, as many as the lens counts.
 async function referencesLensChecks() {
@@ -1312,6 +1359,12 @@ async function run() {
     for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.upToDate || (!process.env.CHECKS_FILE && process.env.SKIP_UP_TO_DATE !== '1')) {
+    for (const r of await upToDateChecks(api, checks.upToDate || 'WebApp/WebApp.csproj')) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  up to date: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.runViewProbe) await runViewProbe();

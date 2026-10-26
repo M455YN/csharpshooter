@@ -348,4 +348,4 @@ async function buildBindings(binding, projectDir) {
   return runner.runBindings(binding, projectDir, true);
 }
 
-module.exports = { registerTaskRunner, buildBindings, readBindings, writeBindings };
+module.exports = { registerTaskRunner, buildBindings, readBindings, writeBindings, commandText };

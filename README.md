@@ -152,6 +152,19 @@ A notification at the bottom right says what is going on until the browser opens
 przeglądarki…*. Its **Cancel** stops the build. The stages come from MSBuild's file log (`-flp`, normal verbosity, a temporary
 file), read as it is written; the terminal keeps MSBuild's own output. Solution Explorer's Build and Rebuild show it too.
 
+With nothing changed since its last build in this window, a start builds nothing (*Kompilacja: aktualne, nic do
+skompilowania*), as Passenger 0.2.1 launches and VS's fast up-to-date check skips a build. Nothing changed means the
+same SDK, configuration, platform and framework. It also means the same files in the folders of the project and of every
+project it references (not `bin`, `obj`, `node_modules`, dot folders, `.csproj.user` and `launchSettings.json`), the same
+`.props`, `.targets`, `global.json` and `NuGet.config` above them, and the same Git HEAD. Finally, the files the build
+listed in `FileListAbsolute.txt` must be as it left them. Files are stamped after the build, since a project's own targets
+may rewrite its sources as it builds (a gulp copy, a build date). A file a build rewrote is compared by its bytes, so the
+same copy again is no change. A file saved during the build makes the next start build again. `DisableFastUpToDateCheck`
+is passed over: VS reads it, but a project that sets it only wants its build steps on every build, which a start with
+nothing changed has no need of. A start while another build runs (the Solution Explorer's, another start's, a
+`tasks.json` `dotnet build`, the NuGet page's) waits for it to end (*Oczekiwanie na zakończenie trwającej kompilacji…*),
+then checks.
+
 The Run and Debug dropdown lists only `launch.json`'s configurations (an extension's own wait behind *.NET
 (CSharpShooter)...* in Select and Start Debugging), so CSharpShooter offers, once per workspace, to add the profiles to
 `.vscode/launch.json` as entries like the one below; *Add Launch Profiles to Run and Debug* in the Command Palette adds
