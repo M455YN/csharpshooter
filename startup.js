@@ -144,6 +144,7 @@ class Startup {
     const fromSuo = solution && startupFromSuo(solution);
     if (fromSuo && this.isRunnable(fromSuo.project, runnable) && (!stored || (stored.suoMtime || 0) < fromSuo.mtime)) {
       await this.context.workspaceState.update('csharpShooter.startup', { project: fromSuo.project, suoMtime: fromSuo.mtime });
+      if (!same(stored?.project, fromSuo.project)) this.changed.fire(); // the Solution Explorer's mark follows too
       return fromSuo.project;
     }
     if (stored && this.isRunnable(stored.project, runnable)) return stored.project;

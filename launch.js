@@ -85,7 +85,9 @@ async function build(project, settings, framework, progress) {
 /** Runnable projects of the solution: Exe output or a web SDK, which is what has launch profiles to run. */
 async function runnableProjects() {
   const files = await vscode.workspace.findFiles('**/*.csproj', '**/{node_modules,bin,obj}/**');
-  return files.map((u) => u.fsPath).filter((p) => {
+  // findFiles answers in no fixed order; sorted, the startup project's fallback (the first web project) is the same project
+  // for the status bar, the Solution Explorer and F5, which each ask on their own.
+  return files.map((u) => u.fsPath).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).filter((p) => {
     const text = fs.readFileSync(p, 'utf8');
     return /Sdk="Microsoft\.NET\.Sdk\.Web"/.test(text) || /<OutputType>\s*(Win)?Exe\s*</i.test(text);
   });
