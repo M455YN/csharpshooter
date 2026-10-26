@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Licensed to the .NET Foundation under one or more agreements. The .NET Foundation licenses this file to you under the MIT license. See the LICENSE.md file in the project root for more information. -->
+<Rule Name="References" Description="Ustawienia skojarzone z funkcją niejawnego globalnego użycia języka C#." DisplayName="Użycie globalne" PageTemplate="generic" Order="200" xmlns="http://schemas.microsoft.com/build/2009/properties">
+  <Rule.Categories>
+    <Category Name="General" DisplayName="Ogólne" Description="Globalne ustawienia użyć dla projektów w języku C#." />
+  </Rule.Categories>
+  <Rule.DataSource>
+    <DataSource Persistence="ProjectFile" SourceOfDefaultValue="AfterContext" HasConfigurationCondition="False" />
+  </Rule.DataSource>
+  <BoolProperty Name="ImplicitUsings" DisplayName="Niejawne użycia globalne" Description="Włącz niejawne użycia globalne, które mają być deklarowane przez zestaw SDK projektu." Category="General">
+    <BoolProperty.DataSource>
+      <DataSource Persistence="ProjectFileWithInterception" SourceOfDefaultValue="AfterContext" HasConfigurationCondition="False" />
+    </BoolProperty.DataSource>
+    <BoolProperty.Metadata>
+      <NameValuePair Name="SearchTerms" Value="niejawne" />
+      <NameValuePair Name="VisibilityCondition">
+        <NameValuePair.Value>(has-csharp-lang-version-or-greater "10")</NameValuePair.Value>
+      </NameValuePair>
+    </BoolProperty.Metadata>
+  </BoolProperty>
+  <StringProperty Name="ImplicitUsingsEditor" DisplayName="Zarządzaj niejawnymi użyciami globalnymi" Description="Zarządzaj typowymi globalnymi dyrektywami użyć, do których ma odwoływać się projekt." Category="General">
+    <StringProperty.DataSource>
+      <DataSource Persistence="ProjectFileWithInterception" HasConfigurationCondition="False" />
+    </StringProperty.DataSource>
+    <StringProperty.ValueEditors>
+      <ValueEditor EditorType="CSharpImplicitUsingsEditor" />
+    </StringProperty.ValueEditors>
+    <StringProperty.Metadata>
+      <NameValuePair Name="VisibilityCondition">
+        <NameValuePair.Value>(and (has-csharp-lang-version-or-greater "10") (has-evaluated-value "References" "ImplicitUsings" true))</NameValuePair.Value>
+      </NameValuePair>
+    </StringProperty.Metadata>
+  </StringProperty>
+</Rule>

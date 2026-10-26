@@ -387,6 +387,12 @@
         "category": "%category.Solution%"
       },
       {
+        "command": "csharpShooter.solution.properties",
+        "title": "%command.solution.properties%",
+        "category": "%category.Solution%",
+        "icon": "$(settings-gear)"
+      },
+      {
         "command": "csharpShooter.solution.manageNuGet",
         "title": "%command.solution.manageNuGet%",
         "category": "%category.Solution%"
@@ -540,6 +546,11 @@
           "command": "csharpShooter.taskRunner.removeBinding",
           "when": "view == csharpShooter.taskRunner && viewItem =~ /^trBound/",
           "group": "2_bind@3"
+        },
+        {
+          "command": "csharpShooter.solution.properties",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
+          "group": "9_properties@1"
         }
       ],
       "csharpShooter.solution.add": [
@@ -1146,6 +1157,11 @@
         "command": "csharpShooter.restart",
         "key": "ctrl+shift+f5",
         "when": "!inDebugMode || debugType == 'csharpshooter'"
+      },
+      {
+        "key": "alt+enter",
+        "command": "csharpShooter.solution.properties",
+        "when": "focusedView == 'csharpShooter.solution' && config.csharpShooter.visualStudioKeybindings"
       }
     ],
     "languages": [

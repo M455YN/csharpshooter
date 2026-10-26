@@ -423,5 +423,20 @@
   "Replace All": "Zamień wszystko",
   "Toggle Replace mode (Ctrl+Shift+H)": "Przełącz tryb zamiany (Ctrl+Shift+H)",
   "Replace all occurrences ({0}) in files ({1})?": "Zamienić wszystkie wystąpienia ({0}) w plikach ({1})?",
-  "Occurrences replaced: {0}    Files changed: {1}": "Zamienione wystąpienia: {0}    Zmienione pliki: {1}"
+  "Occurrences replaced: {0}    Files changed: {1}": "Zamienione wystąpienia: {0}    Zmienione pliki: {1}",
+  "Search properties": "Wyszukaj właściwości",
+  "Configuration:": "Konfiguracja:",
+  "Platform:": "Platforma:",
+  "All configurations": "Wszystkie konfiguracje",
+  "(None)": "(Brak)",
+  "(Not set)": "(Nie ustawiono)",
+  "No properties match the search.": "Żadna właściwość nie pasuje do wyszukiwania.",
+  "Reading the project…": "Odczytywanie projektu…",
+  "Applies to {0}": "Dotyczy: {0}",
+  "Namespace": "Przestrzeń nazw",
+  "from the SDK": "z zestawu SDK",
+  "{0} was not found in the project.": "Nie znaleziono {0} w projekcie.",
+  "Could not save {0}: {1}": "Nie można zapisać {0}: {1}",
+  "MSBuild could not read {0}: {1}": "MSBuild nie mógł odczytać {0}: {1}",
+  "Remove": "Usuń"
 }

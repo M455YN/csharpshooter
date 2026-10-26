@@ -11,6 +11,7 @@ const { registerSearchEverywhere } = require('./search-everywhere');
 const { registerDataVisualizer } = require('./data-visualizer');
 const { registerRazorEnter } = require('./razor-enter');
 const { registerPublishPage } = require('./publish-page');
+const { registerPropertiesPage } = require('./properties-page');
 const { registerNuGetPage } = require('./nuget-page');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
@@ -343,6 +344,7 @@ async function activate(context) {
     }
   }));
   const publishPage = registerPublishPage(context, require('./solution').newPublishProfile);
+  const propertiesPage = registerPropertiesPage(context, solutionView);
   const nugetPage = registerNuGetPage(context, findSolution);
   const launch = registerLaunch(context);
   registerCompat(context, output, launch.provider);
@@ -354,7 +356,7 @@ async function activate(context) {
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, startup, searchEverywhere, dataVisualizer, publishPage, nugetPage, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, nugetPage, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {

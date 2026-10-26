@@ -230,6 +230,24 @@ takes neither from a profile (a multi-targeted project fails without `-f`). It e
 się powodzeniem.* and the folder as MSBuild resolves it, with *Otwórz folder*. Not like VS (yet): only folder profiles
 (no Azure, FTP, Web Deploy).
 
+**Właściwości** (a project's menu, or Alt+Enter in the tree) opens VS 2026's project Properties window in an editor tab,
+made as VS makes it, from the .NET project system's XAML rules (`rules/`, VS's Polish ones in `rules/pl/`): *Aplikacja*,
+*Użycie globalne*, *Kompilacja*, *Pakiet*, *Analiza kodu*, *Debuguj*, *Zasoby*, *Ustawienia*, with their categories on the
+left and *Wyszukaj właściwości* over all of them (a property's name, description and the rule's search terms, such as
+TFM). Each property shows its description, its editor (a list, a box, a check box, a file with *Przeglądaj...*, the global
+usings list) and, under a value with `$(...)` in it, what MSBuild makes of it; it is shown or hidden as its
+VisibilityCondition says (VS's condition language: `has-evaluated-value`, `has-project-capability`, `ne`, `unevaluated`…).
+Values are read from the project file and from one MSBuild evaluation (`dotnet msbuild -getProperty -getItem`); a change
+is written to the project file at once, as VS writes it, and read back. The properties that depend on the configuration
+(on *Kompilacja*) take *Konfiguracja* and *Platforma* at the top, into VS's `'$(Configuration)|$(Platform)'=='Debug|AnyCPU'`
+group, or *Wszystkie konfiguracje*. Where VS's own code stands between a property and the project file, it does here too:
+the target framework written as `TargetFramework` (`net10.0`, with the OS), *Wiele struktur docelowych* moving it to
+`TargetFrameworks`, the resource and manifest choices, the package licence, `DefineConstants` on top of what the project
+inherits, `ImplicitUsings` as `enable`/`disable`, build events as VS's `PreBuild`/`PostBuild` targets, `<Using>` items. Not
+like VS (yet): a property the project file does not set shows its evaluated value (VS shows the unevaluated one wherever it
+is set, e.g. `$(MSBuildProjectName)`); the Debug page's launch profiles, `.resx` and `.settings` open as files; the startup
+object list is not filled from the code.
+
 **Zarządzaj pakietami NuGet dla rozwiązania...** (the solution's menu; **Zarządzaj pakietami NuGet...** on a project)
 opens VS 2026's *NuGet — rozwiązanie* in an editor tab, with VS's own texts (NuGet.PackageManagement.UI's resources):
 *Przeglądaj*, *Zainstalowane* (⚠ when a version is vulnerable), *Aktualizacje* (their count), *Konsoliduj* (packages in

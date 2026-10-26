@@ -81,5 +81,6 @@
   "debugger.snippet0": ".NET: projekt startowy (CSharpShooter)",
   "debugger.snippet1": ".NET: uruchom profil projektu (CSharpShooter)",
   "config.visualStudioKeybindings": "Skróty klawiszowe Visual Studio, jak ma je mapa klawiszy Visual Studio od Microsoftu (Ctrl+Shift+B kompilacja, F9/Ctrl+Shift+F9 punkty przerwania, Ctrl+F10 uruchom do kursora, Ctrl+K Ctrl+D formatuj, Ctrl+R Ctrl+R zmień nazwę, Ctrl+- / Ctrl+Shift+- wstecz i dalej, Ctrl+L wytnij wiersz...), z Ctrl+, i Ctrl+T na Wyszukaj CSharpShooter, Ctrl+Shift+F na jego Znajdź w plikach i Ctrl+Alt+L na jego Solution Explorer. Wyłączone: własne skróty VS Code.",
-  "command.replaceInFiles": "Zamień w plikach"
+  "command.replaceInFiles": "Zamień w plikach",
+  "command.solution.properties": "Właściwości"
 }

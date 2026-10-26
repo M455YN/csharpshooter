@@ -1080,6 +1080,72 @@ async function nugetChecks(api) {
 
 // Opublikuj, as VS publishes to a folder: a new profile written as VS writes it, dotnet publish with it, the app in its
 // folder. A temporary folder and a profile removed afterwards: the project's own profiles (and where they publish) are left.
+// The project Properties page, as VS 2026's: the rules' pages in Polish, values from the project file and MSBuild, a
+// property shown or hidden by its condition, and changes written to the project file as VS writes them (a plain one, one of
+// the Debug configuration's, DefineConstants through VS's interceptor), read back from MSBuild; the project file left as it
+// was, byte for byte.
+async function propertiesChecks(api) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const [sln] = await api.solutionView.provider.getChildren();
+  const lib = (await api.solutionView.provider.getChildren(sln)).find((p) => p.label === 'Contoso.Excel');
+  const before = fs.readFileSync(lib.file);
+  const panel = await vscode.commands.executeCommand('csharpShooter.solution.properties', lib);
+  const until = async (test, ms = 60000) => {
+    for (let t = 0; t < ms && !test(); t += 250) await sleep(250);
+    return test();
+  };
+  try {
+    await until(() => panel.state.model);
+    const all = () => panel.state.model.flatMap((p) => p.categories.flatMap((c) => c.properties));
+    const prop = (id) => all().find((p) => p.id === id);
+    const titles = panel.state.model.map((p) => p.title);
+    const outputType = prop('Application::OutputType');
+    const tfm = prop('Application::InterceptedTargetFramework');
+    expect("pages and values: VS's Polish pages, Typ danych wyjściowych and Struktura docelowa from MSBuild",
+      titles.join() === 'Aplikacja,Użycie globalne,Kompilacja,Pakiet,Analiza kodu,Debuguj,Zasoby' && outputType?.value === 'Library'
+      && outputType.choices.find((c) => c.value === 'Library')?.label === 'Biblioteka klas' && String(tfm?.value).startsWith('.NETCoreApp,Version=v')
+      && tfm.choices.find((c) => c.value === tfm.value)?.label.startsWith('.NET '),
+      `${titles.join(', ')} | ${outputType?.value} | ${tfm?.value} (${tfm?.choices.find((c) => c.value === tfm.value)?.label})`);
+    expect('VisibilityCondition: Docelowe struktury hidden for one framework, Docelowy system operacyjny shown for .NET 5+',
+      !prop('Application::TargetFrameworks') && prop('Application::TargetPlatformIdentifier') && !prop('Application::TargetPlatformVersion') && tfm.searchTerms === 'TFM',
+      `TargetFrameworks ${!!prop('Application::TargetFrameworks')}, TargetPlatformIdentifier ${!!prop('Application::TargetPlatformIdentifier')}`);
+
+    const seq = () => panel.state.model;
+    let was = seq();
+    await panel.request({ type: 'set', id: 'Application::AssemblyTitle', value: 'Shooter Title' });
+    await until(() => seq() !== was);
+    const titled = fs.readFileSync(lib.file, 'utf8');
+    expect('a plain property: written to the project file, read back', titled.includes('<AssemblyTitle>Shooter Title</AssemblyTitle>') && prop('Application::AssemblyTitle')?.value === 'Shooter Title',
+      prop('Application::AssemblyTitle')?.value);
+
+    was = seq();
+    await panel.request({ type: 'set', id: 'Build::Optimize', value: true });
+    await until(() => seq() !== was);
+    was = seq();
+    await panel.request({ type: 'set', id: 'Build::DefineConstants', value: 'SHOOTER' });
+    await until(() => seq() !== was);
+    const debug = fs.readFileSync(lib.file, 'utf8');
+    const open = debug.indexOf(`<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">`);
+    const group = open < 0 ? '' : debug.slice(open, debug.indexOf('</PropertyGroup>', open));
+    expect("the Debug configuration's: Optimize and DefineConstants in its group, DefineConstants on top of what it inherits",
+      group.includes('<Optimize>true</Optimize>') && group.includes('<DefineConstants>$(DefineConstants);SHOOTER</DefineConstants>')
+      && prop('Build::Optimize')?.value === true && prop('Build::DefineConstants')?.value === 'SHOOTER' && panel.state.evaluated.properties.DefineConstants.split(';').includes('SHOOTER'),
+      `group: ${group.split(/\s+/).join(' ').trim()} | evaluated ${panel.state.evaluated.properties.DefineConstants}`);
+    if (process.env.SCREENSHOT) {
+      await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-properties.png'));
+      panel.webview.postMessage({ type: 'search', text: 'TFM' });
+      await sleep(1000);
+      await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-properties-search.png'));
+    }
+  } finally {
+    panel.dispose();
+    fs.writeFileSync(lib.file, before);
+  }
+  expect('the project file put back as it was', Buffer.compare(before, fs.readFileSync(lib.file)) === 0, 'byte for byte');
+  return results;
+}
+
 async function publishChecks(api) {
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
@@ -1460,6 +1526,12 @@ async function run() {
     for (const r of await themeChecks()) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  themes: ${r.name}: ${r.got.join('; ')}`);
+    }
+  }
+  if (checks.properties || (!process.env.CHECKS_FILE && process.env.SKIP_PROPERTIES !== '1')) {
+    for (const r of await propertiesChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  properties: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.publish || (!process.env.CHECKS_FILE && process.env.SKIP_PUBLISH !== '1')) {
