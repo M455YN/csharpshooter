@@ -474,5 +474,8 @@
   "The name cannot be empty or contain | * \" < >.": "Nazwa nie może być pusta ani zawierać znaków | * \" < >.",
   "The last one cannot be removed.": "Nie można usunąć ostatniej.",
   "There is no solution in this workspace.": "W tym obszarze roboczym nie ma rozwiązania.",
-  "Reading the projects…": "Odczytywanie projektów…"
+  "Reading the projects…": "Odczytywanie projektów…",
+  "Categorized": "Według kategorii",
+  "Alphabetical": "Alfabetycznie",
+  "Select a file, folder or project in the Solution Explorer.": "Zaznacz plik, folder lub projekt w Eksploratorze rozwiązań."
 }

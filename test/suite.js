@@ -1205,10 +1205,61 @@ async function configurationManagerChecks(api) {
     }
   } finally {
     panel.dispose();
-    for (const [f, data] of before) fs.writeFileSync(f, data);
+    for (const [f, data] of before) require(path.join(api.extensionPath, 'write-file')).writeFileWhenFree(f, data, 200);
     await startup.setSolutionSettings({ configuration: settings.configuration, platform: settings.platform });
   }
   expect('the solution and its project files put back as they were', [...before].every(([f, data]) => Buffer.compare(data, fs.readFileSync(f)) === 0), `${before.size} files`);
+  return results;
+}
+
+// The Properties window (F4), as VS's: a file's Akcja kompilacji, Kopiuj do katalogu wyjściowego and the rest in Polish,
+// a change written to the project file as VS writes it (an Update; a Remove with an Include) and read back from MSBuild,
+// a folder's and a project's own rows. A file made for it, removed afterwards; the project file left as it was.
+async function propertiesWindowChecks(api) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const [sln] = await api.solutionView.provider.getChildren();
+  const lib = (await api.solutionView.provider.getChildren(sln)).find((p) => p.label === 'Contoso.Excel');
+  const before = fs.readFileSync(lib.file);
+  const file = path.join(path.dirname(lib.file), 'shooter-properties.txt');
+  const win = api.propertiesWindow;
+  const pick = (kind, f) => win.select({ contextValue: kind, file: kind === 'project' ? f : undefined, resourceUri: vscode.Uri.file(f) });
+  const row = (name) => win.state.sheet?.rows.find((r) => r.name === name);
+  fs.writeFileSync(file, 'shooter');
+  try {
+    await vscode.commands.executeCommand('csharpShooter.propertiesWindow.focus');
+    await pick('file', file);
+    const titles = win.state.sheet?.rows.map((r) => r.title).join(', ');
+    const action = row('{}{ItemType}');
+    expect("a file: VS's rows in Polish, Akcja kompilacji Brak (the SDK's None glob), Nie kopiuj, its name and path",
+      action?.value === 'None' && action.choices.find((c) => c.value === 'None')?.label === 'Brak' && row('CopyToOutputDirectory')?.value === 'Never'
+      && row('FileNameAndExtension')?.value === 'shooter-properties.txt' && row('FullPath')?.readOnly && titles.includes('Narzędzie niestandardowe'),
+      `${titles} | ${action?.value} | ${row('CopyToOutputDirectory')?.value}`);
+    if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-properties-window.png'));
+
+    await win.set('CopyToOutputDirectory', 'PreserveNewest');
+    let text = fs.readFileSync(lib.file, 'utf8');
+    expect('Kopiuj, jeśli nowszy: an Update in the project file, read back from MSBuild', /<None Update="shooter-properties\.txt">\s*<CopyToOutputDirectory>PreserveNewest<\/CopyToOutputDirectory>\s*<\/None>/.test(text)
+      && row('CopyToOutputDirectory')?.value === 'PreserveNewest', `${row('CopyToOutputDirectory')?.value}`);
+    await win.set('{}{ItemType}', 'Content');
+    text = fs.readFileSync(lib.file, 'utf8');
+    expect('Akcja kompilacji Zawartość: None Remove, Content Include with its metadata, read back',
+      text.includes('<None Remove="shooter-properties.txt" />') && /<Content Include="shooter-properties\.txt">\s*<CopyToOutputDirectory>PreserveNewest/.test(text)
+      && row('{}{ItemType}')?.value === 'Content' && row('CopyToOutputDirectory')?.value === 'PreserveNewest', `${row('{}{ItemType}')?.value} ${row('CopyToOutputDirectory')?.value}`);
+    await win.set('{}{ItemType}', 'None');
+    await win.set('CopyToOutputDirectory', '');
+    expect('and back: the project file as it was', Buffer.compare(before, fs.readFileSync(lib.file)) === 0 && row('{}{ItemType}')?.value === 'None', 'byte for byte');
+
+    await pick('folder', path.dirname(file));
+    const folder = win.state.sheet?.rows.map((r) => `${r.title}=${r.value}`).join(', ');
+    await pick('project', lib.file);
+    const project = win.state.sheet?.rows.map((r) => `${r.title}=${r.value}`).join(', ');
+    expect("a folder's and a project's rows", folder?.startsWith('Nazwa folderu=') && project?.startsWith(`Nazwa pliku=${path.basename(lib.file)}, Folder projektu=`), `${folder} | ${project}`);
+  } finally {
+    require(path.join(api.extensionPath, 'write-file')).writeFileWhenFree(lib.file, before, 200);
+    fs.rmSync(file, { force: true });
+  }
+  expect('the project file put back as it was', Buffer.compare(before, fs.readFileSync(lib.file)) === 0, 'byte for byte');
   return results;
 }
 
@@ -1598,6 +1649,12 @@ async function run() {
     for (const r of await propertiesChecks(api)) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  properties: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
+    }
+  }
+  if (checks.propertiesWindow || (!process.env.CHECKS_FILE && process.env.SKIP_PROPERTIES_WINDOW !== '1')) {
+    for (const r of await propertiesWindowChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  properties window: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.configurationManager || (!process.env.CHECKS_FILE && process.env.SKIP_CONFIGURATION_MANAGER !== '1')) {
