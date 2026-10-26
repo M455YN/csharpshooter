@@ -96,11 +96,26 @@ function solutionConfigurations(solution) {
   return { configurations: [...new Set(pairs.map((p) => p[0]))], platforms: [...new Set(pairs.map((p) => p[1]))] };
 }
 
-/** What a solution configuration builds a project as: its .sln's "{guid}.<cfg>|<platform>.ActiveCfg = Debug|Any CPU",
- *  as VS maps it (a solution's "debug app" can build a project as Debug); the solution's own names where there is none. */
+/** What a solution configuration builds a project as, as VS maps it (a solution's "debug app" can build a project as
+ *  Debug): an .sln's "{guid}.<cfg>|<platform>.ActiveCfg = Debug|Any CPU", an .slnx's <BuildType Solution="<cfg>|<platform>"
+ *  Project="Debug" /> and <Platform .../> under the project (its platform may be *); the solution's own names where
+ *  there is none. */
 function projectConfiguration(solution, project, configuration, platform) {
-  const text = solution && /\.sln$/i.test(solution) && fs.existsSync(solution) ? fs.readFileSync(solution, 'utf8') : '';
   const rel = path.relative(path.dirname(solution || ''), project).toLowerCase();
+  if (solution && /\.slnx$/i.test(solution) && fs.existsSync(solution)) {
+    const text = fs.readFileSync(solution, 'utf8');
+    const block = [...text.matchAll(/<Project\s+Path="([^"]+)"\s*(?:\/>|>([\s\S]*?)<\/Project>)/g)]
+      .find(([, p]) => p.replace(/[\\/]/g, path.sep).toLowerCase() === rel)?.[2] || '';
+    const pick = (tag, fallback) => {
+      for (const [, sol, proj] of block.matchAll(new RegExp(`<${tag}\\s+Solution="([^"]+)"\\s+Project="([^"]+)"`, 'g'))) {
+        const [c, p = '*'] = sol.split('|');
+        if ((c === '*' || c.toLowerCase() === configuration.toLowerCase()) && (p === '*' || p.toLowerCase() === (platform || '').toLowerCase())) return proj;
+      }
+      return fallback;
+    };
+    return { configuration: pick('BuildType', configuration), platform: pick('Platform', platform) };
+  }
+  const text = solution && /\.sln$/i.test(solution) && fs.existsSync(solution) ? fs.readFileSync(solution, 'utf8') : '';
   const guid = [...text.matchAll(/Project\("\{[^}]+\}"\)\s*=\s*"[^"]+",\s*"([^"]+)",\s*"\{([^}]+)\}"/g)]
     .find(([, p]) => p.replace(/\\/g, path.sep).toLowerCase() === rel)?.[2];
   const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
