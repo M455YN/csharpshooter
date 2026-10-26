@@ -931,6 +931,57 @@ async function visualizerChecks(api, session, frameId) {
   return results;
 }
 
+// NuGet — rozwiązanie, as VS's Manage Packages for Solution: the solution's top-level packages from dotnet list package,
+// those with a newer version under Updates, the vulnerable ones counted; then one package updated in one project through
+// the page (dotnet add package in a task), the project file put back and restored afterwards.
+async function nugetChecks(api) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const page = await api.nugetPage.open();
+  const newer = (a, b) => api.nugetPage.compareVersions(a, b) > 0;
+  try {
+    const data = await Promise.race([page.loaded(), sleep(180000)]);
+    const packages = [...(data?.packages.values() || [])];
+    const installed = page.shown?.rows || [];
+    expect('Installed: the top-level packages with their versions', installed.length && installed.length === packages.length && installed.every((r) => r.installed),
+      `${installed.length} rows: ${installed.slice(0, 6).map((r) => `${r.id} ${r.installed}${r.latest ? ` → ${r.latest}` : ''}${r.vulnerable ? ' ⚠' : ''}`).join(', ')}; ${data?.problems.join(' ') || 'no problems'}`);
+    await page.request({ type: 'tab', tab: 'updates' });
+    const updates = page.shown.rows;
+    expect('Updates: the packages with a newer version, counted on the tab', updates.length === page.shown.updates && updates.every((r) => r.latest && r.update),
+      `${page.shown.updates}: ${updates.map((r) => `${r.id} ${r.installed} → ${r.latest}`).join(', ')}; vulnerable versions: ${page.shown.vulnerableCount}`);
+    const pk = packages.find((p) => !p.auto && p.latest && [...p.projects.values()].some((v) => newer(p.latest, v.resolved)));
+    if (process.env.SCREENSHOT) {
+      if (pk) await page.request({ type: 'select', id: pk.id });
+      await sleep(2500);
+      await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-nuget.png'));
+    }
+    if (!pk) return results;
+    // In every project that has it older, as the Updates tab checks them: one project alone would downgrade it in a project
+    // that references that one (NU1605), as in VS.
+    const projects = [...pk.projects.values()].filter((v) => newer(pk.latest, v.resolved));
+    const before = projects.map((p) => fs.readFileSync(p.file));
+    const same = (a, b) => a.toLowerCase() === b.toLowerCase();
+    try {
+      await page.request({ type: 'tab', tab: 'updates' });
+      await page.request({ type: 'select', id: pk.id });
+      await page.request({ type: 'check', files: page.shown.details.projects.map((p) => p.file), value: false });
+      await page.request({ type: 'check', files: page.shown.details.projects.filter((p) => projects.some((x) => same(x.file, p.file))).map((p) => p.file), value: true });
+      await page.request({ type: 'install', version: pk.latest });
+      const written = projects.every((p) => fs.readFileSync(p.file, 'utf8').includes(pk.latest));
+      const shown = page.shown.details.projects.filter((p) => projects.some((x) => same(x.file, p.file))).map((p) => p.version);
+      expect(`Update: ${pk.id} → ${pk.latest} in ${projects.map((p) => path.basename(p.file)).join(', ')}, by dotnet add package`,
+        page.state.last?.codes.every((c) => c === 0) && written && shown.every((v) => v === pk.latest) && !page.shown.status?.error,
+        `exit ${page.state.last?.codes.join()}, the project files have ${pk.latest}: ${written}, the page shows ${shown.join()}; ${page.shown.status?.text}`);
+    } finally {
+      projects.forEach((p, i) => fs.writeFileSync(p.file, before[i]));
+      await new Promise((resolve) => require('child_process').execFile('dotnet', ['restore', api.nugetPage.pages.keys().next().value], { windowsHide: true }, resolve));
+    }
+  } finally {
+    page.dispose();
+  }
+  return results;
+}
+
 // Opublikuj, as VS publishes to a folder: a new profile written as VS writes it, dotnet publish with it, the app in its
 // folder. A temporary folder and a profile removed afterwards: the project's own profiles (and where they publish) are left.
 async function publishChecks(api) {
@@ -1189,6 +1240,12 @@ async function run() {
     for (const r of await publishChecks(api)) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  publish: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
+    }
+  }
+  if (checks.nuget || (!process.env.CHECKS_FILE && process.env.SKIP_NUGET !== '1')) {
+    for (const r of await nugetChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  NuGet: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.everywhere || (!process.env.CHECKS_FILE && process.env.SKIP_EVERYWHERE !== '1')) {
