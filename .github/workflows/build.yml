@@ -35,6 +35,9 @@ jobs:
       - name: Texts (each English one with its Polish)
         run: npm run check-l10n
 
+      - name: Project Properties rules and project-file edits
+        run: node test/property-rules.js
+
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js ${{ inputs.server-version || '5.11.0' }} win-x64
 
