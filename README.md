@@ -128,7 +128,8 @@ does too), then kept per workspace; the active profile is the project's `.csproj
   (Ctrl+F5), the project's profiles, *Platforma (…)* for a multi-targeted project, *Właściwości debugowania …* (its
   `launchSettings.json`); then *Uruchom bez debugowania* and *Uruchom ponownie* (grey until something runs). The
   configuration and platform go to F5's build and to the Solution Explorer's Build / Rebuild, each project's mapped as the
-  .sln maps it (`{guid}.<cfg>|<platform>.ActiveCfg`), as VS builds; a launch.json entry's own `configuration` wins.
+  solution maps it (an .sln's `{guid}.<cfg>|<platform>.ActiveCfg`, an .slnx's rules), as VS builds; a launch.json entry's
+  own `configuration` wins. Both lists end with *Menedżer konfiguracji...*, as VS's do.
 - **Uruchom ponownie** (the status bar's ↻, Ctrl+Shift+F5), as VS's: the app under the debugger is ended first, a start
   still building is cancelled, an app run with Ctrl+F5 (or left running by an earlier start of the project) is stopped,
   and only then is it built and started again. VS Code's own restart on the debug toolbar builds while the app still
@@ -247,6 +248,20 @@ inherits, `ImplicitUsings` as `enable`/`disable`, build events as VS's `PreBuild
 like VS (yet): a property the project file does not set shows its evaluated value (VS shows the unevaluated one wherever it
 is set, e.g. `$(MSBuildProjectName)`); the Debug page's launch profiles, `.resx` and `.settings` open as files; the startup
 object list is not filled from the code.
+
+**Menedżer konfiguracji...** (the solution's menu, or the end of the status bar's configuration and platform lists) opens
+VS's Configuration Manager in an editor tab, with VS's own texts (msenvui.dll): *Aktywne konfiguracje rozwiązania* and
+*Aktywne platformy rozwiązania* (the status bar's), then *Konteksty projektu*: each project's *Konfiguracja*, *Platforma*,
+*Kompilacja* and *Wdróż* for them, with *Kompiluj wszystko* / *Wdróż wszystko*. Every list has *<Nowy...>* and
+*<Edytuj...>*: *Nowa konfiguracja rozwiązania* / *Nowa platforma rozwiązań* (*Kopiuj ustawienia z*, *Utwórz nowe
+konfiguracje projektu* / *platformy projektu*), *Nowa konfiguracja projektu* / *Nowa platforma projektu* (*Utwórz nowe
+konfiguracje rozwiązania* / *platformy rozwiązania*), and *Edytuj …* to remove or rename one. The solution is written as
+VS 2026 writes it, by the rules of Microsoft's vs-solutionpersistence (the library VS and dotnet read and write solutions
+with): an .sln's whole `ProjectConfigurationPlatforms` matrix, an .slnx's fewest `<BuildType>`, `<Platform>`, `<Build>`
+and `<Deploy>` rules over the defaults (`test/solution-config.js` checks them against `dotnet sln migrate`). A project's
+own configurations and platforms go to its `<Configurations>` / `<Platforms>`; a new one copied from another gets that
+one's `'$(Configuration)|$(Platform)'==…` groups, and a rename renames them. Not like VS (yet): project types other than
+C#/VB/F#/C++ get the defaults; removing a project's configuration leaves its groups in the project file.
 
 **Zarządzaj pakietami NuGet dla rozwiązania...** (the solution's menu; **Zarządzaj pakietami NuGet...** on a project)
 opens VS 2026's *NuGet — rozwiązanie* in an editor tab, with VS's own texts (NuGet.PackageManagement.UI's resources):
@@ -388,7 +403,7 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_NUGET`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_NUGET`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES`, `SKIP_PROPERTIES`, `SKIP_CONFIGURATION_MANAGER` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.

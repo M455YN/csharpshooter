@@ -1146,6 +1146,72 @@ async function propertiesChecks(api) {
   return results;
 }
 
+// Menedżer konfiguracji, as VS's: each project's context for the active solution configuration, a change to one written
+// to the solution as VS writes it, a new solution configuration with new project configurations (in each project file,
+// its Debug groups copied), renamed and removed through Edytuj; the solution and every project file left as they were.
+async function configurationManagerChecks(api) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const config = require(path.join(api.extensionPath, 'solution-config'));
+  const startup = api.startup.startup;
+  const settings = await startup.solutionSettings();
+  const files = [settings.solution, ...config.read(settings.solution).projects.map((p) => p.file)];
+  const before = new Map(files.map((f) => [f, fs.readFileSync(f)]));
+  const panel = await api.configurationManager.open();
+  const until = async (test, ms = 60000) => {
+    for (let t = 0; t < ms && !test(); t += 250) await sleep(250);
+    return test();
+  };
+  const lib = () => config.read(settings.solution).projects.find((p) => path.basename(p.file, path.extname(p.file)) === 'Contoso.Excel');
+  try {
+    await until(() => panel.state);
+    const rows = panel.state.model.projects;
+    expect("the solution's projects, the status bar's configuration and platform", panel.title === 'Menedżer konfiguracji' && rows.length === files.length - 1
+      && panel.state.settings.configuration === settings.configuration && panel.state.settings.platform === settings.platform,
+      `${panel.title}: ${rows.map((p) => p.path).join(', ')} | ${panel.state.settings.configuration}|${panel.state.settings.platform}`);
+
+    const k = config.key(settings.configuration, settings.platform);
+    await panel.request({ type: 'cell', project: lib().path, change: { build: false } });
+    const off = lib().cells.get(k);
+    const text = fs.readFileSync(settings.solution, 'utf8');
+    expect("Kompilacja off for one project: in the solution as VS writes it", off.build === false
+      && (/\.slnx$/i.test(settings.solution) ? text.includes(`<Build Solution="${settings.configuration}|${settings.platform}" Project="false" />`)
+        : !text.includes(`{${lib().guid}}.${settings.configuration}|${settings.platform}.Build.0`)),
+      `${JSON.stringify(off)} | ${text.split(/\r?\n/).filter((l) => /<Build |Build\.0/.test(l)).slice(0, 4).join(' ')}`);
+    await panel.request({ type: 'cell', project: lib().path, change: { build: true } });
+    expect('and on again: the solution as it was', Buffer.compare(before.get(settings.solution), fs.readFileSync(settings.solution)) === 0, 'byte for byte');
+
+    await panel.request({ type: 'newSolution', kind: 'buildTypes', name: 'Shooter Test', from: 'Debug', create: true });
+    const added = config.read(settings.solution);
+    const projectText = fs.readFileSync(lib().file, 'utf8');
+    const mapped = await startup.buildSettings(lib().file);
+    expect('<Nowy...>: a solution configuration, each project its own of that name (Debug\'s groups copied), and the active one',
+      added.buildTypes.includes('Shooter Test') && /<Configurations>[^<]*Shooter Test[^<]*<\/Configurations>/.test(projectText)
+      && (!projectText.includes("=='Debug|AnyCPU'") || projectText.includes("=='Shooter Test|AnyCPU'"))
+      && (await startup.solutionSettings()).configuration === 'Shooter Test' && mapped.configuration === 'Shooter Test',
+      `${added.buildTypes.join(', ')} | ${/<Configurations>([^<]*)/.exec(projectText)?.[1]} | builds as ${mapped.configuration}|${mapped.platform}`);
+    const msbuild = require('child_process').execFileSync('dotnet', ['msbuild', lib().file, '-getProperty:Configurations'], { encoding: 'utf8' }).trim();
+    expect('MSBuild reads the project\'s new configuration', msbuild.includes('Shooter Test'), msbuild);
+
+    await panel.request({ type: 'edit', kind: 'buildTypes', op: 'rename', name: 'Shooter Test', to: 'Shooter Renamed' });
+    const renamed = config.read(settings.solution);
+    await panel.request({ type: 'edit', kind: 'buildTypes', op: 'remove', name: 'Shooter Renamed' });
+    const removed = config.read(settings.solution);
+    expect('<Edytuj...>: renamed, then removed', renamed.buildTypes.includes('Shooter Renamed') && !renamed.buildTypes.includes('Shooter Test')
+      && !removed.buildTypes.includes('Shooter Renamed') && Buffer.compare(before.get(settings.solution), fs.readFileSync(settings.solution)) === 0,
+      `${renamed.buildTypes.join(', ')} -> ${removed.buildTypes.join(', ')}`);
+    if (process.env.SCREENSHOT) {
+      await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-configuration-manager.png'));
+    }
+  } finally {
+    panel.dispose();
+    for (const [f, data] of before) fs.writeFileSync(f, data);
+    await startup.setSolutionSettings({ configuration: settings.configuration, platform: settings.platform });
+  }
+  expect('the solution and its project files put back as they were', [...before].every(([f, data]) => Buffer.compare(data, fs.readFileSync(f)) === 0), `${before.size} files`);
+  return results;
+}
+
 async function publishChecks(api) {
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
@@ -1532,6 +1598,12 @@ async function run() {
     for (const r of await propertiesChecks(api)) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  properties: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
+    }
+  }
+  if (checks.configurationManager || (!process.env.CHECKS_FILE && process.env.SKIP_CONFIGURATION_MANAGER !== '1')) {
+    for (const r of await configurationManagerChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  configuration manager: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.publish || (!process.env.CHECKS_FILE && process.env.SKIP_PUBLISH !== '1')) {

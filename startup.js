@@ -6,6 +6,7 @@ const vscode = require('vscode');
 const { table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
+const config = require('./solution-config');
 
 const TYPE = 'csharpshooter';
 const ENTRY_NAME = 'Projekt startowy (CSharpShooter)';
@@ -25,6 +26,7 @@ const T = table({
   platforms: 'Solution Platforms',
   restart: 'Restart',
   saveAll: 'Save All',
+  configurationManager: 'Configuration Manager...',
 });
 
 const projectName = (file) => path.basename(file, path.extname(file));
@@ -80,47 +82,19 @@ function writeUserProperty(project, name, value) {
     '  <PropertyGroup>', `    <${name}>${value}</${name}>`, '  </PropertyGroup>', '</Project>', ''].join(eol));
 }
 
-/** The solution's configurations and platforms, as its Configuration Manager lists them: the .sln's
- *  SolutionConfigurationPlatforms ("Debug|Any CPU = Debug|Any CPU"), an .slnx's <BuildType>/<Platform>, else VS's defaults. */
+/** The solution's configurations and platforms, as its Configuration Manager lists them (solution-config.js), else VS's
+ *  defaults. */
 function solutionConfigurations(solution) {
-  const text = solution && fs.existsSync(solution) ? fs.readFileSync(solution, 'utf8') : '';
-  let pairs = [...(/GlobalSection\(SolutionConfigurationPlatforms\)[\s\S]*?EndGlobalSection/.exec(text)?.[0] || '').matchAll(/^\s*([^|=\r\n]+)\|([^=\r\n]+?)\s*=/gm)]
-    .map(([, c, p]) => [c.trim(), p.trim()]);
-  if (!pairs.length && /\.slnx$/i.test(solution || '')) {
-    const names = (tag) => [...text.matchAll(new RegExp(`<${tag} Name="([^"]+)"`, 'g'))].map((m) => m[1]);
-    const cs = names('BuildType');
-    const ps = names('Platform');
-    pairs = (cs.length ? cs : ['Debug', 'Release']).flatMap((c) => (ps.length ? ps : ['Any CPU']).map((p) => [c, p]));
-  }
-  if (!pairs.length) pairs = [['Debug', 'Any CPU'], ['Release', 'Any CPU']];
-  return { configurations: [...new Set(pairs.map((p) => p[0]))], platforms: [...new Set(pairs.map((p) => p[1]))] };
+  const model = solution && fs.existsSync(solution) ? config.read(solution) : { buildTypes: ['Debug', 'Release'], platforms: ['Any CPU'] };
+  return { configurations: model.buildTypes, platforms: model.platforms };
 }
 
 /** What a solution configuration builds a project as, as VS maps it (a solution's "debug app" can build a project as
- *  Debug): an .sln's "{guid}.<cfg>|<platform>.ActiveCfg = Debug|Any CPU", an .slnx's <BuildType Solution="<cfg>|<platform>"
- *  Project="Debug" /> and <Platform .../> under the project (its platform may be *); the solution's own names where
- *  there is none. */
+ *  Debug): the project's cell in the solution's matrix; the solution's own names where it has none. */
 function projectConfiguration(solution, project, configuration, platform) {
-  const rel = path.relative(path.dirname(solution || ''), project).toLowerCase();
-  if (solution && /\.slnx$/i.test(solution) && fs.existsSync(solution)) {
-    const text = fs.readFileSync(solution, 'utf8');
-    const block = [...text.matchAll(/<Project\s+Path="([^"]+)"\s*(?:\/>|>([\s\S]*?)<\/Project>)/g)]
-      .find(([, p]) => p.replace(/[\\/]/g, path.sep).toLowerCase() === rel)?.[2] || '';
-    const pick = (tag, fallback) => {
-      for (const [, sol, proj] of block.matchAll(new RegExp(`<${tag}\\s+Solution="([^"]+)"\\s+Project="([^"]+)"`, 'g'))) {
-        const [c, p = '*'] = sol.split('|');
-        if ((c === '*' || c.toLowerCase() === configuration.toLowerCase()) && (p === '*' || p.toLowerCase() === (platform || '').toLowerCase())) return proj;
-      }
-      return fallback;
-    };
-    return { configuration: pick('BuildType', configuration), platform: pick('Platform', platform) };
-  }
-  const text = solution && /\.sln$/i.test(solution) && fs.existsSync(solution) ? fs.readFileSync(solution, 'utf8') : '';
-  const guid = [...text.matchAll(/Project\("\{[^}]+\}"\)\s*=\s*"[^"]+",\s*"([^"]+)",\s*"\{([^}]+)\}"/g)]
-    .find(([, p]) => p.replace(/\\/g, path.sep).toLowerCase() === rel)?.[2];
-  const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const mapped = guid && new RegExp(`\\{${guid}\\}\\.${esc(configuration)}\\|${esc(platform)}\\.ActiveCfg\\s*=\\s*([^|\\r\\n]+)\\|([^\\r\\n]+)`, 'i').exec(text);
-  return mapped ? { configuration: mapped[1].trim(), platform: mapped[2].trim() } : { configuration, platform };
+  const model = solution && fs.existsSync(solution) ? config.read(solution) : undefined;
+  const cell = model?.projects.find((p) => same(p.file, project))?.cells.get(config.key(configuration, platform || 'Any CPU'));
+  return cell ? { configuration: cell.buildType, platform: cell.platform === '?' ? platform : cell.platform } : { configuration, platform };
 }
 
 /** dotnet's arguments for a configuration and platform: -c, and the platform when it is not MSBuild's default (Any CPU). */
@@ -322,8 +296,11 @@ function registerStartup(context, findSolution, launch) {
   });
   const pickSetting = async (key, list, title) => {
     const settings = await startup.solutionSettings();
-    const picked = await vscode.window.showQuickPick(settings[list].map((v) => ({ label: `${v === settings[key] ? '$(check) ' : '$(blank) '}${v}`, value: v })), { placeHolder: title });
-    if (picked) await startup.setSolutionSettings({ [key]: picked.value });
+    // VS's lists end with Menedżer konfiguracji....
+    const picked = await vscode.window.showQuickPick([...settings[list].map((v) => ({ label: `${v === settings[key] ? '$(check) ' : '$(blank) '}${v}`, value: v })),
+      { label: '', kind: vscode.QuickPickItemKind.Separator }, { label: `$(settings) ${T.configurationManager}`, manager: true }], { placeHolder: title });
+    if (picked?.manager) await vscode.commands.executeCommand('csharpShooter.configurationManager');
+    else if (picked) await startup.setSolutionSettings({ [key]: picked.value });
   };
   // `value` (the tests'): set without asking.
   register('csharpShooter.startup.pickConfiguration', (value) => (typeof value === 'string' ? startup.setSolutionSettings({ configuration: value }) : pickSetting('configuration', 'configurations', T.configurations)));

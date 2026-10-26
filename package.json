@@ -393,6 +393,11 @@
         "icon": "$(settings-gear)"
       },
       {
+        "command": "csharpShooter.configurationManager",
+        "title": "%command.configurationManager%",
+        "category": "%category.Solution%"
+      },
+      {
         "command": "csharpShooter.solution.manageNuGet",
         "title": "%command.solution.manageNuGet%",
         "category": "%category.Solution%"
@@ -550,6 +555,11 @@
         {
           "command": "csharpShooter.solution.properties",
           "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
+          "group": "9_properties@1"
+        },
+        {
+          "command": "csharpShooter.configurationManager",
+          "when": "view == csharpShooter.solution && viewItem == solution",
           "group": "9_properties@1"
         }
       ],
