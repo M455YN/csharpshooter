@@ -62,6 +62,12 @@ const T = table({
   palette: 'Command Palette: "{0}"',
   settingsDetail: 'Settings',
   paletteDetail: 'Command Palette',
+  replaceWith: 'Replace with',
+  replace: 'Replace',
+  replaceAll: 'Replace All',
+  toggleReplace: 'Toggle Replace mode (Ctrl+Shift+H)',
+  replaceConfirm: 'Replace all occurrences ({0}) in files ({1})?',
+  replaced: 'Occurrences replaced: {0}    Files changed: {1}',
 });
 
 /** "f:", "t:", "m:" at the start pick a filter, as in VS. */
@@ -84,14 +90,19 @@ function nameTester(query, o) {
   };
 }
 
+/** The query as a line's regular expression, as the options say (null for a bad one). */
+function lineRegex(query, o) {
+  try {
+    return new RegExp(o.regex ? query : o.wholeWord ? `\\b${escapeRe(query)}\\b` : escapeRe(query), o.matchCase || (o.matchCase === undefined && /\p{Lu}/u.test(query)) ? 'g' : 'gi');
+  } catch {
+    return null;
+  }
+}
+
 /** Every match of a line, for its highlight (ripgrep found the line; this finds where in it). */
 function lineRanges(text, query, o) {
-  let re;
-  try {
-    re = new RegExp(o.regex ? query : o.wholeWord ? `\\b${escapeRe(query)}\\b` : escapeRe(query), o.matchCase || (o.matchCase === undefined && /\p{Lu}/u.test(query)) ? 'g' : 'gi');
-  } catch {
-    return [];
-  }
+  const re = lineRegex(query, o);
+  if (!re) return [];
   const out = [];
   for (let m; (m = re.exec(text)) && out.length < 20;) {
     out.push([m.index, m.index + m[0].length]);
@@ -316,7 +327,49 @@ function registerSearchEverywhere(context, solutionView) {
     return vscode.window.showTextDocument(uri, { preview: true, selection: new vscode.Range(at, at.translate(0, length)) });
   };
 
-  const show = (filter, text) => {
+  /** Replace in Files, as VS's: the query's matches (the search's options; $1 and the rest with a regular expression,
+   *  the text as it is without) in the lines given ({ path, line }), or in every line of every file the last text search
+   *  found. One edit, undone as one; the files that were not open saved, as VS saves them with "keep modified files open"
+   *  off, the open ones left modified. Replace All asks first unless `confirmed`. Gives { replaced, files }. */
+  const replace = async (query, o, replacement, targets, confirmed) => {
+    const re = lineRegex(query, o);
+    const found = targets?.length ? targets : state.last?.groups.text || [];
+    if (!re || !found.length) return { replaced: 0, files: 0 };
+    const by = new Map();
+    for (const t of found) (by.get(t.path) || by.set(t.path, new Set()).get(t.path)).add(t.line);
+    const open = new Set(vscode.window.tabGroups.all.flatMap((g) => g.tabs).map((t) => t.input?.uri?.fsPath?.toLowerCase()).filter(Boolean));
+    const with$ = o.regex ? replacement : replacement.replace(/\$/g, '$$$$');
+    const edit = new vscode.WorkspaceEdit();
+    const changed = [];
+    let replaced = 0;
+    for (const [file, lines] of by) {
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+      // Replace All: every line of the file (the list may stop at its limit); Zamień: the lines picked.
+      const numbers = targets?.length ? [...lines] : Array.from({ length: doc.lineCount }, (_, i) => i + 1);
+      let any = false;
+      for (const n of numbers) {
+        if (n < 1 || n > doc.lineCount) continue;
+        const line = doc.lineAt(n - 1);
+        re.lastIndex = 0;
+        const count = [...line.text.matchAll(re)].filter((m) => m[0].length).length;
+        if (!count) continue;
+        edit.replace(doc.uri, line.range, line.text.replace(re, with$));
+        replaced += count;
+        any = true;
+      }
+      if (any) changed.push(doc);
+    }
+    if (!replaced) return { replaced: 0, files: 0 };
+    if (!targets?.length && !confirmed) {
+      const yes = T.replaceAll;
+      if ((await vscode.window.showWarningMessage(T.replaceConfirm(replaced, changed.length), { modal: true }, yes)) !== yes) return { replaced: 0, files: 0, cancelled: true };
+    }
+    if (!(await vscode.workspace.applyEdit(edit))) return { replaced: 0, files: 0 };
+    for (const doc of changed) if (!open.has(doc.uri.fsPath.toLowerCase())) await doc.save();
+    return { replaced, files: changed.length };
+  };
+
+  const show = (filter, text, replaceMode) => {
     const settings = context.globalState.get('csharpShooter.searchEverywhere.options', {});
     if (!panel) {
       panel = vscode.window.createWebviewPanel('csharpShooter.searchEverywhere', T.title, vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
@@ -331,7 +384,7 @@ function registerSearchEverywhere(context, solutionView) {
         const post = (msg) => panel?.webview.postMessage(msg);
         if (m.type === 'ready') {
           state.ready = true;
-          post({ type: 'init', options: settings, recent: recent(), filter: panel.pending?.filter, text: panel.pending?.text });
+          post({ type: 'init', options: settings, recent: recent(), filter: panel.pending?.filter, text: panel.pending?.text, replace: panel.pending?.replace });
         }
         if (m.type === 'search') {
           context.globalState.update('csharpShooter.searchEverywhere.options', m.options);
@@ -340,14 +393,19 @@ function registerSearchEverywhere(context, solutionView) {
         }
         if (m.type === 'preview') post({ type: 'preview', key: m.key, path: m.path, line: m.line, ranges: m.ranges, rel: m.rel, ...preview(m.path, m.line) });
         if (m.type === 'open') await open(m.item);
+        if (m.type === 'replace') {
+          const done = await replace(m.query, m.options, m.replacement, m.targets);
+          state.lastReplace = done;
+          post({ type: 'replaced', text: done.replaced ? T.replaced(done.replaced, done.files) : '', cancelled: !!done.cancelled });
+        }
         if (m.type === 'close') panel?.dispose();
         if (m.type === 'layout') context.globalState.update('csharpShooter.searchEverywhere.layout', m.layout);
       });
     } else {
       panel.reveal(vscode.ViewColumn.Active);
     }
-    panel.pending = { filter, text };
-    if (state.ready) panel.webview.postMessage({ type: 'focus', filter, text });
+    panel.pending = { filter, text, replace: !!replaceMode };
+    if (state.ready) panel.webview.postMessage({ type: 'focus', filter, text, replace: !!replaceMode });
     return panel;
   };
 
@@ -360,6 +418,8 @@ function registerSearchEverywhere(context, solutionView) {
   context.subscriptions.push(
     vscode.commands.registerCommand('csharpShooter.searchEverywhere', (text) => show('code', typeof text === 'string' ? text : undefined)),
     vscode.commands.registerCommand('csharpShooter.findInFiles', (text) => show('text', typeof text === 'string' ? text : selection() || undefined)),
+    // Ctrl+Shift+H, VS's Replace in Files: the same tab with its replace box open.
+    vscode.commands.registerCommand('csharpShooter.replaceInFiles', (text) => show('text', typeof text === 'string' ? text : selection() || undefined, true)),
   );
 
   function html() {
@@ -414,6 +474,13 @@ function registerSearchEverywhere(context, solutionView) {
   .item .ln { min-width: 3em; text-align: right; font-family: var(--vscode-editor-font-family); }
   .line .label { font-family: var(--vscode-editor-font-family); }
   mark { background: var(--vscode-editor-findMatchHighlightBackground); color: inherit; border-radius: 2px; }
+  del { background: var(--vscode-diffEditor-removedTextBackground); text-decoration: line-through; }
+  ins { background: var(--vscode-diffEditor-insertedTextBackground); text-decoration: none; }
+  .btn { font: inherit; padding: 4px 12px; border: 1px solid var(--vscode-button-border, transparent); border-radius: 2px; cursor: pointer; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+  .btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  #r { flex: 1; min-width: 0; border: 0; outline: 0; padding: 5px 8px; font: inherit; background: transparent; color: var(--vscode-input-foreground); }
+  #toggleReplace { width: 26px; }
   .more { padding: 2px 16px 6px; }
   .more button { border: 0; background: transparent; color: var(--vscode-textLink-foreground); cursor: pointer; font: inherit; padding: 0; }
   .recent { padding: 8px 16px; }
@@ -435,12 +502,19 @@ function registerSearchEverywhere(context, solutionView) {
 <progress id="busy" hidden></progress>
 <header>
   <div class="row">
+    <button class="icon" id="toggleReplace" title="${esc(T.toggleReplace)}" aria-label="${esc(T.toggleReplace)}" aria-expanded="false">›</button>
     <div class="box">
       <input id="q" placeholder="${esc(T.watermark)}" aria-label="${esc(T.watermark)}" spellcheck="false" autocomplete="off">
       <button class="toggle" id="matchCase" title="${esc(T.matchCase)}" aria-pressed="false">Aa</button>
       <button class="toggle" id="wholeWord" title="${esc(T.wholeWord)}" aria-pressed="false"><u>ab</u></button>
       <button class="toggle" id="regex" title="${esc(T.regex)}" aria-pressed="false">.*</button>
     </div>
+  </div>
+  <div class="row" id="replaceRow" hidden>
+    <span style="width: 26px"></span>
+    <div class="box"><input id="r" placeholder="${esc(T.replaceWith)}" aria-label="${esc(T.replaceWith)}" spellcheck="false" autocomplete="off"></div>
+    <button class="btn" id="replaceOne">${esc(T.replace)}</button>
+    <button class="btn" id="replaceAll">${esc(T.replaceAll)}</button>
   </div>
   <div class="row">
     <div class="filters" role="tablist">${filters.map(([id, text, tip]) => `<button class="filter" role="tab" data-filter="${id}" title="${esc(tip)}" aria-selected="false">${esc(text)}</button>`).join('')}</div>
@@ -465,7 +539,35 @@ function registerSearchEverywhere(context, solutionView) {
     recent: T.recent, noResultsYet: T.noResultsYet, incomplete: T.incomplete, noPreview: T.noPreview, showPreview: T.showPreview, hidePreview: T.hidePreview })};
   const $ = (id) => document.getElementById(id);
   const q = $('q'), results = $('results'), previewEl = $('preview'), footer = $('footer'), main = $('main');
-  let filter = 'code', seq = 0, groups = {}, expanded = {}, rows = [], sel = -1, timer, recentList = [], lastPreviewKey = '';
+  let filter = 'code', seq = 0, groups = {}, expanded = {}, rows = [], sel = -1, timer, recentList = [], lastPreviewKey = '', replacing = false, notice = '';
+  const r = $('r');
+  // A line's change, as Replace would make it: each match struck through, its replacement beside it ($1… with .*).
+  const escRe = (s) => s.replace(/[.*+?^$(){}|[\\]\\\\]/g, '\\\\$&');
+  const pattern = () => {
+    const o = options();
+    try { return new RegExp(o.regex ? q.value : o.wholeWord ? '\\\\b' + escRe(q.value) + '\\\\b' : escRe(q.value), o.matchCase ? '' : 'i'); } catch { return null; }
+  };
+  const changed = (text, ranges) => {
+    const rx = pattern();
+    if (!rx) return marked(text, ranges);
+    const regex = options().regex;
+    let out = '', at = 0;
+    for (const [a, b] of [...(ranges || [])].sort((x, y) => x[0] - y[0])) {
+      if (a < at) continue;
+      const was = text.slice(a, b);
+      out += esc(text.slice(at, a)) + '<del>' + esc(was) + '</del><ins>' + esc(regex ? was.replace(rx, r.value) : r.value) + '</ins>';
+      at = b;
+    }
+    return out + esc(text.slice(at));
+  };
+  const setReplace = (on) => {
+    replacing = on;
+    $('replaceRow').hidden = !on;
+    $('toggleReplace').setAttribute('aria-expanded', String(on));
+    $('toggleReplace').textContent = on ? '⌄' : '›';
+    if (on && filter !== 'text') { setFilter('text'); run(0); }
+    render();
+  };
   const options = () => ({ filter, matchCase: $('matchCase').getAttribute('aria-pressed') === 'true', wholeWord: $('wholeWord').getAttribute('aria-pressed') === 'true',
     regex: $('regex').getAttribute('aria-pressed') === 'true', scope: $('scope').value, fileTypes: $('fileTypes').value });
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => '&#' + c.charCodeAt(0) + ';');
@@ -495,6 +597,17 @@ function registerSearchEverywhere(context, solutionView) {
   document.querySelectorAll('.filter').forEach((b) => b.onclick = () => { setFilter(b.dataset.filter); q.value = q.value.replace(/^\\s*[ftm]:\\s*/, ''); run(0); q.focus(); });
   ['matchCase', 'wholeWord', 'regex'].forEach((id) => $(id).onclick = () => { const b = $(id); b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); run(0); q.focus(); });
   $('scope').onchange = () => run(0);
+  $('toggleReplace').onclick = () => { setReplace(!replacing); (replacing ? r : q).focus(); };
+  r.addEventListener('input', () => render());
+  // Zamień: the selected line, or every line of the selected file; Zamień wszystko: every file found.
+  const sendReplace = (targets) => vscode.postMessage({ type: 'replace', query: q.value, options: options(), replacement: r.value,
+    targets: targets && targets.map((x) => ({ path: x.path, line: x.line })) });
+  $('replaceOne').onclick = () => {
+    const row = rows[sel];
+    if (!row || filter !== 'text') return;
+    sendReplace(row.header ? rows.filter((x) => !x.header && x.path === row.path) : [row]);
+  };
+  $('replaceAll').onclick = () => { if (filter === 'text' && rows.length) sendReplace(null); };
   $('fileTypes').addEventListener('input', () => run(300));
   const setLayout = (l) => { main.className = l; vscode.postMessage({ type: 'layout', layout: l }); $('pHide').title = l === 'hidden' ? T.showPreview : T.hidePreview; if (l !== 'hidden') showPreview(); };
   $('pRight').onclick = () => setLayout('right');
@@ -517,7 +630,7 @@ function registerSearchEverywhere(context, solutionView) {
           html += '<div class="file" data-row="' + rows.length + '"><span>' + esc(list[0].detail) + '</span><span class="count">' + list.length + '</span></div>';
           rows.push({ kind: 'file', header: true, label: list[0].detail, path: file, line: 0, ranges: [] });
           for (const it of list) {
-            html += '<div class="item line" role="option" data-row="' + rows.length + '"><span class="ln">' + it.line + '</span><span class="label">' + marked(it.label, it.ranges) + '</span></div>';
+            html += '<div class="item line" role="option" data-row="' + rows.length + '"><span class="ln">' + it.line + '</span><span class="label">' + (replacing ? changed(it.label, it.ranges) : marked(it.label, it.ranges)) + '</span></div>';
             rows.push(it);
           }
         }
@@ -537,6 +650,7 @@ function registerSearchEverywhere(context, solutionView) {
     results.innerHTML = html || '<div class="message">' + esc(T.noResultsYet) + '</div>';
     if (sel >= rows.length) sel = rows.length - 1;
     if (sel < 0 && rows.length) sel = rows.findIndex((r) => !r.header);
+    $('replaceOne').disabled = $('replaceAll').disabled = filter !== 'text' || !rows.length;
     mark();
   };
   const mark = () => {
@@ -590,11 +704,14 @@ function registerSearchEverywhere(context, solutionView) {
       }
       if (m.recent) recentList = m.recent;
       if (m.filter) setFilter(m.filter);
+      if (m.replace) setReplace(true);
       if (typeof m.text === 'string') { q.value = m.text; run(0); }
       if (m.type === 'init' && !m.text) render();
       q.focus(); q.select();
     }
     if (m.type === 'recent') recentList = m.recent;
+    // After a replace: the search again (what it replaced is gone), and what was replaced said under it.
+    if (m.type === 'replaced' && !m.cancelled) { notice = m.text; run(0); }
     if (m.type === 'begin') {
       seq = m.seq; groups = {}; sel = -1; expanded = {}; lastPreviewKey = '';
       $('busy').hidden = false;
@@ -608,8 +725,9 @@ function registerSearchEverywhere(context, solutionView) {
     if (m.type === 'done') {
       $('busy').hidden = true;
       if (m.message) results.innerHTML = rows.length ? results.innerHTML : '<div class="message">' + esc(m.message) + '</div>';
-      footer.innerHTML = '<span>' + esc(m.summary || '') + '</span>' + (m.incomplete ? '<span class="warn">' + esc(T.incomplete) + '</span>' : '') +
+      footer.innerHTML = (notice ? '<span>' + esc(notice) + '</span>' : '') + '<span>' + esc(m.summary || '') + '</span>' + (m.incomplete ? '<span class="warn">' + esc(T.incomplete) + '</span>' : '') +
         (m.message && rows.length ? '<span class="warn">' + esc(m.message) + '</span>' : '');
+      notice = '';
       if (!rows.length && !q.value.trim()) render();
     }
     if (m.type === 'preview' && m.key === lastPreviewKey) {
@@ -628,7 +746,7 @@ function registerSearchEverywhere(context, solutionView) {
 </script></body></html>`;
   }
 
-  return { search, show, state, parseQuery };
+  return { search, show, replace, state, parseQuery };
 }
 
 module.exports = { registerSearchEverywhere, parseQuery };
