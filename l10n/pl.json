@@ -243,7 +243,6 @@
   "runInTerminal returned no process ID; use internalConsole, or a client that returns one.": "runInTerminal nie zwrócił identyfikatora procesu; użyj internalConsole lub klienta, który go zwraca.",
   "it ended before its runtime told the debugger it had started": "zakończył działanie, zanim jego środowisko uruchomieniowe powiadomiło debuger o starcie",
   "it ended before the debugger could take hold of it": "zakończył działanie, zanim debuger zdołał go przejąć",
-  "it is not a .NET program the debugger can reach: no runtime in it answered, and it opened no diagnostic port within 10 s": "nie jest programem .NET dostępnym dla debugera: żadne środowisko uruchomieniowe w nim nie odpowiedziało i nie otworzył portu diagnostycznego w ciągu 10 s",
   "the session ended before its runtime told the debugger it had started": "sesja zakończyła się, zanim środowisko uruchomieniowe powiadomiło debuger o starcie",
   "the session ended before the debugger could take hold of it": "sesja zakończyła się, zanim debuger zdołał przejąć program",
   "dbgshim could not take hold of process {0}'s runtime: {1}": "dbgshim nie mógł przejąć środowiska uruchomieniowego procesu {0}: {1}",
@@ -414,5 +413,9 @@
   "Containing Member": "Zawierający element członkowski",
   "Containing Type": "Zawierający typ",
   "Fix all occurrences in:": "Napraw wszystkie wystąpienia w:",
-  "The changes of \"{0}\" could not be applied.": "Nie można zastosować zmian akcji „{0}”."
+  "The changes of \"{0}\" could not be applied.": "Nie można zastosować zmian akcji „{0}”.",
+  "it is not a .NET program the debugger can reach: no runtime in it answered, and it opened no diagnostic port within {0} s": "nie jest programem .NET dostępnym dla debugera: żadne środowisko uruchomieniowe w nim nie odpowiedziało i nie otworzył portu diagnostycznego w ciągu {0} s",
+  "Its runtime was started with {0}=0, which turns its debugger off: nothing can attach to it": "Jego środowisko uruchomieniowe uruchomiono z {0}=0, co wyłącza debuger: nic nie może się do niego dołączyć",
+  "The program ended, but its exit code is lost: {0}.": "Program zakończył się, ale jego kod zakończenia przepadł: {0}.",
+  "Process {0} was not let go ({1}): a .NET program held at its start waits there until a debugger attaches to it or it is stopped.": "Proces {0} nie został zwolniony ({1}): program .NET wstrzymany na starcie czeka, aż dołączy się do niego debuger albo zostanie zatrzymany."
 }
