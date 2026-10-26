@@ -229,10 +229,15 @@ by the editor's Markdown). *Zainstaluj*, *Aktualizuj* and *Odinstaluj* show VS's
 (*Akceptuję*/*Odrzucam*); an unmapped package installed from one source gets its mapping in the nuget.config that holds
 the mapping, as VS adds it. *Aktualizacje* also updates the ticked packages together.
 
-What the solution has comes from `dotnet list package --format json` (`--include-transitive`, `--outdated`, `--vulnerable
---include-transitive`, `--deprecated`); icons, descriptions and *Przeglądaj* from the source's v3 search service, a
-version's licence, date, dependencies, deprecation and advisories from its registration, its README from the feed's
-README address (`nuget-feeds.js`). A local folder source (flat `.nupkg` files, or NuGet's `id/version/` layout such as
+What the solution has comes from each project's `obj/project.assets.json`, as restore wrote it: the packages each framework
+references (top-level), the others its graph resolves (transitive), and NuGet Audit's NU1901–NU1904 warnings (the
+vulnerable versions, with their advisories), read in milliseconds where `dotnet list package` takes seconds (a large web solution: 9 s,
+21 s with `--vulnerable`; the page opens in about 3 s instead of 25). A project not restored, or changed since, is restored
+first; `dotnet list package --format json` is the fallback. The sources and the package source mapping are read from the
+nuget.config files `dotnet nuget config paths` names. Updates are the newest version the chosen source's search offers, as
+in VS; icons, descriptions and *Przeglądaj* come from that search, a version's licence, date, dependencies, deprecation and
+advisories from its registration (fetched behind the list for the installed packages), its README from the feed's README
+address (`nuget-feeds.js`). A local folder source (flat `.nupkg` files, or NuGet's `id/version/` layout such as
 VS's Offline Packages) is read from its `.nuspec` files, inside the `.nupkg` when not beside it (with its packed icon and
 README). Changes are `dotnet add/remove package` in a task per project, its output in the task's terminal, run again (up to
 three times, half a second apart) when another program had the project file open, as Passenger does; then `dotnet
