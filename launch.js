@@ -9,6 +9,7 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
 const { buildArgs } = require('./startup');
+const upToDate = require('./up-to-date');
 
 const TYPE = 'csharpshooter';
 
@@ -43,7 +44,8 @@ function urlsOf({ profile, iis }) {
 /** Asks MSBuild what the build writes, so AssemblyName, OutputPath and target framework are the project's own. */
 function msbuildProperties(project, settings, framework) {
   return new Promise((resolve, reject) => {
-    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', `-p:Configuration=${settings.configuration}`,
+    // IntermediateOutputPath and CleanFile: where the build lists what it wrote, which the up-to-date check keeps.
+    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', '-getProperty:IntermediateOutputPath', '-getProperty:CleanFile', `-p:Configuration=${settings.configuration}`,
       ...buildArgs(settings).filter((a) => a.startsWith('-p:')),
       ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
       { cwd: path.dirname(project), windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
@@ -57,13 +59,46 @@ function msbuildProperties(project, settings, framework) {
   });
 }
 
+// A task building, cleaning, publishing or restoring .NET projects (the Solution Explorer's, another start's, tasks.json's,
+// the NuGet page's), which writes what a build here reads and makes.
+const BUILDING = /\bdotnet(\.exe)?["']?\s+(build|msbuild|clean|publish|restore|pack|test|add|remove)\b/i;
+const buildsUnderWay = () => vscode.tasks.taskExecutions.filter((e) => e.task.definition?.type === 'csharpShooter.nuget' || BUILDING.test(require('./task-runner').commandText(e.task.execution)));
+
+/** Waits for the builds under way to end, as Passenger 0.2.1 does, where a second build would fight the first over its
+ *  files; then the check reads what they left. */
+async function waitForBuilds(progress) {
+  if (!buildsUnderWay().length) return;
+  progress.report(t('Waiting for the build under way to end…'));
+  await new Promise((resolve) => {
+    const subscriptions = [];
+    const settle = () => (!buildsUnderWay().length || progress.token.isCancellationRequested) && (subscriptions.forEach((s) => s.dispose()), resolve());
+    subscriptions.push(vscode.tasks.onDidEndTask(settle), progress.token.onCancellationRequested(settle));
+  });
+}
+
 /** Builds the project in a task the person sees, as VS builds on F5, saying in `progress` what the build is doing;
- *  resolves with whether it succeeded, and the errors it had. */
+ *  resolves with whether it succeeded, the errors it had, and the up-to-date check that came first (`upToDate` when it
+ *  found nothing to build, with the project's properties its last build's launch read). */
 async function build(project, settings, framework, progress) {
   // Before Build bindings of the project's gulpfiles (csharpShooter.taskRunner.buildBindings), as VS runs them.
   const { buildBindings } = require('./task-runner');
+  await waitForBuilds(progress);
+  if (progress.token.isCancellationRequested) return { ok: false, errors: 0 };
   progress.report(t('Build started…'));
   if (!(await buildBindings('BeforeBuild', path.dirname(project)))) return { ok: false, errors: 0 };
+  const checked = await upToDate.check(project, settings, framework);
+  if (checked.holds) {
+    progress.report(t('Build: up to date'));
+    return { ok: await buildBindings('AfterBuild', path.dirname(project)), errors: 0, checked, upToDate: true };
+  }
+  // A file of the project saved while it builds, or before the launch keeps what the build left, may have come too late
+  // for the build: then it does not stand.
+  const saves = vscode.workspace.onDidSaveTextDocument((d) => upToDate.reads(checked, d.uri.fsPath) && (checked.savedMeanwhile = true));
+  checked.unwatch = () => saves.dispose();
+  return { ...(await runBuild(project, settings, framework, progress, buildBindings)), checked };
+}
+
+async function runBuild(project, settings, framework, progress, buildBindings) {
   const log = buildLog();
   const task = new vscode.Task({ type: 'shell', task: `build ${path.basename(project)}` }, vscode.TaskScope.Workspace,
     `build ${path.basename(project, '.csproj')}`, 'CSharpShooter',
@@ -183,19 +218,31 @@ class LaunchProfiles {
     // The configuration launch.json names, else the solution's (the status bar's) as the .sln maps it for this project.
     const settings = config.configuration ? { configuration: config.configuration, platform: config.platform }
       : (await this.startup?.buildSettings(project)) || { configuration: 'Debug' };
-    if (config.build !== false) {
-      const built = await build(project, settings, config.framework, progress);
-      this.state.lastBuild = { project, ok: built.ok };
-      if (!built.ok) {
-        if (!progress.token.isCancellationRequested) {
-          vscode.window.showErrorMessage(built.errors ? t("Build of {0} failed ({1} errors); see the task's terminal and Problems.", path.basename(project), built.errors) : t("Build of {0} failed; see the task's terminal and Problems.", path.basename(project)));
+    let built;
+    let props;
+    try {
+      if (config.build !== false) {
+        built = await build(project, settings, config.framework, progress);
+        this.state.lastBuild = { project, ok: built.ok, upToDate: !!built.upToDate };
+        if (!built.ok) {
+          if (!progress.token.isCancellationRequested) {
+            vscode.window.showErrorMessage(built.errors ? t("Build of {0} failed ({1} errors); see the task's terminal and Problems.", path.basename(project), built.errors) : t("Build of {0} failed; see the task's terminal and Problems.", path.basename(project)));
+          }
+          return undefined;
         }
-        return undefined;
       }
+      if (progress.token.isCancellationRequested) return undefined; // a Restart came in meanwhile
+      // Nothing built: the properties the last build's launch read still hold, as the project's files do.
+      props = built?.upToDate ? built.checked.props : undefined;
+      if (!props) {
+        progress.report(t('Reading the project properties…'));
+        props = await msbuildProperties(project, settings, config.framework);
+      }
+      if (built?.ok && !built.upToDate) built.kept = !built.checked.savedMeanwhile && !progress.token.isCancellationRequested && upToDate.built(built.checked, props);
+    } finally {
+      built?.checked?.unwatch?.();
+      if (built?.checked && !built.upToDate && !built.kept) upToDate.forget(built.checked);
     }
-    if (progress.token.isCancellationRequested) return undefined; // a Restart came in meanwhile
-    progress.report(t('Reading the project properties…'));
-    const props = await msbuildProperties(project, settings, config.framework);
     const entry = config.launchProfile ? runnableProfiles(project).find((p) => p.name === config.launchProfile) : undefined;
     if (config.launchProfile && !entry) {
       vscode.window.showErrorMessage(t('No launch profile "{0}" in {1} that runs here.', config.launchProfile, path.basename(project)));

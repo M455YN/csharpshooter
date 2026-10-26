@@ -170,6 +170,8 @@
   "Build started…": "Kompilacja rozpoczęta…",
   "Build succeeded (warnings: {0})": "Kompilacja zakończyła się powodzeniem (ostrzeżenia: {0})",
   "Build succeeded": "Kompilacja zakończyła się powodzeniem",
+  "Build: up to date": "Kompilacja: aktualne, nic do skompilowania",
+  "Waiting for the build under way to end…": "Oczekiwanie na zakończenie trwającej kompilacji…",
   "Project to run": "Projekt do uruchomienia",
   "Launch profile": "Profil uruchamiania",
   "No runnable project in this workspace.": "W tym obszarze roboczym nie ma projektu, który można uruchomić.",
