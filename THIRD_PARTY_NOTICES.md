@@ -45,3 +45,9 @@ Razor's own TextMate grammar, which embeds HTML's and C#'s, unchanged: a file of
 [dotnet/roslyn](https://github.com/dotnet/roslyn) (`src/Razor/src/Razor/src/Microsoft.VisualStudio.RazorExtension/EmbeddedGrammars/`,
 where Razor's tooling moved from dotnet/razor), as Passenger ships it. MIT License, Copyright (c) .NET Foundation and
 Contributors; the licence text is the MIT one above.
+
+## Visual Studio's keys (`package.json`, `contributes.keybindings`)
+
+The keybindings of Microsoft's [Visual Studio Keymap for VS Code](https://github.com/microsoft/vscode-vs-keybindings)
+0.2.1, each made conditional on `csharpShooter.visualStudioKeybindings`, three of them on CSharpShooter's own commands.
+MIT License, Copyright (c) Microsoft Corporation; the licence text is the MIT one above.

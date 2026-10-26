@@ -114,6 +114,11 @@
             "%config.uiLanguage.en%",
             "%config.uiLanguage.pl%"
           ]
+        },
+        "csharpShooter.visualStudioKeybindings": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.visualStudioKeybindings%"
         }
       }
     },
@@ -856,6 +861,261 @@
     ],
     "keybindings": [
       {
+        "key": "ctrl+shift+b",
+        "command": "workbench.action.tasks.build",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+b",
+        "command": "workbench.debug.viewlet.action.addFunctionBreakpointAction",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+shift+f9",
+        "command": "workbench.debug.viewlet.action.removeAllBreakpoints",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+shift+f5",
+        "command": "workbench.action.debug.restart",
+        "when": "config.csharpShooter.visualStudioKeybindings && inDebugMode"
+      },
+      {
+        "key": "ctrl+f10",
+        "command": "editor.debug.action.runToCursor",
+        "when": "config.csharpShooter.visualStudioKeybindings && inDebugMode"
+      },
+      {
+        "key": "ctrl+k ctrl+d",
+        "command": "editor.action.formatDocument",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+k ctrl+x",
+        "command": "insertSnippet",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+shift+l",
+        "command": "editor.action.deleteLines",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "ctrl+l",
+        "command": "editor.action.clipboardCutAction",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "ctrl+shift+g",
+        "command": "workbench.action.files.openFileFolder",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "alt+f12",
+        "command": "editor.action.referenceSearch.trigger",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+y",
+        "command": "redo",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+w",
+        "command": "editor.action.smartSelect.expand",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "shift+alt+.",
+        "command": "editor.action.addSelectionToNextFindMatch",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorFocus"
+      },
+      {
+        "key": "ctrl+alt+space",
+        "command": "editor.action.triggerSuggest",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorHasCompletionItemProvider && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "alt+space",
+        "command": "undo",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+delete",
+        "command": "deleteWordEndRight",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "ctrl+backspace",
+        "command": "deleteWordStartLeft",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "ctrl+shift+s",
+        "command": "workbench.action.files.saveAll",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+alt+o",
+        "command": "workbench.action.output.toggleOutput",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+alt+l",
+        "command": "workbench.view.extension.csharpShooter",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+r ctrl+r",
+        "command": "editor.action.rename",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorHasRenameProvider && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "ctrl+r ctrl+w",
+        "command": "editor.action.toggleRenderWhitespace",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+k ctrl+m",
+        "command": "editor.foldAll",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "ctrl+-",
+        "command": "workbench.action.navigateBack",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+shift+-",
+        "command": "workbench.action.navigateForward",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+,",
+        "command": "csharpShooter.searchEverywhere",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "shift+alt+down",
+        "command": "cursorColumnSelectDown",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "shift+alt+left",
+        "command": "cursorColumnSelectLeft",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "shift+alt+pagedown",
+        "command": "cursorColumnSelectPageDown",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "shift+alt+pageup",
+        "command": "cursorColumnSelectPageUp",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "shift+alt+right",
+        "command": "cursorColumnSelectRight",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "shift+alt+up",
+        "command": "cursorColumnSelectUp",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "shift+alt+enter",
+        "command": "workbench.action.toggleZenMode",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+f4",
+        "command": "workbench.action.closeActiveEditor",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+d",
+        "command": "editor.action.copyLinesDownAction",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+right",
+        "command": "cursorWordStartRight",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "ctrl+shift+right",
+        "command": "cursorWordStartRightSelect",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "ctrl+enter",
+        "command": "editor.action.insertLineBefore",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "shift+enter",
+        "command": "editor.action.insertLineAfter",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "ctrl+shift+down",
+        "command": "editor.action.wordHighlight.next",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && hasWordHighlights"
+      },
+      {
+        "key": "ctrl+shift+up",
+        "command": "editor.action.wordHighlight.prev",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && hasWordHighlights"
+      },
+      {
+        "key": "alt+a",
+        "command": "editor.action.replaceAll",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorFocus && findWidgetVisible"
+      },
+      {
+        "key": "alt+a",
+        "command": "search.action.replaceAll",
+        "when": "config.csharpShooter.visualStudioKeybindings && replaceActive && searchViewletVisible && !findWidgetVisible"
+      },
+      {
+        "key": "alt+a",
+        "command": "search.action.replaceAllInFile",
+        "when": "config.csharpShooter.visualStudioKeybindings && fileMatchFocus && replaceActive && searchViewletVisible"
+      },
+      {
+        "key": "alt+a",
+        "command": "search.action.replaceAllInFolder",
+        "when": "config.csharpShooter.visualStudioKeybindings && folderMatchFocus && replaceActive && searchViewletVisible"
+      },
+      {
+        "key": "alt+r",
+        "command": "editor.action.replaceOne",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorFocus && findWidgetVisible"
+      },
+      {
+        "key": "alt+r",
+        "command": "search.action.replace",
+        "when": "config.csharpShooter.visualStudioKeybindings && matchFocus && replaceActive && searchViewletVisible"
+      },
+      {
+        "key": "alt+e",
+        "command": "toggleSearchRegex",
+        "when": "config.csharpShooter.visualStudioKeybindings && searchInputBoxFocus && searchViewletVisible"
+      },
+      {
+        "key": "alt+e",
+        "command": "toggleFindRegex",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorFocus"
+      },
+      {
+        "key": "ctrl+delete",
+        "command": "deleteWordStartRight",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && !editorReadonly"
+      },
+      {
         "command": "csharpShooter.solution.search",
         "key": "ctrl+;",
         "mac": "cmd+;"
@@ -863,12 +1123,14 @@
       {
         "command": "csharpShooter.searchEverywhere",
         "key": "ctrl+t",
-        "mac": "cmd+t"
+        "mac": "cmd+t",
+        "when": "config.csharpShooter.visualStudioKeybindings"
       },
       {
         "command": "csharpShooter.findInFiles",
         "key": "ctrl+shift+f",
-        "mac": "cmd+shift+f"
+        "mac": "cmd+shift+f",
+        "when": "config.csharpShooter.visualStudioKeybindings"
       },
       {
         "command": "csharpShooter.restart",
@@ -908,16 +1170,56 @@
       }
     ],
     "semanticTokenTypes": [
-      { "id": "controlKeyword", "superType": "keyword", "description": "C# control keyword (if, return, throw…)" },
-      { "id": "extensionMethod", "superType": "method", "description": "C# extension method" },
-      { "id": "field", "superType": "property", "description": "C# field" },
-      { "id": "constant", "superType": "variable", "description": "C# constant" },
-      { "id": "delegate", "superType": "class", "description": "C# delegate type" },
-      { "id": "recordClass", "superType": "class", "description": "C# record class" },
-      { "id": "recordStruct", "superType": "struct", "description": "C# record struct" },
-      { "id": "module", "superType": "namespace", "description": "Visual Basic module" },
-      { "id": "operatorOverloaded", "superType": "operator", "description": "C# overloaded operator" },
-      { "id": "stringVerbatim", "superType": "string", "description": "C# verbatim string" }
+      {
+        "id": "controlKeyword",
+        "superType": "keyword",
+        "description": "C# control keyword (if, return, throw…)"
+      },
+      {
+        "id": "extensionMethod",
+        "superType": "method",
+        "description": "C# extension method"
+      },
+      {
+        "id": "field",
+        "superType": "property",
+        "description": "C# field"
+      },
+      {
+        "id": "constant",
+        "superType": "variable",
+        "description": "C# constant"
+      },
+      {
+        "id": "delegate",
+        "superType": "class",
+        "description": "C# delegate type"
+      },
+      {
+        "id": "recordClass",
+        "superType": "class",
+        "description": "C# record class"
+      },
+      {
+        "id": "recordStruct",
+        "superType": "struct",
+        "description": "C# record struct"
+      },
+      {
+        "id": "module",
+        "superType": "namespace",
+        "description": "Visual Basic module"
+      },
+      {
+        "id": "operatorOverloaded",
+        "superType": "operator",
+        "description": "C# overloaded operator"
+      },
+      {
+        "id": "stringVerbatim",
+        "superType": "string",
+        "description": "C# verbatim string"
+      }
     ],
     "configurationDefaults": {
       "files.associations": {
