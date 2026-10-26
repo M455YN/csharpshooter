@@ -356,6 +356,18 @@ function publishDir(projectFile, configuration, profile, framework) {
   });
 }
 
+/** A dotnet command in a task (a command line, or dotnet's arguments, each quoted for the shell); resolves with its exit
+ *  code once it ends. */
+async function terminalTask(name, cmd, cwd, started = () => {}) {
+  const shell = typeof cmd === 'string' ? new vscode.ShellExecution(cmd, { cwd })
+    : new vscode.ShellExecution('dotnet', cmd.map((value) => ({ value, quoting: vscode.ShellQuoting.Strong })), { cwd });
+  const execution = await vscode.tasks.executeTask(new vscode.Task({ type: 'shell', task: name }, vscode.TaskScope.Workspace, name, 'CSharpShooter', shell));
+  started(execution);
+  return new Promise((resolve) => {
+    const done = vscode.tasks.onDidEndTaskProcess((e) => e.execution === execution && (done.dispose(), resolve(e.exitCode)));
+  });
+}
+
 function registerSolutionView(context, findSolution) {
   const provider = new SolutionProvider(findSolution);
   const view = vscode.window.createTreeView('csharpShooter.solution', { treeDataProvider: provider, showCollapseAll: true });
@@ -373,18 +385,6 @@ function registerSolutionView(context, findSolution) {
   watcher.onDidDelete((u) => relevant(u) && refreshSoon());
   watcher.onDidChange((u) => /\.(csproj|sln|slnx)$/i.test(u.fsPath) && refreshSoon());
   context.subscriptions.push(watcher);
-
-  // A dotnet command in a task (a command line, or dotnet's arguments, each quoted for the shell); resolves with its exit
-  // code once it ends.
-  const terminalTask = async (name, cmd, cwd, started = () => {}) => {
-    const shell = typeof cmd === 'string' ? new vscode.ShellExecution(cmd, { cwd })
-      : new vscode.ShellExecution('dotnet', cmd.map((value) => ({ value, quoting: vscode.ShellQuoting.Strong })), { cwd });
-    const execution = await vscode.tasks.executeTask(new vscode.Task({ type: 'shell', task: name }, vscode.TaskScope.Workspace, name, 'CSharpShooter', shell));
-    started(execution);
-    return new Promise((resolve) => {
-      const done = vscode.tasks.onDidEndTaskProcess((e) => e.execution === execution && (done.dispose(), resolve(e.exitCode)));
-    });
-  };
   // A build in a task, what it does said at the bottom right as F5's build says it, and its outcome in the status bar as VS's.
   const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
   // `args`: dotnet's, quoted one by one, so the file logger's ';' never ends the shell's command (PowerShell's would).
@@ -495,4 +495,4 @@ function registerSolutionView(context, findSolution) {
   return { provider, view, findItem: (p) => findItem(provider, p) };
 }
 
-module.exports = { registerSolutionView, readSolution, readProject, nestingParents, newPublishProfile };
+module.exports = { registerSolutionView, readSolution, readProject, nestingParents, newPublishProfile, terminalTask };

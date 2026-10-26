@@ -369,6 +369,16 @@
         "command": "csharpShooter.solution.publishPage",
         "title": "%command.solution.publishPage%",
         "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.manageNuGet",
+        "title": "%command.solution.manageNuGet%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.manageNuGetSolution",
+        "title": "%command.solution.manageNuGetSolution%",
+        "category": "%category.Solution%"
       }
     ],
     "menus": {
@@ -434,6 +444,16 @@
           "command": "csharpShooter.solution.editProject",
           "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
           "group": "2_edit@1"
+        },
+        {
+          "command": "csharpShooter.solution.manageNuGetSolution",
+          "when": "view == csharpShooter.solution && viewItem == solution",
+          "group": "2_edit@2"
+        },
+        {
+          "command": "csharpShooter.solution.manageNuGet",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
+          "group": "2_edit@2"
         },
         {
           "command": "csharpShooter.solution.openInTerminal",
@@ -615,6 +635,10 @@
         },
         {
           "command": "csharpShooter.solution.publishPage",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.manageNuGet",
           "when": "false"
         }
       ],
