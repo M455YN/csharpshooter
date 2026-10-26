@@ -366,6 +366,11 @@
         "category": "%category.CSharpShooter%"
       },
       {
+        "command": "csharpShooter.replaceInFiles",
+        "title": "%command.replaceInFiles%",
+        "category": "%category.CSharpShooter%"
+      },
+      {
         "command": "csharpShooter.visualizeData",
         "title": "%command.visualizeData%",
         "icon": "$(search)",
@@ -1130,6 +1135,11 @@
         "command": "csharpShooter.findInFiles",
         "key": "ctrl+shift+f",
         "mac": "cmd+shift+f",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+shift+h",
+        "command": "csharpShooter.replaceInFiles",
         "when": "config.csharpShooter.visualStudioKeybindings"
       },
       {

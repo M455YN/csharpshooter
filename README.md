@@ -314,9 +314,14 @@ text; ⤢ in the Solution Explorer's box with its query) in one editor tab, laid
 - **Summary** under them, as Find in Files': *Pasujące wiersze: N  Pasujące pliki: N  Łączna liczba przeszukanych
   plików: N* (or the count per filter), *Niekompletne wyniki* when cut at 5 000 lines or 500 items; *Ostatnie zapytania*
   when the box is empty.
+- **Zamień w plikach** (Ctrl+Shift+H, or › beside the box), VS's Replace in Files: a *Zamień na* box, each line of the
+  results showing its change (the match struck through, the replacement beside it; `$1`... with *Użyj wyrażeń
+  regularnych*), *Zamień* on the selected line (or on the selected file's lines) and *Zamień wszystko* on every file
+  found, after asking. One edit, undone with Ctrl+Z; the files that were not open are saved, as VS saves them, the open
+  ones left modified.
 
-Not like VS (yet): no replace, no syntax colours in the preview, no *Zaznaczenie* scope. Ctrl+T and Ctrl+Shift+F take
-VS Code's Go to Symbol in Workspace and Search while `csharpShooter.visualStudioKeybindings` is on (below).
+Not like VS (yet): no syntax colours in the preview, no *Zaznaczenie* scope. Ctrl+T, Ctrl+Shift+F and Ctrl+Shift+H take
+VS Code's Go to Symbol in Workspace, Search and Replace while `csharpShooter.visualStudioKeybindings` is on (below).
 
 ## Visual Studio 2026 look
 

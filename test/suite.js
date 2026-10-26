@@ -707,7 +707,37 @@ async function searchEverywhereChecks(api) {
   const icon = vscode.extensions.getExtension('M455YN.csharpshooter').packageJSON.contributes.menus['view/title'].find((m) => m.command === 'csharpShooter.searchEverywhere');
   expect('the Solution Explorer box (⤢) and title open it with their query', state.last?.query === 'HomeController' && state.last.groups.files?.length > 0 && icon?.when.includes('csharpShooter.solution'),
     `"${state.last?.query}" ${state.last?.summary}; title icon: ${icon?.when}`);
-  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+
+  // Zamień w plikach (Ctrl+Shift+H), on a file of the test's own, removed after: Zamień on one line, Zamień wszystko on
+  // the rest, then a regular expression's group; the file is saved, not having been open.
+  const scratch = path.resolve(root(), 'WebApp', 'csharpshooter-replace.txt');
+  fs.writeFileSync(scratch, 'alpha beta alpha\nkeep\nalpha(1)\n');
+  try {
+    const only = { filter: 'text', fileTypes: 'csharpshooter-replace.txt' };
+    r = await search('alpha', only);
+    const hits = (r.groups.text || []).map((l) => l.line).join();
+    const one = await api.searchEverywhere.replace('alpha', only, 'omega', [{ path: scratch, line: 3 }]);
+    const afterOne = fs.readFileSync(scratch, 'utf8');
+    r = await search('alpha', only);
+    const rest = await api.searchEverywhere.replace('alpha', only, 'omega', null, true);
+    const afterAll = fs.readFileSync(scratch, 'utf8');
+    r = await search('(be)ta', { ...only, regex: true });
+    const grouped = await api.searchEverywhere.replace('(be)ta', { ...only, regex: true }, '$1TA', null, true);
+    const afterRegex = fs.readFileSync(scratch, 'utf8');
+    expect('Zamień w plikach: one line, then all (saved), then a regular expression\'s $1',
+      hits === '1,3' && one.replaced === 1 && afterOne === 'alpha beta alpha\nkeep\nomega(1)\n' && rest.replaced === 2 && afterAll === 'omega beta omega\nkeep\nomega(1)\n'
+      && grouped.replaced === 1 && afterRegex === 'omega beTA omega\nkeep\nomega(1)\n',
+      `lines ${hits}; ${one.replaced} → ${JSON.stringify(afterOne)}; ${rest.replaced} → ${JSON.stringify(afterAll)}; ${grouped.replaced} → ${JSON.stringify(afterRegex)}`);
+    if (process.env.SCREENSHOT) {
+      fs.writeFileSync(scratch, 'alpha beta alpha\nkeep\nalpha(1)\n');
+      await vscode.commands.executeCommand('csharpShooter.replaceInFiles', 'alpha');
+      await sleep(3000);
+      await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-replace.png'));
+    }
+  } finally {
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    fs.rmSync(scratch, { force: true });
+  }
   return results;
 }
 
