@@ -12,6 +12,7 @@ const { registerDataVisualizer } = require('./data-visualizer');
 const { registerRazorEnter } = require('./razor-enter');
 const { registerPublishPage } = require('./publish-page');
 const { registerPropertiesPage } = require('./properties-page');
+const { registerConfigurationManager } = require('./config-manager');
 const { registerNuGetPage } = require('./nuget-page');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
@@ -352,11 +353,12 @@ async function activate(context) {
   const startup = registerStartup(context, findSolution, launch);
   launch.provider.startup = startup.startup;
   solutionView.provider.startup = startup.startup;
+  const configurationManager = registerConfigurationManager(context, findSolution, startup.startup);
   const markStartup = async () => solutionView.provider.setStartup(await startup.startup.project());
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, nugetPage, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, configurationManager, nugetPage, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {

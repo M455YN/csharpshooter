@@ -1,6 +1,6 @@
 # Third-party notices
 
-CSharpShooter bundles two programs it did not write, and one file.
+CSharpShooter bundles two programs it did not write, and one file; some of its code follows code of others.
 
 ## The .NET debugger (`debugger/`)
 
@@ -45,6 +45,13 @@ The XAML rules of the .NET project system's property pages ([dotnet/project-syst
 `src/Microsoft.VisualStudio.ProjectSystem.Managed/ProjectSystem/Rules/PropertyPages`), unchanged, with the Polish ones Visual
 Studio 2026 ships made from them; `property-rules.js` follows what its intercepting value providers do. MIT License,
 Copyright (c) .NET Foundation and Contributors; the licence text is the MIT one above.
+
+## The Configuration Manager's solution rules (`solution-config.js`)
+
+How an .sln's and an .slnx's configurations are read and written, ported from Microsoft's
+[vs-solutionpersistence](https://github.com/microsoft/vs-solutionpersistence) (`ConfigurationRuleFollower`,
+`SolutionConfigurationMap`'s rules, `ProjectTypeTable.BuiltInTypes`, the .sln writer's `ProjectConfigurationPlatforms`).
+MIT License, Copyright (c) Microsoft Corporation; the licence text is the MIT one above.
 
 ## The Razor grammar (`syntaxes/aspnetcorerazor.tmLanguage.json`)
 
