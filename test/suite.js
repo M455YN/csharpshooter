@@ -1296,6 +1296,73 @@ async function referencesLensChecks() {
     got: error ? [error] : [`${shown?.length} in the peek`, ...(shown || []).slice(0, 3).map((l) => `${path.basename(l.uri.fsPath)}:${l.range.start.line + 1}`)] }];
 }
 
+// Roslyn's other client commands, on edits made for the check and reverted after: two unused variables give a fix with
+// Fix All (roslyn.client.fixAllCodeAction, scope Document) and the submenu of ways to suppress the warning
+// (roslyn.client.nestedCodeAction); "override " in the class gives a completion item that is a complex edit
+// (roslyn.client.completionComplexEdit).
+async function clientCommandChecks() {
+  const results = [];
+  const { doc, pos } = await position('Contoso.Core/Authorization/AppUser.cs', 'RightsChecker.CheckRightsExpr(conditions, __GetModules', 0);
+  const editor = await vscode.window.showTextDocument(doc);
+  const run = async (command) => {
+    try {
+      return { result: await vscode.commands.executeCommand(command.command, ...(command.arguments || []).slice(0, 1), ...command.extra) };
+    } catch (e) {
+      return { error: e.message };
+    }
+  };
+  try {
+    const indent = doc.lineAt(pos.line).text.match(/^\s*/)[0];
+    await editor.edit((e) => e.insert(new vscode.Position(pos.line, 0), `${indent}int shooterUnusedA;\n${indent}int shooterUnusedB;\n`));
+    const at = new vscode.Position(pos.line, indent.length + 6);
+    let actions = [];
+    for (let i = 0; i < 20 && !actions.some((a) => a.command?.command === 'roslyn.client.fixAllCodeAction'); i++) {
+      await sleep(1500);
+      actions = (await vscode.commands.executeCommand('vscode.executeCodeActionProvider', doc.uri, new vscode.Range(at, at))) || [];
+    }
+    const titles = actions.map((a) => `${a.title}${a.command ? ` [${a.command.command.replace('roslyn.client.', '')}]` : ''}`);
+    const nested = actions.find((a) => a.command?.command === 'roslyn.client.nestedCodeAction');
+    const inner = nested?.command.arguments[0].NestedCodeActions || [];
+    const pragma = inner.find((a) => /#pragma/.test(a.title)) || inner[0];
+    const n = pragma && await run({ ...nested.command, extra: [pragma.title] });
+    results.push({ name: 'nestedCodeAction: a suppression picked from the submenu is applied', ok: !n?.error && /#pragma warning disable/.test(doc.getText()),
+      got: [n?.error || `${inner.length} under "${nested?.title}"`, `picked: ${pragma?.title}`] });
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+    await editor.edit((e) => e.insert(new vscode.Position(pos.line, 0), `${indent}int shooterUnusedA;\n${indent}int shooterUnusedB;\n`));
+    actions = [];
+    for (let i = 0; i < 20 && !actions.some((a) => a.command?.command === 'roslyn.client.fixAllCodeAction'); i++) {
+      await sleep(1500);
+      actions = (await vscode.commands.executeCommand('vscode.executeCodeActionProvider', doc.uri, new vscode.Range(at, at))) || [];
+    }
+    const fixAll = actions.find((a) => a.command?.command === 'roslyn.client.fixAllCodeAction');
+    const f = fixAll && await run({ ...fixAll.command, extra: ['Document'] });
+    results.push({ name: 'fixAllCodeAction: Fix All in Document removes both variables', ok: !!fixAll && !f.error && !/shooterUnused/.test(doc.getText()),
+      got: [f?.error || `"${fixAll?.title}" with ${fixAll?.command.arguments[0].FixAllFlavors?.join('/')}`, `${(doc.getText().match(/shooterUnused/g) || []).length} left`, ...(fixAll ? [] : titles.slice(0, 8))] });
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+
+    const classLine = doc.getText().split(/\r?\n/).findIndex((l) => /\bclass AppUser\b/.test(l));
+    let brace = classLine;
+    while (!doc.lineAt(brace).text.includes('{')) brace++;
+    const member = doc.lineAt(brace).text.match(/^\s*/)[0] + '    ';
+    await editor.edit((e) => e.insert(new vscode.Position(brace + 1, 0), `${member}override \n`));
+    const caret = new vscode.Position(brace + 1, member.length + 9);
+    let item;
+    for (let i = 0; i < 10 && !item; i++) {
+      const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, caret, undefined, 100);
+      item = list?.items.find((x) => /^ToString\(/.test(typeof x.label === 'string' ? x.label : x.label.label));
+      if (!item) await sleep(1500);
+    }
+    const c = item?.command?.command === 'roslyn.client.completionComplexEdit' && await vscode.commands.executeCommand(item.command.command, ...item.command.arguments).then((r) => ({ r }), (e) => ({ error: e.message }));
+    const line = doc.lineAt(brace + 1).text.trim();
+    results.push({ name: 'completionComplexEdit: override ToString() written in', ok: !!c && !c.error && /override string ToString\(\)/.test(doc.getText()),
+      got: [c?.error || `command ${item?.command?.command}`, line] });
+  } finally {
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  }
+  return results;
+}
+
 async function run() {
   const ext = vscode.extensions.getExtension('M455YN.csharpshooter');
   const api = await ext.activate();
@@ -1339,6 +1406,12 @@ async function run() {
     for (const r of await referencesLensChecks()) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  CodeLens: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.clientCommands || (!process.env.CHECKS_FILE && process.env.SKIP_CLIENT_COMMANDS !== '1')) {
+    for (const r of await clientCommandChecks()) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  client commands: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.solution !== false && (!process.env.CHECKS_FILE || checks.solution)) {
