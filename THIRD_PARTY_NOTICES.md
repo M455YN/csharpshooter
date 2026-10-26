@@ -4,8 +4,8 @@ CSharpShooter bundles two programs it did not write, and one file.
 
 ## The .NET debugger (`debugger/`)
 
-The debug adapter of [Passenger](https://github.com/Zaneris/passenger) 0.2.0, ported to .NET 10 by
-`debugger-port/net10.patch` (its release tag `v0.2.0`, commit `4265c9f`). Its licence and the notices for what it carries in turn are copied beside it by
+The debug adapter of [Passenger](https://github.com/Zaneris/passenger), its main after 0.2.0, ported to .NET 10 by
+`debugger-port/net10.patch` (commit `39a3600`). Its licence and the notices for what it carries in turn are copied beside it by
 `scripts/build-debugger.ps1` (`debugger/LICENSE.Passenger.txt`, `debugger/THIRD_PARTY_NOTICES.Passenger.md`).
 
 ```

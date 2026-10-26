@@ -2,7 +2,7 @@
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
-.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) 0.2.0 (MIT). No C# Dev Kit and no `vsdbg`,
+.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its main after 0.2.0). No C# Dev Kit and no `vsdbg`,
 so nothing here carries Visual Studio's licence terms, except the two closed Microsoft assemblies the Roslyn package
 ships (`Microsoft.VisualStudio.Telemetry`, `Microsoft.VisualStudio.Utilities.Internal`; Razor's MEF parts need them, and
 the server runs with `--telemetryLevel off`).
@@ -16,8 +16,9 @@ npm install
 npm run fetch-server
 ```
 
-The debugger is Passenger's, its 0.2.0 release (tag `v0.2.0`, commit `4265c9f`, which the script fetches), ported to
-.NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
+The debugger is Passenger's, its main after the 0.2.0 release (commit `39a3600` of 2026-10-26, which the script fetches:
+0.2.0 and the fixes since, among them an evaluation that calls a method taking a nested type, and the engine's hangs on
+a stop, terminate or failed attach), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
 on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
 
 ```bash

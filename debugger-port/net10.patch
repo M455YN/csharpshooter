@@ -1,5 +1,5 @@
 diff --git a/Directory.Build.props b/Directory.Build.props
-index 4f0f6eb..9676e87 100644
+index 8ae45d5..d58cdb1 100644
 --- a/Directory.Build.props
 +++ b/Directory.Build.props
 @@ -1,7 +1,7 @@
@@ -8,14 +8,14 @@ index 4f0f6eb..9676e87 100644
    <PropertyGroup>
 -    <TargetFramework>net11.0</TargetFramework>
 +    <TargetFramework>net10.0</TargetFramework>
-     <!-- What a package says it is (tools/package-mac.sh) until a vX.Y.Z tag on the commit names the version. -->
+     <!-- The version, until a vX.Y.Z tag on the commit names it. -->
      <Version>0.2.0</Version>
      <Nullable>enable</Nullable>
 diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
-index 22a28d4..e1c51e2 100644
+index 455ba4a..519b338 100644
 --- a/src/Passenger.Core/ChildProcesses.cs
 +++ b/src/Passenger.Core/ChildProcesses.cs
-@@ -384,10 +384,7 @@ public static class ChildProcesses
+@@ -397,10 +397,7 @@ public static class ChildProcesses
          start.RedirectStandardInput = true;
          start.RedirectStandardOutput = true;
          start.RedirectStandardError = true;
@@ -28,7 +28,7 @@ index 22a28d4..e1c51e2 100644
          Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory) { Start = start });
          // What it writes is nobody's: its pipes closed here, its writes to them fail, which .NET's console passes over.
 diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
-index e7489b6..c9b129e 100644
+index e192720..cc790de 100644
 --- a/src/Passenger.Core/Lifeline.cs
 +++ b/src/Passenger.Core/Lifeline.cs
 @@ -51,18 +51,26 @@ internal static partial class Lifeline
@@ -61,7 +61,7 @@ index e7489b6..c9b129e 100644
 +    }
  
      /// <summary>Puts a process group that leads itself on the watchdog's list: a child's, or a program the terminal started
-     /// in its pseudo-terminal, which leads a session and group of its own as a child here does.</summary>
+     /// in its pseudo-terminal.</summary>
 @@ -174,7 +182,6 @@ internal static partial class Lifeline
                  UseShellExecute = false,
                  CreateNoWindow = true,
@@ -143,22 +143,19 @@ index e7489b6..c9b129e 100644
 +    }
  }
 diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
-index 9c0c36d..07faf33 100644
+index 4041a2f..2a9ae08 100644
 --- a/src/Passenger.DebugAdapter/DebugAdapter.cs
 +++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
-@@ -263,6 +263,8 @@ public sealed partial class DebugAdapter
-                 return Task.CompletedTask;
-             });
+@@ -256,11 +256,13 @@ public sealed partial class DebugAdapter
+             return Leave(() => debugger.DisconnectAsync(arguments.TerminateDebuggee ?? false,
+                 arguments.LetGoWithin is int within and > 0 ? TimeSpan.FromMilliseconds(within) : null));
          }, then: RequestShutdown);
 +        // Terminated follows the answer, as the protocol has it: the engine lets go of the runtime before its exit callback
 +        // can say so, and VS Code holds the session (and the next F5 of it) open until it hears terminated.
          connection.Handle<TerminateArguments>(DapCommands.Terminate, _ =>
          {
              debugger.Ending();
-@@ -271,7 +273,7 @@ public sealed partial class DebugAdapter
-                 debugger.Terminate();
-                 return Task.CompletedTask;
-             });
+             return Leave(debugger.TerminateAsync);
 -        });
 +        }, then: () => connection.SendEvent(DapEvents.Terminated, new TerminatedEvent()));
          connection.Handle<ThreadArguments, ExceptionInfoResponse>(DapCommands.ExceptionInfo, ExceptionInfo);
@@ -179,10 +176,10 @@ index aaec179..ef545fe 100644
      /// <summary>
      /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
-index 4bdf5a7..dd30110 100644
+index 0a706cd..a42de92 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
 +++ b/src/Passenger.Debugger/SuspendedLaunch.cs
-@@ -154,53 +154,99 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -163,53 +163,99 @@ public sealed partial class SuspendedLaunch : IDisposable
          }
      }
  
@@ -192,9 +189,7 @@ index 4bdf5a7..dd30110 100644
      private static SuspendedLaunch StartOnWindows(string program, IReadOnlyList<string> arguments, string? folder, IReadOnlyDictionary<string, string> variables)
      {
 -        ProcessStartInfo start = new(program, arguments)
-+        Dictionary<string, string> environment = new(StringComparer.OrdinalIgnoreCase);
-+        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
-         {
+-        {
 -            WorkingDirectory = folder ?? Environment.CurrentDirectory,
 -            UseShellExecute = false,
 -            CreateNoWindow = true,
@@ -203,6 +198,9 @@ index 4bdf5a7..dd30110 100644
 -            RedirectStandardError = true,
 -            StartSuspended = true,
 -        };
++        Dictionary<string, string> environment = new(StringComparer.OrdinalIgnoreCase);
++        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
++        {
 +            environment[(string)entry.Key] = (string?)entry.Value ?? string.Empty;
 +        }
          foreach ((string key, string value) in variables)
@@ -258,18 +256,18 @@ index 4bdf5a7..dd30110 100644
 +            {
 +                InitialThreadId = started.ThreadId,
 +            };
-         }
--        catch (Exception error) when (error is InvalidOperationException or Win32Exception or NotSupportedException)
++        }
 +        catch
-         {
--            return null;
++        {
 +            parentIn.Dispose();
 +            parentOut.Dispose();
 +            parentErr.Dispose();
 +            throw;
-+        }
+         }
+-        catch (Exception error) when (error is InvalidOperationException or Win32Exception or NotSupportedException)
 +        finally
-+        {
+         {
+-            return null;
 +            childIn.Dispose();
 +            childOut.Dispose();
 +            childErr.Dispose();
@@ -306,7 +304,7 @@ index 4bdf5a7..dd30110 100644
                  resumed = true;
              }
              return;
-@@ -316,6 +362,11 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -390,6 +436,11 @@ public sealed partial class SuspendedLaunch : IDisposable
      public void Dispose()
      {
          process?.Dispose();
@@ -318,7 +316,7 @@ index 4bdf5a7..dd30110 100644
          if (resumeHandle != 0)
          {
              DbgShim.CloseResumeHandle(resumeHandle);
-@@ -438,4 +489,50 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -531,4 +582,50 @@ public sealed partial class SuspendedLaunch : IDisposable
      [LibraryImport("kernel32", EntryPoint = "SetHandleInformation", SetLastError = true)]
      [return: MarshalAs(UnmanagedType.Bool)]
      private static partial bool SetHandleInformation(nint handle, uint mask, uint flags);
