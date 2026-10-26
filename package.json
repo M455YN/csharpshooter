@@ -907,6 +907,18 @@
         }
       }
     ],
+    "semanticTokenTypes": [
+      { "id": "controlKeyword", "superType": "keyword", "description": "C# control keyword (if, return, throw…)" },
+      { "id": "extensionMethod", "superType": "method", "description": "C# extension method" },
+      { "id": "field", "superType": "property", "description": "C# field" },
+      { "id": "constant", "superType": "variable", "description": "C# constant" },
+      { "id": "delegate", "superType": "class", "description": "C# delegate type" },
+      { "id": "recordClass", "superType": "class", "description": "C# record class" },
+      { "id": "recordStruct", "superType": "struct", "description": "C# record struct" },
+      { "id": "module", "superType": "namespace", "description": "Visual Basic module" },
+      { "id": "operatorOverloaded", "superType": "operator", "description": "C# overloaded operator" },
+      { "id": "stringVerbatim", "superType": "string", "description": "C# verbatim string" }
+    ],
     "configurationDefaults": {
       "files.associations": {
         "*.cshtml": "aspnetcorerazor",

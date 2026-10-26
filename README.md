@@ -318,7 +318,10 @@ made from VS 2026's own theme files by `scripts/make-themes.js`: the shell's col
 tool windows, menus, status bar grey and red while debugging, buttons, text boxes, selection) from `Theme.Dark.pkgdef` /
 `Theme.Light.pkgdef`, the editor's from `EditorColors.pkgdef` and VS's Fonts and Colors defaults, C# classified as VS
 classifies it (classes, interfaces, structs, methods, parameters, locals, control keywords) through the server's semantic
-tokens, Razor and HTML as VS shows them.
+tokens, Razor and HTML as VS shows them. Properties and fields stay the colour of plain text, as in VS. Roslyn's own
+token types (field, extension method, record, constant, control keyword...) are declared with VS Code's types as their
+supertypes, so another theme (VSCodium's *Dark 2026*) colours them too, though in its own way: there locals and
+properties are plain text and parameters orange.
 
 ```bash
 node scripts/make-themes.js "C:/Program Files/Microsoft Visual Studio/18/Community"

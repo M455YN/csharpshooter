@@ -124,6 +124,7 @@
     "local": "#1F377F",
     "property": "#000000",
     "field": "#000000",
+    "constant": "#000000",
     "enumMember": "#000000",
     "namespace": "#000000",
     "controlKeyword": "#8F08C4",

@@ -9,6 +9,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const defaultChecks = [
   { name: 'C#: F12 on a method (.cs)', file: 'Contoso.Core/Authorization/AppUser.cs', needle: 'RightsChecker.CheckRightsExpr(conditions, __GetModules', off: 20, kind: 'definition', expect: 'RightsChecker.cs' },
+  { name: 'C#: a NuGet package\'s type has its semantic token', file: 'Contoso.Core/Authorization/AppUser.cs', needle: 'protected SqlConnection _sqlConnection;', off: 10, kind: 'semantic', expect: 'class' },
+  { name: 'C#: a field has its semantic token', file: 'Contoso.Core/Authorization/AppUser.cs', needle: 'protected SqlConnection _sqlConnection;', off: 25, kind: 'semantic', expect: 'field' },
   { name: 'C#: completion after a dot (.cs)', file: 'Contoso.Core/Authorization/AppUser.cs', needle: 'RightsChecker.CheckRightsExpr(conditions, __GetModules', off: 14, kind: 'completion', expect: 'CheckRightsExpr' },
   { name: 'cshtml: completion of Model.', file: 'WebApp/Views/Pass/Login.cshtml', needle: '@if (Model.', off: 11, kind: 'completion', expect: 'ShowLogOutMessage' },
   { name: 'cshtml: F12 on @model type', file: 'WebApp/Views/Pass/Login.cshtml', needle: '@model LoginViewModel', off: 10, kind: 'definition', expect: 'LoginViewModel.cs' },
@@ -53,6 +55,22 @@ async function ask(check) {
   if (check.kind === 'completion') {
     const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, pos);
     return (list?.items || []).map((i) => (typeof i.label === 'string' ? i.label : i.label.label));
+  }
+  if (check.kind === 'semantic') {
+    // The semantic token at the position: its type and modifiers, as the theme's semanticTokenColors sees them.
+    const legend = await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokensLegend', doc.uri);
+    const tokens = await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens', doc.uri);
+    if (!legend || !tokens) return [];
+    const d = tokens.data;
+    for (let i = 0, line = 0, ch = 0; i < d.length; i += 5) {
+      line += d[i];
+      ch = d[i] ? d[i + 1] : ch + d[i + 1];
+      if (line === pos.line && ch <= pos.character && pos.character < ch + d[i + 2]) {
+        const mods = legend.tokenModifiers.filter((m, b) => d[i + 4] & (1 << b));
+        return [[legend.tokenTypes[d[i + 3]], ...mods].join('.')];
+      }
+    }
+    return [`no token at ${pos.line + 1}:${pos.character + 1}`];
   }
   const hovers = (await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, pos)) || [];
   return hovers.flatMap((h) => h.contents.map((c) => (typeof c === 'string' ? c : c.value)));
@@ -1114,6 +1132,16 @@ async function themeChecks() {
   } finally {
     await config.update('colorTheme', was, vscode.ConfigurationTarget.Global);
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  }
+  // Roslyn's own token types (field, extensionMethod, recordClass…) are coloured by a theme that knows only VS Code's
+  // (VSCodium's Dark 2026) through their supertypes, and by ours through a colour or a supertype.
+  if (cs) {
+    const legend = await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokensLegend', (await vscode.workspace.openTextDocument(cs)).uri);
+    const declared = Object.fromEntries(vscode.extensions.getExtension('M455YN.csharpshooter').packageJSON.contributes.semanticTokenTypes.map((t) => [t.id, t.superType]));
+    const ours = JSON.parse(fs.readFileSync(path.join(vscode.extensions.getExtension('M455YN.csharpshooter').extensionPath, 'themes', 'visual-studio-2026-dark-color-theme.json'), 'utf8')).semanticTokenColors;
+    const wanted = ['field', 'extensionMethod', 'constant', 'recordClass', 'recordStruct', 'delegate', 'controlKeyword'];
+    const missing = wanted.filter((t) => !legend?.tokenTypes.includes(t) || !declared[t] || !(ours[t] || ours[declared[t]]));
+    results.push({ name: 'Roslyn\'s own token types have a supertype and a colour', ok: missing.length === 0, got: missing.length ? [`missing ${missing.join(', ')}`, `legend ${legend?.tokenTypes.length}`] : [wanted.map((t) => `${t}→${declared[t]}`).join(', ')] });
   }
   return results;
 }
