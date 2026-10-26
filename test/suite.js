@@ -931,9 +931,11 @@ async function visualizerChecks(api, session, frameId) {
   return results;
 }
 
-// NuGet — rozwiązanie, as VS's Manage Packages for Solution: the solution's top-level packages from dotnet list package,
-// those with a newer version under Updates, the vulnerable ones counted; then one package updated in one project through
-// the page (dotnet add package in a task), the project file put back and restored afterwards.
+// NuGet — rozwiązanie, as VS's Manage Packages for Solution: the solution's top-level and transitive packages from dotnet
+// list package, those with a newer version under Updates, the vulnerable ones counted; a package's details from its
+// source (licence, date published, dependencies) and its README; Browse over a local folder source; then one package
+// updated in its projects through the page, as VS does it: Preview Changes, then dotnet add package in a task, tried
+// again while another program holds the project file. The project files are put back and restored afterwards.
 async function nugetChecks(api) {
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
@@ -942,14 +944,40 @@ async function nugetChecks(api) {
   try {
     const data = await Promise.race([page.loaded(), sleep(180000)]);
     const packages = [...(data?.packages.values() || [])];
+    const top = packages.filter((p) => p.projects.size);
     const installed = page.shown?.rows || [];
-    expect('Installed: the top-level packages with their versions', installed.length && installed.length === packages.length && installed.every((r) => r.installed),
+    expect('Installed: the top-level packages with their versions', installed.length && installed.length === top.length && installed.every((r) => r.installed),
       `${installed.length} rows: ${installed.slice(0, 6).map((r) => `${r.id} ${r.installed}${r.latest ? ` → ${r.latest}` : ''}${r.vulnerable ? ' ⚠' : ''}`).join(', ')}; ${data?.problems.join(' ') || 'no problems'}`);
+    const transitive = page.shown.transitiveRows;
+    expect('Installed: the transitive packages under their own group, with the versions dotnet resolved', transitive.length && transitive.every((r) => r.transitive && r.installed),
+      `${transitive.length}: ${transitive.slice(0, 4).map((r) => `${r.id} ${r.installed}`).join(', ')}; banner: ${page.shown.banner}`);
     await page.request({ type: 'tab', tab: 'updates' });
     const updates = page.shown.rows;
     expect('Updates: the packages with a newer version, counted on the tab', updates.length === page.shown.updates && updates.every((r) => r.latest && r.update),
-      `${page.shown.updates}: ${updates.map((r) => `${r.id} ${r.installed} → ${r.latest}`).join(', ')}; vulnerable versions: ${page.shown.vulnerableCount}`);
+      `${page.shown.updates}: ${updates.map((r) => `${r.id} ${r.installed} → ${r.latest}`).join(', ')}`);
     const pk = packages.find((p) => !p.auto && p.latest && [...p.projects.values()].some((v) => newer(p.latest, v.resolved)));
+    if (pk) {
+      await page.request({ type: 'select', id: pk.id });
+      const d = page.shown.details;
+      expect(`the pane: ${pk.id}'s licence, date published and dependencies from its source`, d?.license && d.published && Array.isArray(d.dependencies),
+        `${d?.version}: licence ${d?.license?.text}, published ${d?.published}, ${d?.dependencies?.length} dependency groups, mapping: ${d?.mapping.text}`);
+      await page.request({ type: 'paneTab', tab: 'readme' });
+      for (const end = Date.now() + 30000; page.shown.details?.readme === undefined && Date.now() < end;) await sleep(200);
+      expect('the pane: its README, rendered', page.shown.details?.readme?.includes('<'), page.shown.details?.readme?.replace(/\s+/g, ' ').slice(0, 120));
+      await page.request({ type: 'paneTab', tab: 'details' });
+    }
+    const folder = page.shown.sources.find((s) => s.value !== '*' && !/^https?:/i.test(s.value));
+    if (folder) {
+      await page.request({ type: 'source', source: folder.value });
+      await page.request({ type: 'tab', tab: 'browse' });
+      await page.request({ type: 'search', query: 'System' });
+      const found = page.shown.rows;
+      expect(`Browse in a folder source (${folder.label}): its .nupkg files, read from their .nuspec`, found.length && found.every((r) => r.id && (r.latest || r.installed)),
+        found.slice(0, 4).map((r) => `${r.id} ${r.latest || r.installed} ${r.authors}`).join(', '));
+      await page.request({ type: 'search', query: '' });
+      await page.request({ type: 'source', source: page.shown.sources.find((s) => /nuget\.org/i.test(s.value))?.value });
+      await page.request({ type: 'tab', tab: 'updates' });
+    }
     if (process.env.SCREENSHOT) {
       if (pk) await page.request({ type: 'select', id: pk.id });
       await sleep(2500);
@@ -961,18 +989,34 @@ async function nugetChecks(api) {
     const projects = [...pk.projects.values()].filter((v) => newer(pk.latest, v.resolved));
     const before = projects.map((p) => fs.readFileSync(p.file));
     const same = (a, b) => a.toLowerCase() === b.toLowerCase();
+    let lock;
     try {
-      await page.request({ type: 'tab', tab: 'updates' });
       await page.request({ type: 'select', id: pk.id });
       await page.request({ type: 'check', files: page.shown.details.projects.map((p) => p.file), value: false });
       await page.request({ type: 'check', files: page.shown.details.projects.filter((p) => projects.some((x) => same(x.file, p.file))).map((p) => p.file), value: true });
+      page.dialog = undefined;
       await page.request({ type: 'install', version: pk.latest });
+      const preview = page.dialog;
+      if (process.env.SCREENSHOT) {
+        await sleep(1500);
+        await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-nuget-preview.png'));
+      }
+      const lines = (preview?.preview || []).flatMap((p) => p.sections.flatMap((s) => s.items.map((i) => `${p.name}: ${s.label} ${i}`)));
+      expect('Preview Changes first, as VS lists them', preview?.title === 'Podgląd zmian' && lines.length === projects.length && lines.every((l) => l.includes(`do ${pk.id} wersji ${pk.latest}`)), lines.join('; ') || `no dialog: ${page.shown.status?.text}; checked ${JSON.stringify(page.shown.details?.projects.map((p) => [p.name, p.checked, p.version]))}`);
+      if (!preview) return results;
+      // Another program holds the first project file a moment: dotnet add fails on it, and the page runs it again.
+      lock = require('child_process').spawn('powershell', ['-NoProfile', '-Command',
+        `$f = [IO.File]::Open('${projects[0].file}', 'Open', 'ReadWrite', 'None'); 'locked'; Start-Sleep -Milliseconds 1500; $f.Close()`]);
+      await new Promise((resolve) => lock.stdout.once('data', resolve));
+      await page.request(preview.buttons[0].answer);
       const written = projects.every((p) => fs.readFileSync(p.file, 'utf8').includes(pk.latest));
-      const shown = page.shown.details.projects.filter((p) => projects.some((x) => same(x.file, p.file))).map((p) => p.version);
+      const now = page.shown.details.projects.filter((p) => projects.some((x) => same(x.file, p.file))).map((p) => p.version);
       expect(`Update: ${pk.id} → ${pk.latest} in ${projects.map((p) => path.basename(p.file)).join(', ')}, by dotnet add package`,
-        page.state.last?.codes.every((c) => c === 0) && written && shown.every((v) => v === pk.latest) && !page.shown.status?.error,
-        `exit ${page.state.last?.codes.join()}, the project files have ${pk.latest}: ${written}, the page shows ${shown.join()}; ${page.shown.status?.text}`);
+        page.state.last?.codes.every((c) => c === 0) && written && now.every((v) => v === pk.latest) && !page.shown.status?.error,
+        `exit ${page.state.last?.codes.join()}, the project files have ${pk.latest}: ${written}, the page shows ${now.join()}; ${page.shown.status?.text}`);
+      expect('a project file another program held: dotnet add run again', page.state.last?.attempts[0] > 1, `attempts ${page.state.last?.attempts.join()}`);
     } finally {
+      lock?.kill();
       projects.forEach((p, i) => fs.writeFileSync(p.file, before[i]));
       await new Promise((resolve) => require('child_process').execFile('dotnet', ['restore', api.nugetPage.pages.keys().next().value], { windowsHide: true }, resolve));
     }

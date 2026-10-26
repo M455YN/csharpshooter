@@ -214,18 +214,31 @@ się powodzeniem.* and the folder as MSBuild resolves it, with *Otwórz folder*.
 opens VS 2026's *NuGet — rozwiązanie* in an editor tab, with VS's own texts (NuGet.PackageManagement.UI's resources):
 *Przeglądaj*, *Zainstalowane* (⚠ when a version is vulnerable), *Aktualizacje* (their count), *Konsoliduj* (packages in
 different versions across projects), the search box (**Ctrl+L**), *Uwzględnij wersję wstępną*, *Pokaż tylko podatne na
-zagrożenia*, *Źródło pakietów* and its ⚙ (the user's NuGet.Config), the yellow *Masz zainstalowane narażone na ataki wersje
-pakietów: N.* and *Pakiety najwyższego poziomu (N)*: each package with its icon, *przez* its authors, its description, the
-installed version (⚠ when vulnerable) and the newer one under it, ↑ or ✓ on the icon. The selected package's pane has its
-projects to tick with their installed versions, *Wersja:* (*Najnowsza stabilna*), *Zainstaluj*/*Aktualizuj*,
-*Odinstaluj*, its advisories, description, authors, downloads, project URL and tags; *Aktualizacje* also updates the
-ticked packages together. What the solution has comes from `dotnet list package --format json` (plain, `--outdated`,
-`--vulnerable --include-transitive`, the count counting transitive ones as VS does); icons, descriptions, versions and
-*Przeglądaj* from the source's v3 search service (nuget.org's). Changes are `dotnet add/remove package` in a task per
-project, then `dotnet restore` of the solution, as Passenger makes them, so under central package management the SDK
-writes `Directory.Packages.props` (the pane says so). Not like VS (yet): no transitive packages list, no deprecation, no
-README or dependencies in the pane, no license acceptance or preview of changes, one source at a time (folder sources
-are not searched), no package source mapping.
+zagrożenia*, *Źródło pakietów* (the sources by their nuget.config names, *Wszystkie* searching them all at once) and its ⚙
+(the user's NuGet.Config), the yellow *Masz zainstalowane narażone na ataki wersje pakietów: N.* (with *przestarzałe* when
+some are deprecated), *Pakiety najwyższego poziomu (N)* and *Pakiety pośrednie (N)* (folded, as VS has them): each package
+with its icon, *przez* its authors, its description, the installed version (⚠ when vulnerable or deprecated) and the
+newer one under it, ↑ or ✓ on the icon. The selected package's pane has its projects to tick with their installed
+versions (*Pośrednie* where another package brings it; installing it there makes it top-level), *Wersja:* (*Najnowsza
+stabilna*), *Zainstaluj*/*Aktualizuj*, *Odinstaluj*, the package source mapping (*Mapowanie źródła pakietu jest
+wyłączone.*, *Znaleziono...*, *Wymaga...* with *Konfiguruj*), *Opcje* → *Pokaż okno podglądu*, the deprecation (reason,
+*Pakiet alternatywny*, a link that selects it) and advisories of the chosen version, then *Szczegóły pakietu* (description,
+version, authors, licence, date published, downloads, project URL, tags, *Zależności* by framework) or *README* (rendered
+by the editor's Markdown). *Zainstaluj*, *Aktualizuj* and *Odinstaluj* show VS's *Podgląd zmian* first (per project:
+*Instalowanie:*, *Aktualizacje:*, *Odinstalowywanie:*), then *Akceptacja licencji* for a package that asks for it
+(*Akceptuję*/*Odrzucam*); an unmapped package installed from one source gets its mapping in the nuget.config that holds
+the mapping, as VS adds it. *Aktualizacje* also updates the ticked packages together.
+
+What the solution has comes from `dotnet list package --format json` (`--include-transitive`, `--outdated`, `--vulnerable
+--include-transitive`, `--deprecated`); icons, descriptions and *Przeglądaj* from the source's v3 search service, a
+version's licence, date, dependencies, deprecation and advisories from its registration, its README from the feed's
+README address (`nuget-feeds.js`). A local folder source (flat `.nupkg` files, or NuGet's `id/version/` layout such as
+VS's Offline Packages) is read from its `.nuspec` files, inside the `.nupkg` when not beside it (with its packed icon and
+README). Changes are `dotnet add/remove package` in a task per project, its output in the task's terminal, run again (up to
+three times, half a second apart) when another program had the project file open, as Passenger does; then `dotnet
+restore` of the solution. Under central package management the SDK writes `Directory.Packages.props` (the pane says so).
+Not like VS (yet): no *Zachowanie zależności* or uninstall options, licences asked for the package itself, not for
+dependencies it brings; no credential providers for private feeds beyond what dotnet itself uses.
 
 Right-click a project or folder → **Add**:
 - **New Folder...**

@@ -148,6 +148,12 @@
         }
       ]
     },
+    "taskDefinitions": [
+      {
+        "type": "csharpShooter.nuget",
+        "properties": {}
+      }
+    ],
     "submenus": [
       {
         "id": "csharpShooter.solution.add",
