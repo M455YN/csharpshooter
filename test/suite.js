@@ -942,7 +942,9 @@ async function nugetChecks(api) {
   const page = await api.nugetPage.open();
   const newer = (a, b) => api.nugetPage.compareVersions(a, b) > 0;
   try {
+    const opened = Date.now();
     const data = await Promise.race([page.loaded(), sleep(180000)]);
+    expect("the list, its updates and vulnerabilities in seconds (the restore assets, the source's search)", data && Date.now() - opened < 10000, `${((Date.now() - opened) / 1000).toFixed(1)} s`);
     const packages = [...(data?.packages.values() || [])];
     const top = packages.filter((p) => p.projects.size);
     const installed = page.shown?.rows || [];
@@ -955,7 +957,9 @@ async function nugetChecks(api) {
     const updates = page.shown.rows;
     expect('Updates: the packages with a newer version, counted on the tab', updates.length === page.shown.updates && updates.every((r) => r.latest && r.update),
       `${page.shown.updates}: ${updates.map((r) => `${r.id} ${r.installed} → ${r.latest}`).join(', ')}`);
-    const pk = packages.find((p) => !p.auto && p.latest && [...p.projects.values()].some((v) => newer(p.latest, v.resolved)));
+    // The first package with an update, at the newest version its source offers.
+    const pk = updates[0] && packages.find((p) => p.id === updates[0].id);
+    const latest = updates[0]?.latest;
     if (pk) {
       await page.request({ type: 'select', id: pk.id });
       const d = page.shown.details;
@@ -986,7 +990,7 @@ async function nugetChecks(api) {
     if (!pk) return results;
     // In every project that has it older, as the Updates tab checks them: one project alone would downgrade it in a project
     // that references that one (NU1605), as in VS.
-    const projects = [...pk.projects.values()].filter((v) => newer(pk.latest, v.resolved));
+    const projects = [...pk.projects.values()].filter((v) => newer(latest, v.resolved));
     const before = projects.map((p) => fs.readFileSync(p.file));
     const same = (a, b) => a.toLowerCase() === b.toLowerCase();
     let lock;
@@ -995,25 +999,25 @@ async function nugetChecks(api) {
       await page.request({ type: 'check', files: page.shown.details.projects.map((p) => p.file), value: false });
       await page.request({ type: 'check', files: page.shown.details.projects.filter((p) => projects.some((x) => same(x.file, p.file))).map((p) => p.file), value: true });
       page.dialog = undefined;
-      await page.request({ type: 'install', version: pk.latest });
+      await page.request({ type: 'install', version: latest });
       const preview = page.dialog;
       if (process.env.SCREENSHOT) {
         await sleep(1500);
         await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-nuget-preview.png'));
       }
       const lines = (preview?.preview || []).flatMap((p) => p.sections.flatMap((s) => s.items.map((i) => `${p.name}: ${s.label} ${i}`)));
-      expect('Preview Changes first, as VS lists them', preview?.title === 'Podgląd zmian' && lines.length === projects.length && lines.every((l) => l.includes(`do ${pk.id} wersji ${pk.latest}`)), lines.join('; ') || `no dialog: ${page.shown.status?.text}; checked ${JSON.stringify(page.shown.details?.projects.map((p) => [p.name, p.checked, p.version]))}`);
+      expect('Preview Changes first, as VS lists them', preview?.title === 'Podgląd zmian' && lines.length === projects.length && lines.every((l) => l.includes(`do ${pk.id} wersji ${latest}`)), lines.join('; ') || `no dialog: ${page.shown.status?.text}; checked ${JSON.stringify(page.shown.details?.projects.map((p) => [p.name, p.checked, p.version]))}`);
       if (!preview) return results;
       // Another program holds the first project file a moment: dotnet add fails on it, and the page runs it again.
       lock = require('child_process').spawn('powershell', ['-NoProfile', '-Command',
         `$f = [IO.File]::Open('${projects[0].file}', 'Open', 'ReadWrite', 'None'); 'locked'; Start-Sleep -Milliseconds 1500; $f.Close()`]);
       await new Promise((resolve) => lock.stdout.once('data', resolve));
       await page.request(preview.buttons[0].answer);
-      const written = projects.every((p) => fs.readFileSync(p.file, 'utf8').includes(pk.latest));
+      const written = projects.every((p) => fs.readFileSync(p.file, 'utf8').includes(latest));
       const now = page.shown.details.projects.filter((p) => projects.some((x) => same(x.file, p.file))).map((p) => p.version);
-      expect(`Update: ${pk.id} → ${pk.latest} in ${projects.map((p) => path.basename(p.file)).join(', ')}, by dotnet add package`,
-        page.state.last?.codes.every((c) => c === 0) && written && now.every((v) => v === pk.latest) && !page.shown.status?.error,
-        `exit ${page.state.last?.codes.join()}, the project files have ${pk.latest}: ${written}, the page shows ${now.join()}; ${page.shown.status?.text}`);
+      expect(`Update: ${pk.id} → ${latest} in ${projects.map((p) => path.basename(p.file)).join(', ')}, by dotnet add package`,
+        page.state.last?.codes.every((c) => c === 0) && written && now.every((v) => v === latest) && !page.shown.status?.error,
+        `exit ${page.state.last?.codes.join()}, the project files have ${latest}: ${written}, the page shows ${now.join()}; ${page.shown.status?.text}`);
       expect('a project file another program held: dotnet add run again', page.state.last?.attempts[0] > 1, `attempts ${page.state.last?.attempts.join()}`);
     } finally {
       lock?.kill();

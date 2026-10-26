@@ -12,7 +12,7 @@ const { table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const { readSolution } = require('./solution');
 const feeds = require('./nuget-feeds');
 
@@ -213,6 +213,72 @@ async function readInstalled(target, prerelease) {
   return { packages, projects, sources: outdated.sources || all.sources || [], problems: [...new Set(problems)] };
 }
 
+const AUDIT = { NU1901: 'low', NU1902: 'moderate', NU1903: 'high', NU1904: 'critical' };
+/** The same from each project's obj/project.assets.json, as restore wrote it: milliseconds where dotnet list takes
+ *  seconds (a large web solution: 9 s, 21 s with --vulnerable). The packages each framework references are top-level ("[1.21.0, )"
+ *  as asked), the others its graph resolves transitive, and NuGet Audit's warnings (NU1901-NU1904, the advisory's address
+ *  in their message) mark the vulnerable versions. Undefined when a project has no assets or they are older than its
+ *  file. Updates and deprecation come from the package source instead. */
+function readAssets(projectFiles) {
+  const packages = new Map(); // id (lower case) -> package
+  const get = (id) => {
+    const key = id.toLowerCase();
+    if (!packages.has(key)) packages.set(key, { id, projects: new Map(), transitive: new Map(), latest: undefined, advisories: new Map(), deprecations: new Map(), auto: false });
+    return packages.get(key);
+  };
+  for (const file of projectFiles) {
+    const assets = path.join(path.dirname(file), 'obj', 'project.assets.json');
+    let json;
+    try {
+      if (fs.statSync(assets).mtimeMs < fs.statSync(file).mtimeMs) return undefined;
+      json = JSON.parse(fs.readFileSync(assets, 'utf8'));
+    } catch {
+      return undefined;
+    }
+    if (keyOf(json.project?.restore?.projectPath || '') !== keyOf(file)) return undefined;
+    const key = keyOf(file);
+    const resolved = new Map(); // id (lower case) -> { id, version }
+    for (const [graph, libraries] of Object.entries(json.targets || {})) {
+      if (graph.includes('/')) continue; // a runtime's graph repeats its framework's
+      for (const [name, library] of Object.entries(libraries)) {
+        const [id, version] = name.split('/');
+        if (library.type === 'package' && !resolved.has(id.toLowerCase())) resolved.set(id.toLowerCase(), { id, version });
+      }
+    }
+    const top = new Set();
+    for (const framework of Object.values(json.project.frameworks || {})) {
+      for (const [id, dependency] of Object.entries(framework.dependencies || {})) {
+        if (dependency.target !== 'Package') continue;
+        const r = resolved.get(id.toLowerCase());
+        const pk = get(r?.id || id);
+        top.add(id.toLowerCase());
+        const requested = (dependency.version || '').replace(/^\[([^,\]]+)(,\s*\))?\]?$/, '$1');
+        if (!pk.projects.has(key)) pk.projects.set(key, { file: path.normalize(file), requested, resolved: r?.version || requested });
+        pk.auto ||= !!dependency.autoReferenced;
+      }
+    }
+    for (const [lower, r] of resolved) {
+      if (top.has(lower)) continue;
+      const pk = get(r.id);
+      if (!pk.transitive.has(key)) pk.transitive.set(key, { file: path.normalize(file), resolved: r.version });
+    }
+    for (const log of json.logs || []) {
+      const severity = AUDIT[log.code];
+      const r = severity && log.libraryId && resolved.get(log.libraryId.toLowerCase());
+      if (!r) continue;
+      const pk = get(r.id);
+      const advisories = pk.advisories.get(r.version) || [];
+      const url = /https?:\/\/\S+/.exec(log.message || '')?.[0] || '';
+      if (!advisories.some((a) => a.advisoryurl === url && a.severity === severity)) advisories.push({ severity, advisoryurl: url });
+      pk.advisories.set(r.version, advisories);
+    }
+  }
+  return { packages, projects: projectFiles.map((f) => path.normalize(f)), sources: [], problems: [] };
+}
+
+/** dotnet restore of the solution, out of sight, before its assets are read. */
+const restoreQuietly = (target) => new Promise((resolve) => execFile('dotnet', ['restore', target], { cwd: path.dirname(target), windowsHide: true, maxBuffer: 16 << 20 }, resolve));
+
 const LOCKED = /being used by another process|używany przez inny proces/i;
 /** dotnet with these arguments in a task of its own, its output in the task's terminal and kept: { code, said }. Run
  *  again (three times at most) when it failed only because another program had the project file open, as Passenger
@@ -283,6 +349,7 @@ function registerNuGetPage(context, findSolution) {
     let sources = []; // [{ url, name }]
     let mapping = { on: false, mapping: new Map(), files: [] };
     let loading;
+    let settled; // the list's versions and updates are in
     let browsed; // the Browse tab's results
     const meta = new Map(); // source|id -> the search's entry for a package, or null
     const versionInfo = new Map(); // source|id -> { version: details }, or a promise of it
@@ -317,19 +384,38 @@ function registerNuGetPage(context, findSolution) {
       return versionInfo.get(key);
     };
 
+    // The projects' restore assets; a project not restored yet (or changed since) is restored first, and dotnet list
+    // is the last resort (a project without assets: packages.config).
+    const readPackages = async () => {
+      const read = readAssets(solutionProjects());
+      if (read) return read;
+      view.status = { text: T.working('restore'), busy: true };
+      show();
+      await restoreQuietly(target);
+      view.status = undefined;
+      return readAssets(solutionProjects()) || readInstalled(target, view.prerelease);
+    };
+    let configs; // the nuget.config files' sources and mapping, read once (and again on Refresh)
     const reload = async () => {
       loading = true;
+      settled = false;
       show();
-      const [read, mapped] = await Promise.all([readInstalled(target, view.prerelease), feeds.readMapping(path.dirname(target))]);
-      mapping = mapped;
+      const [read, config] = await Promise.all([readPackages(), (configs ||= feeds.readConfigs(path.dirname(target)))]);
+      mapping = config;
       // A restore that failed (NU1605, a downgrade a change caused) leaves dotnet list with nothing: the list stays as it
       // was, the error above it.
       data = read.projects.length || !data.projects.length ? read : { ...data, problems: read.problems };
-      if (!sources.length || read.projects.length) sources = await feeds.listSources(path.dirname(target), data.sources);
+      if (!sources.length) sources = config.sources.length ? config.sources : await feeds.listSources(path.dirname(target));
       if (view.source !== ALL && !sources.some((s) => s.url === view.source)) view.source = sources.find((s) => /^https?:/.test(s.url))?.url || sources[0]?.url;
       loading = false;
       show();
+      const tops = [...data.packages.values()].filter((p) => p.projects.size).map((p) => p.id);
       await fetchMeta([...data.packages.values()].filter((p) => p.projects.size || view.transitiveOpen).map((p) => p.id));
+      settled = true;
+      show();
+      // Each top-level package's versions from its source, a few at a time behind the list: their deprecation, and the
+      // pane's details ready before a package is selected.
+      for (let i = 0; i < tops.length; i += 6) await Promise.all(tops.slice(i, i + 6).map((id) => fetchInfo(id).catch(() => {})));
       show();
     };
 
@@ -349,8 +435,10 @@ function registerNuGetPage(context, findSolution) {
     const installedVersions = (pk) => [...new Set([...pk.projects.values()].map((v) => v.resolved))].sort(compareVersions);
     const anyVersions = (pk) => [...new Set([...pk.projects.values(), ...pk.transitive.values()].map((v) => v.resolved))].sort(compareVersions);
     const vulnerableVersions = (pk) => [...pk.advisories.entries()].filter(([, a]) => a.length).map(([v]) => v);
-    const deprecatedVersions = (pk) => [...pk.deprecations.keys()];
-    const hasUpdate = (pk) => !pk.auto && pk.projects.size > 0 && pk.latest && installedVersions(pk).some((v) => compareVersions(pk.latest, v) > 0);
+    const deprecatedVersions = (pk) => [...new Set([...pk.deprecations.keys(), ...installedVersions(pk).filter((v) => infoOf(pk.id)?.[v]?.deprecation)])];
+    // The newest version the chosen source offers (dotnet list's --outdated where the page fell back to it).
+    const latestOf = (pk) => pk.latest || (metaOf(pk.id)?.versions || []).map((v) => v.version).filter((v) => view.prerelease || !v.includes('-')).sort(compareVersions).at(-1);
+    const hasUpdate = (pk) => !pk.auto && pk.projects.size > 0 && !!latestOf(pk) && installedVersions(pk).some((v) => compareVersions(latestOf(pk), v) > 0);
 
     /** A list row: what VS shows of a package. */
     const rowOf = (id, found) => {
@@ -366,7 +454,7 @@ function registerNuGetPage(context, findSolution) {
         installed: versions.length > 1 ? T.multiple : versions[0] || '',
         transitive: !!pk && !top,
         // Browse shows the source's latest beside what is installed when it is newer, as VS does.
-        latest: found && pk ? (versions.length && compareVersions(found.version, versions.at(-1)) > 0 ? found.version : '') : pk ? (hasUpdate(pk) ? pk.latest : '') : m?.version || '',
+        latest: found && pk ? (versions.length && compareVersions(found.version, versions.at(-1)) > 0 ? found.version : '') : pk ? (hasUpdate(pk) ? latestOf(pk) : '') : m?.version || '',
         update: !!pk && !!hasUpdate(pk),
         upToDate: top && !hasUpdate(pk),
         vulnerable: !!pk && vulnerableVersions(pk).length > 0,
@@ -624,6 +712,7 @@ function registerNuGetPage(context, findSolution) {
         if (view.selected) await fetchInfo(view.selected);
       }
       if (m.type === 'refresh') {
+        configs = undefined;
         feeds.folderIndexes.clear();
         meta.clear();
         versionInfo.clear();
@@ -664,7 +753,7 @@ function registerNuGetPage(context, findSolution) {
         for (const id of m.ids) {
           const pk = data.packages.get(id.toLowerCase());
           if (!pk || !hasUpdate(pk)) continue;
-          for (const v of pk.projects.values()) if (compareVersions(pk.latest, v.resolved) > 0) plan.push({ file: v.file, id: pk.id, from: v.resolved, to: pk.latest, action: 'install' });
+          for (const v of pk.projects.values()) if (compareVersions(latestOf(pk), v.resolved) > 0) plan.push({ file: v.file, id: pk.id, from: v.resolved, to: latestOf(pk), action: 'install' });
         }
         return apply(plan, m, m);
       }
@@ -684,7 +773,7 @@ function registerNuGetPage(context, findSolution) {
     panel.webview.html = html();
     panel.state = state;
     panel.loaded = () => new Promise((resolve) => {
-      const wait = () => (!loading && data.projects.length ? resolve(data) : setTimeout(wait, 200));
+      const wait = () => (!loading && settled && data.projects.length ? resolve(data) : setTimeout(wait, 200));
       wait();
     });
     return panel;
@@ -1008,4 +1097,4 @@ function registerNuGetPage(context, findSolution) {
   return { open, pages, state, compareVersions, readInstalled };
 }
 
-module.exports = { registerNuGetPage, compareVersions };
+module.exports = { registerNuGetPage, compareVersions, readAssets };
