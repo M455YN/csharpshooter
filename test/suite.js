@@ -1103,13 +1103,26 @@ async function run() {
   if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-loading.png'));
   await Promise.race([api.whenReady(), sleep(300000)]);
   const lines = [`projects loaded after ${((Date.now() - t0) / 1000).toFixed(1)} s`];
-  // What the bottom right said while the server started and loaded the solution, and that it closed once loaded.
-  for (let i = 0; i < 20 && !api.loading()?.done; i++) await sleep(250);
+  // What the bottom right said while the server started and loaded the solution, then while Razor made its views ready,
+  // and that it closed once Razor answered.
+  for (let i = 0; i < 1200 && !api.loading()?.done; i++) await sleep(250);
   const said = api.loading()?.lines || [];
   const loadingOk = api.loading()?.done && said.some((l) => l.startsWith('Uruchamianie serwera C#')) && said.some((l) => /^Wczytywanie rozwiązania WebApp \(5 projektów\)… \d+ s$/.test(l))
-    && /^Rozwiązanie WebApp wczytane w \d+ s/.test(said[said.length - 1]);
-  lines.push(`${loadingOk ? 'PASS' : 'FAIL'}  loading: the bottom right says it until the projects are loaded: ${[...new Set(said.map((l) => l.replace(/\d+ s$/, 'N s')))].join(' | ')}`);
+    && said.some((l) => l.startsWith('Przygotowywanie widoków Razor (.cshtml)…')) && /^Rozwiązanie WebApp wczytane w \d+ s/.test(said[said.length - 1]);
+  lines.push(`${loadingOk ? 'PASS' : 'FAIL'}  loading: the bottom right says it until the projects are loaded and Razor answers: ${[...new Set(said.map((l) => l.replace(/\d+ s$/, 'N s')))].join(' | ')}`);
   let failedLoading = loadingOk ? 0 : 1;
+  // Once it has closed, a .cshtml opened then answers at once: Razor's hover on C# and its colours.
+  const razorCheck = defaultChecks.find((c) => c.kind === 'hover');
+  if (!process.env.CHECKS_FILE && razorCheck) {
+    const opened = Date.now();
+    const { doc } = await position(razorCheck.file, razorCheck.needle, razorCheck.off);
+    const hover = await ask(razorCheck);
+    const tokens = await vscode.commands.executeCommand('vscode.provideDocumentRangeSemanticTokens', doc.uri, new vscode.Range(0, 0, doc.lineCount, 0));
+    const took = Date.now() - opened;
+    const razorOk = hover.some((h) => h.includes(razorCheck.expect)) && tokens?.data.length > 0 && took < 5000;
+    lines.push(`${razorOk ? 'PASS' : 'FAIL'}  loading: a .cshtml answers right after the notice closes: hover and ${tokens ? tokens.data.length / 5 : 0} tokens in ${took} ms`);
+    failedLoading += razorOk ? 0 : 1;
+  }
   // The side bar opened on the Solution Explorer, the workspace having a solution.
   const shown = api.solutionView.view.visible;
   lines.push(`${shown ? 'PASS' : 'FAIL'}  startup: the Solution Explorer is what the side bar shows: visible ${shown}`);

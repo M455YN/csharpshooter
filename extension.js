@@ -131,10 +131,20 @@ async function startServer(context) {
 
   const t0 = Date.now();
   let solutionName = '';
-  client.onNotification('workspace/projectInitializationComplete', () => {
+  let projectFiles = [];
+  client.onNotification('workspace/projectInitializationComplete', async () => {
     output.appendLine('Projects loaded.');
-    loading?.finish(t('Solution {0} loaded in {1} s: C# completion, F12 and Razor ready', solutionName, Math.round((Date.now() - t0) / 1000)));
     readyResolve();
+    // C# and F12 answer now, but Razor first generates the C# of a project's views (on a web project with many .cshtml,
+    // tens of seconds), and until then a .cshtml has no colours, completion or hover: the notice stays up for that.
+    const notice = loading;
+    if (!notice || notice.done) return;
+    notice.stage(t('Preparing Razor views (.cshtml)…'));
+    const razorStart = Date.now();
+    await Promise.race([razorAnswers(projectFiles), new Promise((r) => setTimeout(r, 5 * 60 * 1000))]).catch(() => {});
+    output.appendLine(`Razor answered after ${Math.round((Date.now() - razorStart) / 1000)} s.`);
+    notice.finish(t('Solution {0} loaded in {1} s: C# completion, F12 and Razor ready', solutionName, Math.round((Date.now() - t0) / 1000)));
+    recolourViews();
   });
   client.onNotification('window/_roslyn_showToast', (toast) => output.appendLine(`[toast] ${toast.message}`));
   client.onRequest('razor/updateHtml', () => null);
@@ -151,21 +161,54 @@ async function startServer(context) {
   const solution = await findSolution();
   if (solution) {
     solutionName = path.basename(solution, path.extname(solution));
-    let count = 0;
     try {
-      const walk = (node) => node.projects.length + node.folders.reduce((n, f) => n + walk(f), 0);
-      count = walk(readSolution(solution));
+      const walk = (node) => [...node.projects, ...node.folders.flatMap(walk)];
+      projectFiles = walk(readSolution(solution));
     } catch {
-      // the count is only for the message
+      // only for the message and Razor's views
     }
+    const count = projectFiles.length;
     loading.stage(count ? tn(count, 'Loading solution {1} (1 project)…', 'Loading solution {1} ({0} projects)…', solutionName) : t('Loading solution {0}…', solutionName));
     output.appendLine(`Opening ${solution}`);
     await client.sendNotification('solution/open', { solution: toServerUri(vscode.Uri.file(solution)) });
   } else {
     loading.stage(t('Loading projects…'));
     const projects = await vscode.workspace.findFiles('**/*.csproj', '**/{node_modules,bin,obj}/**');
+    projectFiles = projects.map((p) => p.fsPath);
     await client.sendNotification('project/open', { projects: projects.map(toServerUri) });
   }
+}
+
+/** Resolves once Razor colours the views open in editors and a few of each project's own. Its colours need the views'
+ *  C# generated and compiled, which Razor does for a whole project at once, and its first view with the project's tag
+ *  helpers (<page-title>, <grid-modal>) binds them, on a large web project about as long again: views of a project are asked one
+ *  after another until one answers at once. Asking starts that work now, so a view opened later answers at once. */
+async function razorAnswers(projectFiles) {
+  const colours = async (uri) => {
+    const doc = await vscode.workspace.openTextDocument(uri);
+    await vscode.commands.executeCommand('vscode.provideDocumentRangeSemanticTokens', doc.uri, new vscode.Range(0, 0, doc.lineCount, 0));
+  };
+  const open = vscode.window.visibleTextEditors.map((e) => e.document.uri).filter((u) => /\.(cshtml|razor)$/i.test(u.fsPath));
+  await Promise.all([...open.map(colours), ...projectFiles.map(async (project) => {
+    const found = await vscode.workspace.findFiles(new vscode.RelativePattern(path.dirname(project), '**/*.{cshtml,razor}'), '**/{node_modules,bin,obj}/**', 30);
+    const tagHelpers = (u) => { try { return /<[a-z]+-[a-z]/.test(fs.readFileSync(u.fsPath, 'utf8')); } catch { return false; } };
+    // pages before _ViewStart/_ViewImports, which hold little C#; those with tag helper elements first
+    const pages = found.filter((u) => !path.basename(u.fsPath).startsWith('_')).map((u) => [u, tagHelpers(u)]);
+    const views = [...pages.filter((p) => p[1]), ...pages.filter((p) => !p[1])].map((p) => p[0]).slice(0, 5);
+    for (const view of views) {
+      const asked = Date.now();
+      await colours(view);
+      if (Date.now() - asked < 2000) break;
+    }
+  })]);
+}
+
+/** Razor colours a view by range, and the language client passes the server's semantic tokens refresh on to whole-document
+ *  providers only: a view coloured while the projects loaded keeps those colours until scrolled or edited. A provider
+ *  registered and removed has VS Code ask again for the views on screen. */
+function recolourViews() {
+  vscode.languages.registerDocumentRangeSemanticTokensProvider({ language: 'aspnetcorerazor' },
+    { provideDocumentRangeSemanticTokens: () => null }, new vscode.SemanticTokensLegend([])).dispose();
 }
 
 async function stopServer() {
