@@ -42,6 +42,8 @@
   "command.visualizeData": "Visualizer (DataTable, DataSet, IEnumerable)",
   "command.solution.publish": "Publish (profile)",
   "command.solution.publishPage": "Publish...",
+  "command.solution.manageNuGet": "Manage NuGet Packages...",
+  "command.solution.manageNuGetSolution": "Manage NuGet Packages for Solution...",
   "container.solutionExplorer": "Solution Explorer",
   "view.search": "Search",
   "view.solution": "Solution Explorer",
