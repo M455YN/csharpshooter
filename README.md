@@ -210,6 +210,23 @@ takes neither from a profile (a multi-targeted project fails without `-f`). It e
 się powodzeniem.* and the folder as MSBuild resolves it, with *Otwórz folder*. Not like VS (yet): only folder profiles
 (no Azure, FTP, Web Deploy).
 
+**Zarządzaj pakietami NuGet dla rozwiązania...** (the solution's menu; **Zarządzaj pakietami NuGet...** on a project)
+opens VS 2026's *NuGet — rozwiązanie* in an editor tab, with VS's own texts (NuGet.PackageManagement.UI's resources):
+*Przeglądaj*, *Zainstalowane* (⚠ when a version is vulnerable), *Aktualizacje* (their count), *Konsoliduj* (packages in
+different versions across projects), the search box (**Ctrl+L**), *Uwzględnij wersję wstępną*, *Pokaż tylko podatne na
+zagrożenia*, *Źródło pakietów* and its ⚙ (the user's NuGet.Config), the yellow *Masz zainstalowane narażone na ataki wersje
+pakietów: N.* and *Pakiety najwyższego poziomu (N)*: each package with its icon, *przez* its authors, its description, the
+installed version (⚠ when vulnerable) and the newer one under it, ↑ or ✓ on the icon. The selected package's pane has its
+projects to tick with their installed versions, *Wersja:* (*Najnowsza stabilna*), *Zainstaluj*/*Aktualizuj*,
+*Odinstaluj*, its advisories, description, authors, downloads, project URL and tags; *Aktualizacje* also updates the
+ticked packages together. What the solution has comes from `dotnet list package --format json` (plain, `--outdated`,
+`--vulnerable --include-transitive`, the count counting transitive ones as VS does); icons, descriptions, versions and
+*Przeglądaj* from the source's v3 search service (nuget.org's). Changes are `dotnet add/remove package` in a task per
+project, then `dotnet restore` of the solution, as Passenger makes them, so under central package management the SDK
+writes `Directory.Packages.props` (the pane says so). Not like VS (yet): no transitive packages list, no deprecation, no
+README or dependencies in the pane, no license acceptance or preview of changes, one source at a time (folder sources
+are not searched), no package source mapping.
+
 Right-click a project or folder → **Add**:
 - **New Folder...**
 - **View (.cshtml)...**: `Name.cshtml` with `ViewData["Title"]`, in the folder (a project's `Views` when the project
@@ -235,7 +252,7 @@ the projects' folders without `bin`, `obj`, `node_modules` and binary files (abo
 10 000 files). VS adds classes and methods there, from its language services; this adds text.
 
 Not like VS (yet): files a project includes from outside its folder or removes with `<Compile Remove>` show as on disk;
-no drag and drop, rename, other item templates or NuGet manager; the search has no *Wyszukuj wśród elementów
+no drag and drop, rename or other item templates; the search has no *Wyszukuj wśród elementów
 zewnętrznych* (VS's External Dependencies) and no index saved between sessions. VS Code gives a view above the tree at
 least 120 px, so the box has room below it (the result count goes there).
 
@@ -307,7 +324,7 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_NUGET`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
@@ -316,7 +333,7 @@ their place.
 
 - HTML help inside `.cshtml` (HTML element/attribute completion, HTML formatting): Razor asks the client for it, and this
   extension answers empty. Tag helpers, components and C# come from Razor itself and work.
-- Hot Reload (Passenger's `applyChanges` request), test explorer, solution view, NuGet: none.
+- Hot Reload (Passenger's `applyChanges` request), test explorer, solution view: none.
 - *Add to Watch* and *Copy as Expression* on a member deeper than the frame's own (a field of a field) give the member's
   name alone, Passenger's `evaluateName` there, which the frame does not know. The magnifier builds the whole expression
   itself (`variable-paths.js`); the fix is to rewrite `evaluateName` in `variables` responses with it, in the inline
