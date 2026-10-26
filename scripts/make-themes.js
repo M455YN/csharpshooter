@@ -101,7 +101,7 @@ function make(kind, file) {
     semanticTokenColors: {
       class: r.class, struct: r.struct, interface: r.interface, enum: r.enum, typeParameter: r.typeParameter, delegate: r.delegate, method: r.method,
       function: r.method, extensionMethod: r.method, parameter: r.parameter, variable: r.variable, local: r.variable, property: r.property, field: r.field,
-      enumMember: r.enumMember, namespace: r.namespace, controlKeyword: r.controlKeyword, keyword: e.keyword, string: e.string, number: e.number, comment: e.comment,
+      constant: r.field, enumMember: r.enumMember, namespace: r.namespace, controlKeyword: r.controlKeyword, keyword: e.keyword, string: e.string, number: e.number, comment: e.comment,
       operator: e.operator, operatorOverloaded: r.operatorOverloaded, stringEscapeCharacter: e.escape, label: r.label, regexComment: e.comment,
       excludedCode: e.preprocessor, preprocessorText: e.preprocessor,
     },

@@ -127,6 +127,20 @@ async function startServer(context) {
       middleware: {
         // Roslyn asks for its options by section; null leaves each at the server's default.
         workspace: { configuration: (params) => params.items.map(() => null) },
+        // While the solution loads, Roslyn colours a file from what it has so far: the types of NuGet packages and other
+        // projects are not resolved yet and stay plain names. VS Code asks C# by range, which the server's refresh does not
+        // reach, so a file opened then kept those colours until Razor's views were ready (on SkillBox a minute) or it was
+        // scrolled. Asked again a moment later, until the notice closes or the answer stays the same.
+        provideDocumentRangeSemanticTokens: async (document, range, token, next) => {
+          const tokens = await next(document, range, token);
+          if (document.languageId === 'csharp' && loading && !loading.done && tokens) {
+            const key = `${document.uri} ${range.start.line}`;
+            const data = tokens.data.join();
+            if (loadingColours.get(key) !== data) recolourSoon();
+            loadingColours.set(key, data);
+          }
+          return tokens;
+        },
       },
     });
 
@@ -145,7 +159,8 @@ async function startServer(context) {
     await Promise.race([razorAnswers(projectFiles), new Promise((r) => setTimeout(r, 5 * 60 * 1000))]).catch(() => {});
     output.appendLine(`Razor answered after ${Math.round((Date.now() - razorStart) / 1000)} s.`);
     notice.finish(t('Solution {0} loaded in {1} s: C# completion, F12 and Razor ready', solutionName, Math.round((Date.now() - t0) / 1000)));
-    recolourViews();
+    recolour();
+    loadingColours.clear();
   });
   client.onNotification('window/_roslyn_showToast', (toast) => output.appendLine(`[toast] ${toast.message}`));
   client.onRequest('razor/updateHtml', () => null);
@@ -204,12 +219,21 @@ async function razorAnswers(projectFiles) {
   })]);
 }
 
-/** Razor colours a view by range, and the language client passes the server's semantic tokens refresh on to whole-document
- *  providers only: a view coloured while the projects loaded keeps those colours until scrolled or edited. A provider
- *  registered and removed has VS Code ask again for the views on screen. */
-function recolourViews() {
+/** Razor colours a view by range, and so does Roslyn a .cs file, and the language client passes the server's semantic
+ *  tokens refresh on to whole-document providers only: a file coloured while the projects loaded keeps those colours
+ *  until scrolled or edited. A range provider registered and removed has VS Code ask again for every file on screen. */
+function recolour() {
   vscode.languages.registerDocumentRangeSemanticTokensProvider({ language: 'aspnetcorerazor' },
     { provideDocumentRangeSemanticTokens: () => null }, new vscode.SemanticTokensLegend([])).dispose();
+}
+
+let recolourTimer;
+const loadingColours = new Map(); // a .cs file's last colours by range while the projects load
+function recolourSoon() {
+  recolourTimer ??= setTimeout(() => {
+    recolourTimer = undefined;
+    recolour();
+  }, 3000);
 }
 
 /** Roslyn's References CodeLens runs this client command with the document and the member's start (the C# extension
