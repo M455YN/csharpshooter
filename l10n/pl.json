@@ -160,6 +160,7 @@
   ],
   "Loading solution {0}…": "Wczytywanie rozwiązania {0}…",
   "Loading projects…": "Wczytywanie projektów…",
+  "Preparing Razor views (.cshtml)…": "Przygotowywanie widoków Razor (.cshtml)…",
   "Debug adapter not found: {0}": "Nie znaleziono adaptera debugowania: {0}",
   "errors: {0}": "błędy: {0}",
   "warnings: {0}": "ostrzeżenia: {0}",
