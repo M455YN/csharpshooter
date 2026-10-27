@@ -287,6 +287,31 @@ async function taskRunnerChecks(api) {
     await sleep(1000);
     await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-task-runner.png'));
   }
+  // An error in a file the watcher minifies ends gulp (exit code 1, as in VS); Project Open starts it again, its tab
+  // keeping the error. The file and what the watcher writes from it put back afterwards.
+  const controls = path.join(path.dirname(sb.file), 'wwwroot', 'app', 'js', 'controls');
+  const watched = fs.existsSync(controls) && fs.readdirSync(controls).find((f) => f.endsWith('.js'));
+  if (watched && tab) {
+    const source = path.join(controls, watched);
+    const minified = path.join(controls, 'minifiedControls', watched.replace(/\.js$/, '.min.js'));
+    const saved = [source, minified].filter((f) => fs.existsSync(f)).map((f) => [f, fs.readFileSync(f)]);
+    const live = () => (runner.consoles.get(tab.key)?.text || '').replace(/\x1b\[[\d;]*m/g, ''); // a run again has a tab of its own
+    const starts = () => live().split("Starting 'watchFiles_WebApp'").length - 1;
+    try {
+      await sleep(11000); // past the first seconds, in which a failing start is not tried again
+      fs.appendFileSync(source, '\nlet s s;\n');
+      for (let i = 0; i < 120 && starts() < 2; i++) await sleep(500);
+      const text = live();
+      expect('a watcher ended by an error in a file it watches starts again (Project Open), its tab keeping the error',
+        text.includes('SyntaxError in plugin') && /exit code 1|kodem zakończenia 1/.test(text) && starts() >= 2 && runner.running.has(tab.key),
+        `starts ${starts()}, running ${runner.running.has(tab.key)}: ${JSON.stringify(text.split(/\r?\n/).filter((l) => /SyntaxError|exit|zakończ|Starting/.test(l)).slice(-5))}`);
+    } finally {
+      for (const [f, data] of saved) fs.writeFileSync(f, data);
+      await sleep(5000); // the watcher minifies the restored file: what it wrote is put back too
+      for (const [f, data] of saved) fs.writeFileSync(f, data);
+      if (!saved.some(([f]) => f === minified)) fs.rmSync(minified, { force: true });
+    }
+  }
   for (const key of [...runner.running.keys()]) runner.stop(...key.split('|'));
   for (let i = 0; i < 30 && runner.running.size; i++) await sleep(500);
   expect('running tasks stop', runner.running.size === 0, runner.running.size ? `${runner.running.size} still running` : 'all stopped');
@@ -324,9 +349,13 @@ async function taskRunnerChecks(api) {
     fs.writeFileSync(lobby, before);
   }
 
-  // Before Build, as a build of WebApp runs it when buildBindings is on.
+  // Before Build, as a build of WebApp runs it when buildBindings is on. What it writes (wwwroot's css and minified js,
+  // from sources that may have changed since they were last built) is put back afterwards.
   const config = vscode.workspace.getConfiguration('csharpShooter.taskRunner');
   await config.update('buildBindings', true, vscode.ConfigurationTarget.Global);
+  const wwwroot = path.join(path.dirname(sb.file), 'wwwroot');
+  const filesIn = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? filesIn(path.join(dir, e.name)) : [path.join(dir, e.name)])) : []);
+  const built = new Map(filesIn(wwwroot).map((f) => [f, fs.readFileSync(f)]));
   try {
     const { buildBindings } = require(path.join(api.extensionPath, 'task-runner.js'));
     const t0 = Date.now();
@@ -336,6 +365,8 @@ async function taskRunnerChecks(api) {
     expect('Before Build binding runs before a build', ok, `gulp beforeBuild ${ok ? 'succeeded' : 'FAILED'} in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   } finally {
     await config.update('buildBindings', undefined, vscode.ConfigurationTarget.Global);
+    for (const f of filesIn(wwwroot)) if (!built.has(f)) fs.rmSync(f, { force: true });
+    for (const [f, data] of built) if (Buffer.compare(data, fs.readFileSync(f)) !== 0) fs.writeFileSync(f, data);
   }
   return results;
 }

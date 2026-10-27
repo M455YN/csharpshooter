@@ -540,5 +540,6 @@
   "The debugger could not attach to the test host.": "Nie można dołączyć debugera do hosta testowego.",
   "Filter the tests by name, or with Class:, Namespace:, Project:, State: or FullName: (a leading - leaves matches out)": "Filtruj testy według nazwy albo za pomocą Class:, Namespace:, Project:, State: lub FullName: (poprzedzający - pomija dopasowania)",
   "Group the tests by": "Grupuj testy według",
-  "Cannot go to the test \"{0}\".": "Nie można przejść do testu „{0}”."
+  "Cannot go to the test \"{0}\".": "Nie można przejść do testu „{0}”.",
+  "Task {0} exited with exit code {1}; Project Open starts it again.": "Zadanie {0} zakończone z kodem zakończenia {1}; Otwarcie projektu uruchamia je ponownie."
 }

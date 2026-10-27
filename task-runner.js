@@ -34,7 +34,9 @@ const T = table({
   takeOver: 'Stop it and run it here',
   showTerminal: 'Show terminal',
   tookOver: 'tasks.json started "{0}" as the folder opened; it is stopped, and {1} runs here, as Project Open binds it.',
+  restarted: 'Task {0} exited with exit code {1}; Project Open starts it again.',
 });
+const RESTART_AFTER = 10000; // ms a run must last before an error that ends it starts it again
 const BINDINGS = [['BeforeBuild', n_('Before Build')], ['AfterBuild', n_('After Build')], ['Clean', n_('Clean')], ['ProjectOpened', n_('Project Open')]];
 const BINDING_LINE = /^(\uFEFF?)\/\/\/\s*<binding\b([^>]*?)\/>[^\r\n]*(\r?\n|$)/;
 const ATTRIBUTE = /(\w+)\s*=\s*'([^']*)'/g;
@@ -268,7 +270,7 @@ class TaskRunner {
 
   /** Runs a task as VS does, its output in a console tab of its own (and in the task's terminal); resolves once it ends
    *  (a watch task: when stopped), with its exit code. */
-  async run(file, name, kind = 'task') {
+  async run(file, name, kind = 'task', again = false) {
     const key = `${file}|${name}`;
     if (this.running.has(key) || this.otherRun(file, name)) return undefined; // one run of a task at a time, whoever started it
     const dir = path.dirname(file);
@@ -277,7 +279,8 @@ class TaskRunner {
     const args = kind === 'script' ? `npm run ${name}` : `gulp -b "${dir}" --color --gulpfile "${file.replace(/\\/g, '/')}" ${name}`;
     const [shell, shellArgs] = process.platform === 'win32' ? ['cmd.exe', ['/c', args]] : ['sh', ['-c', args]];
     const env = { ...process.env, ...toolsEnv(dir) };
-    const tab = { key, file, task: name, cwd: dir, commandLine: `${shell} ${shellArgs.join(' ')}`, env, text: '', running: true, code: undefined };
+    // Started again (Project Open's): its tab keeps what the last run said, the error that ended it among it.
+    const tab = { key, file, task: name, cwd: dir, commandLine: `${shell} ${shellArgs.join(' ')}`, env, text: again ? this.consoles.get(key)?.text ?? '' : '', running: true, code: undefined };
     const print = (text) => {
       tab.text = (tab.text + text).slice(-500000);
       this.tabs.append(key, text);
@@ -391,10 +394,23 @@ class TaskRunner {
         const byTasksJson = binding === 'ProjectOpened' && this.otherRun(file, task) && this.startedByTasksJson(file, task);
         if (byTasksJson) this.say(T.tookOver(byTasksJson, `${task} (${path.basename(path.dirname(file))})`));
         const ended = byTasksJson ? this.takeOver(`${file}|${task}`) : this.run(file, task);
+        if (binding === 'ProjectOpened') this.keepRunning(file, task, ended);
         if (wait && (await ended) !== 0) return false;
       }
     }
     return true;
+  }
+
+  /** Project Open's task (a watcher), ended by an error in a file it watched (gulp ends on a plugin's error no handler
+   *  takes, as in VS, whose Task Runner runs the same command and leaves it ended): started again, so it watches on. Not
+   *  when stopped here, ended cleanly, or failed within its first seconds (a gulpfile or gulp that does not start). */
+  async keepRunning(file, task, run) {
+    for (let started = Date.now(); ; started = Date.now()) {
+      const code = await run;
+      if (code === undefined || code === 0 || this.consoles.get(`${file}|${task}`)?.stopped || Date.now() - started < RESTART_AFTER) return;
+      this.say(`${new Date().toLocaleTimeString()} ${T.restarted(`${task} (${path.basename(path.dirname(file))})`, code)}`);
+      run = this.run(file, task, 'task', true);
+    }
   }
 
   toggleBinding(file, binding, task) {
