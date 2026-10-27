@@ -62,6 +62,10 @@ jobs:
         shell: pwsh
         run: ./scripts/build-debugger.ps1 -Runtime win-x64
 
+      - name: Test bridge (vstest.console through its translation layer, for the Test Explorer)
+        shell: pwsh
+        run: ./scripts/build-testbridge.ps1
+
       - name: Package VSIX
         run: npm run package
 

@@ -25,6 +25,12 @@ on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
 powershell -File scripts/build-debugger.ps1
 ```
 
+The Test Explorer's bridge to vstest.console (`testbridge/`, below under *Test Explorer*):
+
+```bash
+npm run build-testbridge
+```
+
 The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspended` and `SafeProcessHandle.Resume`
 (a suspended `CreateProcessW` with piped standard streams, then `ResumeThread`), `KillOnParentExit` (a kill-on-close
 Windows job), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator. Off Windows, `StartDetached` is dropped,
@@ -406,6 +412,31 @@ zadania*): each gulpfile of the solution's projects with its tasks (gulp's own `
 
 Not like VS: Grunt, output parsed into Problems (VS's JSHint listeners), a console tab per run.
 
+## Test Explorer
+
+*Eksplorator testów*, as Visual Studio 2026's, in the bottom panel beside the Output and Problems: the solution's test
+projects' tests grouped Projekt → przestrzeń nazw → klasa (or by class, namespace, project, state, duration), the
+counts, *Wyszukaj* with VS's filters, and the summary beside the tree. Tests are found and run the way VS finds and runs them:
+
+- A VSTest project (Microsoft.NET.Test.Sdk with an xUnit, NUnit or MSTest adapter) goes to vstest.console of the
+  solution's .NET SDK, driven through VSTest's translation layer (`VsTestConsoleWrapper`) by `testbridge/`, a small .NET
+  program the extension talks to over stdin and stdout. Discovery gives each test's source file and line; a theory's or a
+  parameterized test's rows are tests of their own.
+- A Microsoft.Testing.Platform project (its `ProjectCapability` `TestingPlatformServer`, the capability VS looks at:
+  xUnit v3, MSTest's runner, TUnit, NUnit's runner) is run as its own program in server mode (`--server --client-port`)
+  and asked over JSON-RPC (`testing/discoverTests`, `testing/runTests`).
+- **Uruchom** builds what it runs first, then shows results as they come, not when the run ends.
+- **Debuguj** runs the same way under Passenger's debugger: VSTest starts the test host and asks for the debugger
+  (`ITestHostLauncher3.AttachDebuggerToProcess`), which attaches to its process id; the test host runs nothing until the
+  adapter has the breakpoints (its `configurationDone`). A Testing Platform program is attached to before it is asked to
+  run. Stopping the debugger stops the run.
+
+The bridge is built into `testbridge/out` (`npm run build-testbridge`, or `scripts/build-testbridge.ps1`; the workflows
+build it before packaging). `CSHARPSHOOTER_VSTEST_LOG=<file>` keeps vstest.console's diagnostic log.
+
+Not like VS: test discovery from source before a build (VS's Real-Time Discovery), playlists, code coverage, a test's
+child processes under the debugger.
+
 ## Test
 
 Runs the checks in `test/suite.js` in a real editor against a real solution (written for a sample ASP.NET Core MVC solution):
@@ -423,7 +454,7 @@ their place.
 
 - HTML help inside `.cshtml` (HTML element/attribute completion, HTML formatting): Razor asks the client for it, and this
   extension answers empty. Tag helpers, components and C# come from Razor itself and work.
-- Hot Reload (Passenger's `applyChanges` request), test explorer, solution view: none.
+- Hot Reload (Passenger's `applyChanges` request), solution view: none.
 - *Add to Watch* and *Copy as Expression* on a member deeper than the frame's own (a field of a field) give the member's
   name alone, Passenger's `evaluateName` there, which the frame does not know. The magnifier builds the whole expression
   itself (`variable-paths.js`); the fix is to rewrite `evaluateName` in `variables` responses with it, in the inline

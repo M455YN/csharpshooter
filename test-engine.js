@@ -1,85 +1,50 @@
-// What the Test Explorer does without VS Code: finds the tests of a built test assembly (vstest's own list of fully
-// qualified names, as VS's Test Explorer gets them), runs them through `dotnet test` (a VSTEST filter, a TRX log), reads the
-// TRX back, and groups the tests for the tree. Debugging a run is VSTEST_HOST_DEBUG: the test host waits for a debugger and
-// says its process id, which test-explorer.js attaches to.
+// What the Test Explorer does without VS Code, as Visual Studio 2026's Test Explorer does it: a test project whose project
+// capabilities say TestingPlatformServer is a Microsoft.Testing.Platform program, asked for its tests and run in its server
+// mode (`--server --client-port`, JSON-RPC: initialize, testing/discoverTests, testing/runTests, testing/testUpdates/tests);
+// every other one is VSTest's, found and run by vstest.console through VSTest's translation layer (testbridge/, a small
+// .NET program that drives VsTestConsoleWrapper). Results come as they happen. Debugging is the debugger attaching to the
+// process the tests run in: VSTest's test host asks for it (ITestHostLauncher3.AttachDebuggerToProcess) and waits until
+// the debugger has it; a Testing Platform program is attached to before it is asked to run anything.
 const fs = require('fs');
-const os = require('os');
+const net = require('net');
 const path = require('path');
+const crypto = require('crypto');
+const readline = require('readline');
 const { execFile, spawn } = require('child_process');
 
-const UNESCAPE = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-const unescapeXml = (s) => s.replace(/&(?:#x([0-9a-f]+)|#(\d+)|(amp|lt|gt|quot|apos));/gi,
-  (m, hex, dec, name) => (name ? UNESCAPE[name.toLowerCase()] : String.fromCodePoint(hex ? parseInt(hex, 16) : parseInt(dec, 10))));
-const attributes = (text) => Object.fromEntries([...text.matchAll(/([\w:]+)="([^"]*)"/g)].map((m) => [m[1], unescapeXml(m[2])]));
+const BRIDGE_DLL = 'CSharpShooter.TestBridge.dll';
+/** The bridge as it ships (testbridge/out, scripts/build-testbridge.ps1), or as `dotnet build -c Release` leaves it. */
+const bridgePath = () => [path.join(__dirname, 'testbridge', 'out', BRIDGE_DLL), path.join(__dirname, 'testbridge', 'bin', 'Release', 'net8.0', BRIDGE_DLL)].find((p) => fs.existsSync(p));
 
-/** "00:00:01.5000000" -> milliseconds. */
-function durationMs(text) {
-  const m = /^(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(text || '');
-  return m ? Math.round((((+(m[1] || 0) * 24 + +m[2]) * 60 + +m[3]) * 60 + +m[4]) * 1000) : 0;
-}
-
-/** The outcome of a TRX result as the explorer knows it: passed, failed, skipped (not executed, inconclusive). */
-const outcomeOf = (trx) => (/^passed$/i.test(trx) ? 'passed' : /^(failed|timeout|aborted|error)$/i.test(trx) ? 'failed' : 'skipped');
-const WORST = { failed: 3, passed: 2, skipped: 1 };
-
-/** A TRX file's results by test, as Map fully qualified name -> { outcome, duration, message, stack, stdout, stderr }; the
- *  rows of a theory (one result each) are one test: failed if any failed, their times added. */
-function parseTrx(xml) {
-  const methods = new Map(); // testId -> fully qualified name
-  for (const m of xml.matchAll(/<UnitTest\b([^>]*)>([\s\S]*?)<\/UnitTest>/g)) {
-    const method = /<TestMethod\b([^>]*?)\/?>/.exec(m[2]);
-    if (!method) continue;
-    const a = attributes(method[1]);
-    methods.set(attributes(m[1]).id, `${a.className}.${a.name}`);
-  }
-  const results = new Map();
-  for (const m of xml.matchAll(/<UnitTestResult\b([^>]*?)(?:\/>|>([\s\S]*?)<\/UnitTestResult>)/g)) {
-    const a = attributes(m[1]);
-    const body = m[2] || '';
-    const tag = (name) => { const t = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(body); return t ? unescapeXml(t[1]).trim() : ''; };
-    const fqn = methods.get(a.testId) || a.testName;
-    const outcome = outcomeOf(a.outcome);
-    const one = { outcome, duration: durationMs(a.duration), message: tag('Message'), stack: tag('StackTrace'), stdout: tag('StdOut'), stderr: tag('StdErr') };
-    const before = results.get(fqn);
-    if (!before) { results.set(fqn, one); continue; }
-    before.duration += one.duration;
-    if (WORST[outcome] > WORST[before.outcome]) before.outcome = outcome;
-    for (const k of ['message', 'stack', 'stdout', 'stderr']) before[k] = [before[k], one[k]].filter(Boolean).join(k === 'stack' ? '\n' : '\n\n');
-  }
-  return results;
-}
-
-/** A `dotnet test --filter` that picks these tests: FullyQualifiedName=a|FullyQualifiedName=b, with the characters the
- *  filter language reads escaped. */
-const filterFor = (fqns) => fqns.map((f) => `FullyQualifiedName=${f.replace(/[\\()&|=!~]/g, '\\$&')}`).join('|');
-
-/** The names in lists no longer than a command line allows. */
-function chunks(fqns, limit = 8000) {
-  const out = [];
-  let current = [];
-  let size = 0;
-  for (const f of fqns) {
-    if (current.length && size + f.length + 30 > limit) { out.push(current); current = []; size = 0; }
-    current.push(f);
-    size += f.length + 30;
-  }
-  if (current.length) out.push(current);
-  return out;
-}
-
-/** Namespace, class and method of a fully qualified name: Ns.Sub.Class.Method (a nested class is Outer+Inner). */
+/** Namespace, class and method of a fully qualified name: Ns.Sub.Class.Method (a nested class is Outer+Inner); the
+ *  arguments of a parameterized test's name (Method(1, "a.b")) stay with the method. */
 function splitName(fqn) {
-  const cut = fqn.lastIndexOf('.');
+  const paren = fqn.indexOf('(');
+  const cut = fqn.lastIndexOf('.', paren < 0 ? fqn.length : paren);
   const type = cut < 0 ? '' : fqn.slice(0, cut);
   const dot = type.lastIndexOf('.');
   return { fullClass: type, namespace: dot < 0 ? '' : type.slice(0, dot), className: dot < 0 ? type : type.slice(dot + 1), method: fqn.slice(cut + 1) };
 }
 
-/** Whether a project file is a test project: it references Microsoft.NET.Test.Sdk, or says IsTestProject. */
+/** A test's namespace, class and method: from the type and method its framework names (ManagedType, location.type), else
+ *  from its fully qualified name. `method` has no arguments; `name` is what the tree shows (the display name). */
+function partsOf(test) {
+  const named = splitName(test.fqn);
+  const type = test.type || named.fullClass;
+  const dot = type.lastIndexOf('.');
+  const method = (test.method || named.method).replace(/\(.*$/s, '');
+  // xUnit names a test by its class and method: the tree shows it without its class, as VS does.
+  const name = test.name?.startsWith(`${type}.`) ? test.name.slice(type.length + 1) : test.name || named.method;
+  return { fullClass: type, namespace: dot < 0 ? '' : type.slice(0, dot), className: dot < 0 ? type : type.slice(dot + 1), method, name };
+}
+
+/** Whether a project file is a test project: it references Microsoft.NET.Test.Sdk, says IsTestProject, or is a Testing
+ *  Platform program (xUnit v3, TUnit, MSTest's or NUnit's runner, MSTest.Sdk). */
 function isTestProject(file) {
   try {
     const text = fs.readFileSync(file, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
-    return /<IsTestProject>\s*true\s*<\/IsTestProject>/i.test(text) || (/Microsoft\.NET\.Test\.Sdk/i.test(text) && !/<IsTestProject>\s*false/i.test(text));
+    if (/<IsTestProject>\s*false/i.test(text)) return false;
+    return /<IsTestProject>\s*true\s*<\/IsTestProject>/i.test(text) || /Microsoft\.NET\.Test\.Sdk|xunit\.v3|"TUnit|MSTest\.Sdk|Microsoft\.Testing\.Platform|EnableMSTestRunner|EnableNUnitRunner/i.test(text);
   } catch {
     return false;
   }
@@ -88,22 +53,18 @@ function isTestProject(file) {
 const runDotnet = (args, options) => new Promise((resolve) => execFile('dotnet', args,
   { windowsHide: true, maxBuffer: 64 << 20, ...options }, (error, stdout, stderr) => resolve({ error, stdout, stderr })));
 
-/** The built assembly of a test project for a configuration (and framework), from MSBuild. */
-async function targetPath(project, { configuration, platform }, framework) {
-  const { stdout } = await runDotnet(['msbuild', project, '-getProperty:TargetPath', `-p:Configuration=${configuration}`,
+/** The built assembly of a test project for a configuration (and framework), and whether it is a Testing Platform server
+ *  (its ProjectCapability TestingPlatformServer, the capability Visual Studio looks at), from MSBuild. */
+async function projectInfo(project, { configuration, platform }, framework) {
+  const { stdout } = await runDotnet(['msbuild', project, '-getProperty:TargetPath', '-getItem:ProjectCapability', `-p:Configuration=${configuration}`,
     ...(platform && !/^any\s?cpu$/i.test(platform) ? [`-p:Platform=${platform}`] : []), ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
   { cwd: path.dirname(project) });
-  return stdout.trim().split(/\r?\n/).pop() || undefined; // one -getProperty prints the bare value
-}
-
-/** The fully qualified names of the tests in a built assembly (vstest's /ListFullyQualifiedTests), [] when there are none. */
-async function listTests(dll) {
-  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'csharpshooter-tests-')), 'list.txt');
   try {
-    await runDotnet(['vstest', dll, '/ListFullyQualifiedTests', `/ListTestsTargetPath:${out}`], { cwd: path.dirname(dll), timeout: 120000 });
-    return fs.existsSync(out) ? [...new Set(fs.readFileSync(out, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean))] : [];
-  } finally {
-    fs.rmSync(path.dirname(out), { recursive: true, force: true });
+    const json = JSON.parse(stdout.slice(stdout.indexOf('{')));
+    const capabilities = (json.Items?.ProjectCapability || []).map((c) => c.Identity);
+    return { dll: json.Properties?.TargetPath || undefined, mtp: capabilities.includes('TestingPlatformServer') };
+  } catch {
+    return { dll: undefined, mtp: false };
   }
 }
 
@@ -118,39 +79,249 @@ function buildProject(project, args, { framework } = {}, onOutput = () => {}) {
   });
 }
 
-/** One `dotnet test` of a project: the tests (all of them without a filter), built first unless noBuild. With debug the test
- *  host waits for a debugger: onAttach(pid) is called with its process id. Resolves { code, results } once the process ends. */
-function runTests({ project, args = [], fqns, noBuild, debug, framework }, { onOutput = () => {}, onAttach = () => {} } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'csharpshooter-tests-'));
-  const trx = 'run.trx';
-  const argv = ['test', project, ...args, ...(framework ? ['-f', framework] : []), '--nologo', '--logger', `trx;LogFileName=${trx}`, '--results-directory', dir,
-    ...(noBuild ? ['--no-build'] : []), ...(fqns ? ['--filter', filterFor(fqns)] : [])];
-  const child = spawn('dotnet', argv, { cwd: path.dirname(project), windowsHide: true, env: { ...process.env, ...(debug ? { VSTEST_HOST_DEBUG: '1' } : {}) } });
-  let attached = false;
-  const read = (data) => {
-    const text = data.toString();
-    onOutput(text);
-    const pid = !attached && /Process Id:\s*(\d+)/.exec(text);
-    if (pid) { attached = true; onAttach(+pid[1]); }
-  };
-  child.stdout.on('data', read);
-  child.stderr.on('data', read);
-  const done = new Promise((resolve) => {
-    const finish = (code) => {
-      let results = new Map();
-      try { results = parseTrx(fs.readFileSync(path.join(dir, trx), 'utf8')); } catch { /* no log: the build failed, or the run was cancelled */ }
-      fs.rmSync(dir, { recursive: true, force: true });
-      resolve({ code, results });
+/** A path as a key: whole, in one case, with one kind of slash. */
+const pathKey = (file) => path.resolve(file).toLowerCase();
+
+// ---- VSTest, through the bridge ---------------------------------------------------------------------------------
+
+/** vstest.console behind testbridge/: one process for the session, started when first asked. Its requests go one at a
+ *  time (vstest.console does one thing at a time), except cancel. `handlers` of the request going now hear what it tells:
+ *  found(tests), results(results), running(tests), log(level, message), and for a debugged run attach({ pid }) -> bool and
+ *  launch({ file, args, cwd, env }) -> process id. */
+class VsTest {
+  constructor(log = () => {}) {
+    this.log = log;
+    this.child = undefined;
+    this.pending = new Map();
+    this.next = 0;
+    this.queue = Promise.resolve();
+    this.handlers = {};
+  }
+
+  start() {
+    if (this.child) return;
+    const bridge = bridgePath();
+    if (!bridge) throw new Error('The test bridge is not built (testbridge/out): powershell -File scripts/build-testbridge.ps1');
+    const child = spawn('dotnet', [bridge], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    this.child = child;
+    child.stderr.on('data', (d) => this.log('error', d.toString()));
+    readline.createInterface({ input: child.stdout }).on('line', (line) => this.receive(line));
+    const gone = () => {
+      if (this.child !== child) return;
+      this.child = undefined;
+      for (const { reject } of this.pending.values()) reject(new Error('The test bridge ended'));
+      this.pending.clear();
     };
-    child.on('error', () => finish(-1));
-    child.on('close', (code) => finish(code));
+    child.on('error', gone);
+    child.on('exit', gone);
+  }
+
+  send(message) {
+    this.child?.stdin.write(`${JSON.stringify(message)}\n`);
+  }
+
+  async receive(line) {
+    let m;
+    try { m = JSON.parse(line); } catch { return; }
+    if (m.method && m.id !== undefined) { // the bridge asks: attach, launch
+      const handler = this.handlers[m.method];
+      try {
+        this.send({ id: m.id, result: handler ? await handler(m.params) : null });
+      } catch (error) {
+        this.send({ id: m.id, error: { message: String(error?.message || error) } });
+      }
+      return;
+    }
+    if (m.method) {
+      const p = m.params || {};
+      if (m.method === 'found') this.handlers.found?.(p.tests);
+      else if (m.method === 'results') this.handlers.results?.(p.results);
+      else if (m.method === 'running') this.handlers.running?.(p.tests);
+      else if (m.method === 'log') (this.handlers.log || this.log)(p.level, p.message);
+      return;
+    }
+    const waiting = this.pending.get(m.id);
+    if (!waiting) return;
+    this.pending.delete(m.id);
+    if (m.error) waiting.reject(new Error(m.error.message));
+    else waiting.resolve(m.result);
+  }
+
+  request(method, params) {
+    this.start();
+    const id = ++this.next;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      this.send({ id, method, params });
+    });
+  }
+
+  /** One request after the one before has ended, its handlers listening meanwhile. */
+  exclusive(method, params, handlers) {
+    const turn = this.queue.then(async () => {
+      this.handlers = handlers;
+      try { return await this.request(method, params); } finally { this.handlers = {}; }
+    });
+    this.queue = turn.catch(() => {});
+    return turn;
+  }
+
+  /** The tests in built assemblies: [{ id, fqn, name, source, file, line, type, method, traits }]. */
+  async discover(sources, folder) {
+    const tests = [];
+    await this.exclusive('discover', { sources, folder }, { found: (list) => tests.push(...list) });
+    return tests;
+  }
+
+  /** Runs tests by id (as discovered) or every test of sources; resolves { aborted, canceled, error, elapsed }. */
+  run(params, handlers) {
+    return this.exclusive('run', params, handlers);
+  }
+
+  cancel() {
+    if (this.child) this.request('cancel', {}).catch(() => {});
+  }
+
+  dispose() {
+    if (!this.child) return;
+    this.send({ method: 'exit' });
+    const child = this.child;
+    setTimeout(() => child.exitCode === null && child.kill(), 5000);
+    this.child = undefined;
+  }
+}
+
+// ---- Microsoft.Testing.Platform, in its server mode ---------------------------------------------------------------
+
+const MTP_STATES = { passed: 'passed', failed: 'failed', error: 'failed', 'timed-out': 'failed', skipped: 'skipped' };
+
+/** A Testing Platform test node as a test: [{ id (its uid), fqn, name, file, line, type, method }], and its result when it
+ *  has one ({ outcome, duration, message, stack, stdout, stderr }). */
+function readNode(node) {
+  const text = (k) => (typeof node[k] === 'string' ? node[k] : undefined);
+  let type = text('location.type');
+  const space = text('location.namespace');
+  if (space && type && !type.startsWith(`${space}.`)) type = `${space}.${type}`;
+  const method = text('location.method')?.replace(/\(.*$/s, '');
+  const name = text('display-name') || node.uid;
+  const fqn = type && method ? `${type}.${method}` : text('vstest.TestCase.FullyQualifiedName') || name;
+  const test = { id: node.uid, fqn, name, file: text('location.file'), line: +node['location.line-start'] || 0, type, method, state: text('execution-state') };
+  const outcome = MTP_STATES[test.state];
+  if (outcome && !node['retry.is-superseded']) {
+    test.result = { outcome, duration: +node['time.duration-ms'] || 0, message: text('error.message') || '', stack: text('error.stacktrace') || '',
+      stdout: text('standardOutput') || '', stderr: text('standardError') || '' };
+  }
+  return test;
+}
+
+/** One Testing Platform program in its server mode, connected back to a port of ours and initialized. `attach(pid)`, when
+ *  given, has the debugger take the program before anything is asked of it. */
+async function mtpHost(dll, { log = () => {}, attach } = {}) {
+  const { createMessageConnection, SocketMessageReader, SocketMessageWriter } = require('vscode-jsonrpc/node');
+  const server = net.createServer();
+  await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  const child = spawn('dotnet', ['exec', dll, '--server', '--client-host', '127.0.0.1', '--client-port', String(port)], { cwd: path.dirname(dll), windowsHide: true });
+  let said = '';
+  const keep = (d) => { said = (said + d.toString()).slice(-4000); };
+  child.stdout.on('data', keep);
+  child.stderr.on('data', keep);
+  let socket;
+  try {
+    socket = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${path.basename(dll)} did not connect within 60 s\n${said}`)), 60000);
+      server.once('connection', (s) => { clearTimeout(timer); resolve(s); });
+      child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`${path.basename(dll)} ended (exit code ${code}) before it connected\n${said}`)); });
+    });
+  } catch (error) {
+    server.close();
+    if (child.exitCode === null) child.kill();
+    throw error;
+  }
+  server.close();
+  const connection = createMessageConnection(new SocketMessageReader(socket), new SocketMessageWriter(socket));
+  const listeners = new Map(); // runId -> { changed, ended }
+  connection.onNotification('testing/testUpdates/tests', (p) => {
+    const run = listeners.get(p?.runId);
+    if (!run) return;
+    if (!Array.isArray(p.changes)) return void run.ended();
+    run.changed(p.changes.map((c) => c?.node).filter((n) => n?.uid).map(readNode));
   });
-  const cancel = () => {
-    if (child.exitCode !== null) return;
-    if (process.platform === 'win32') execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {});
-    else child.kill('SIGKILL');
+  connection.onNotification('client/log', (p) => p?.message && log(p.level || 'information', p.message));
+  connection.onRequest('client/attachDebugger', async (p) => attach && attach(p?.processId));
+  connection.onError(() => {});
+  connection.listen();
+  const initialized = await connection.sendRequest('initialize', {
+    processId: process.pid,
+    clientInfo: { name: 'CSharpShooter', version: '1.0.0' },
+    capabilities: { testing: { debuggerProvider: !!attach } },
+  });
+  const pid = initialized?.processId || child.pid;
+  if (attach && !(await attach(pid))) throw new Error('The debugger could not attach to the test program.');
+  return {
+    pid,
+    /** A discovery or a run: each changed node to `changed`, resolved once the program says it has told all. */
+    async ask(method, params, changed) {
+      const runId = crypto.randomUUID();
+      let ended;
+      const told = new Promise((resolve) => { ended = resolve; });
+      listeners.set(runId, { changed, ended });
+      try {
+        await connection.sendRequest(method, { ...params, runId });
+        await Promise.race([told, new Promise((r) => setTimeout(r, 5000))]);
+      } finally {
+        listeners.delete(runId);
+      }
+    },
+    end() {
+      try { connection.sendNotification('exit', {}); } catch { /* gone */ }
+      setTimeout(() => { connection.dispose(); socket.destroy(); if (child.exitCode === null) kill(child.pid); }, 3000);
+    },
+    kill() {
+      connection.dispose();
+      socket.destroy();
+      if (child.exitCode === null) kill(child.pid);
+    },
   };
-  return { done, cancel };
+}
+
+const kill = (pid) => (process.platform === 'win32' ? execFile('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true }, () => {}) : process.kill(pid, 'SIGKILL'));
+
+/** The tests of a built Testing Platform program. */
+async function mtpDiscover(dll, { log } = {}) {
+  const host = await mtpHost(dll, { log });
+  const tests = new Map();
+  try {
+    await host.ask('testing/discoverTests', {}, (nodes) => nodes.forEach((n) => n.state === 'discovered' && tests.set(n.id, n)));
+  } finally {
+    host.end();
+  }
+  return [...tests.values()];
+}
+
+/** Runs tests of a Testing Platform program, [{ id, name }] as found (all of them when none are given): results(list), running(tests) as they
+ *  come. { done, cancel }: done resolves { canceled }. */
+function mtpRun(dll, tests, { results = () => {}, running = () => {}, log, attach } = {}) {
+  let host;
+  let canceled = false;
+  const done = (async () => {
+    host = await mtpHost(dll, { log, attach });
+    if (canceled) { host.kill(); return { canceled }; }
+    try {
+      await host.ask('testing/runTests', tests ? { tests: tests.map((t) => ({ uid: t.id, 'display-name': t.name })) } : {}, (nodes) => {
+        const finished = nodes.filter((n) => n.result);
+        const started = nodes.filter((n) => n.state === 'in-progress');
+        if (started.length) running(started);
+        if (finished.length) results(finished.map((n) => ({ ...n, ...n.result })));
+      });
+    } catch (error) {
+      if (!canceled) throw error;
+    } finally {
+      host.end();
+    }
+    return { canceled };
+  })();
+  return { done, cancel: () => { canceled = true; host?.kill(); } };
 }
 
 // ---- the tree ---------------------------------------------------------------------------------------------------
@@ -164,6 +335,16 @@ function groupState(tests, results) {
   return states.has('failed') ? 'failed' : states.has('notrun') ? 'notrun' : states.has('passed') ? 'passed' : states.size ? 'skipped' : 'notrun';
 }
 
+/** A result that comes for a test already given one in this run (a theory's rows, a retried attempt): the worst outcome,
+ *  the times added, the texts one after another. */
+const WORST = { failed: 3, passed: 2, skipped: 1 };
+function mergeResult(before, one) {
+  before.duration += one.duration;
+  if (WORST[one.outcome] > WORST[before.outcome]) before.outcome = one.outcome;
+  for (const k of ['message', 'stack', 'stdout', 'stderr']) before[k] = [before[k], one[k]].filter(Boolean).join(k === 'stack' ? '\n' : '\n\n');
+  return before;
+}
+
 const DURATION_BUCKETS = [[30000, 'slowest'], [15000, 'slower'], [1000, 'slow'], [100, 'medium'], [0, 'fast']];
 const bucketOf = (test, results) => {
   const r = results.get(test.key);
@@ -173,7 +354,7 @@ const bucketOf = (test, results) => {
 /** The tree of tests for a grouping: nodes { id, kind, name, children, tests } with the tests leaves ({ kind: 'test' }).
  *  `label(kind, value)` names the groups that stand for something (a state, a duration class, an empty namespace). */
 function groupTests(tests, mode, results, label = (kind, value) => value) {
-  const leaf = (test, parent) => ({ id: `${parent}/${test.key}`, kind: 'test', name: splitName(test.fqn).method, test, tests: [test], children: [] });
+  const leaf = (test, parent) => ({ id: `${parent}/${test.key}`, kind: 'test', name: partsOf(test).name, test, tests: [test], children: [] });
   const bucket = (parent, items, kind, keyOf, nameOf, order) => {
     const groups = new Map();
     for (const item of items) {
@@ -186,11 +367,11 @@ function groupTests(tests, mode, results, label = (kind, value) => value) {
   const finish = (node, children) => ({ ...node, children, tests: children.flatMap((c) => c.tests) });
   const byProject = (items, parent, below) => bucket(parent, items, 'project', (t) => t.project, (k) => items.find((t) => t.project === k).projectName)
     .map((g) => finish(g, below(g.list, g.id)));
-  const byNamespace = (items, parent, below) => bucket(parent, items, 'namespace', (t) => splitName(t.fqn).namespace, (k) => k || label('namespace', ''))
+  const byNamespace = (items, parent, below) => bucket(parent, items, 'namespace', (t) => partsOf(t).namespace, (k) => k || label('namespace', ''))
     .map((g) => finish(g, below(g.list, g.id)));
-  const byClass = (items, parent, below, full) => bucket(parent, items, 'class', (t) => (full ? splitName(t.fqn).fullClass : splitName(t.fqn).className) || '', (k) => k || label('class', ''))
+  const byClass = (items, parent, below, full) => bucket(parent, items, 'class', (t) => (full ? partsOf(t).fullClass : partsOf(t).className) || '', (k) => k || label('class', ''))
     .map((g) => finish(g, below(g.list, g.id)));
-  const leaves = (items, parent) => items.slice().sort((a, b) => splitName(a.fqn).method.localeCompare(splitName(b.fqn).method)).map((t) => leaf(t, parent));
+  const leaves = (items, parent) => items.slice().sort((a, b) => partsOf(a).name.localeCompare(partsOf(b).name)).map((t) => leaf(t, parent));
   switch (mode) {
     case 'class': return byClass(tests, '', leaves, true);
     case 'namespace': return byNamespace(tests, '', leaves);
@@ -208,7 +389,7 @@ function groupTests(tests, mode, results, label = (kind, value) => value) {
  *  gives the words each state answers to (in the UI's language too). */
 function matchesFilter(test, results, text, stateNames = {}) {
   const terms = [...text.matchAll(/(-?)(?:(\w+):)?(?:"([^"]*)"|(\S+))/g)];
-  const name = splitName(test.fqn);
+  const name = partsOf(test);
   return terms.every(([, not, key, quoted, bare]) => {
     const value = (quoted ?? bare).toLowerCase();
     let hit;
@@ -222,7 +403,7 @@ function matchesFilter(test, results, text, stateNames = {}) {
         hit = [state, ...(stateNames[state] || [])].some((w) => w.toLowerCase().startsWith(value));
         break;
       }
-      case '': case 'name': hit = test.fqn.toLowerCase().includes(value); break;
+      case '': case 'name': hit = test.fqn.toLowerCase().includes(value) || name.name.toLowerCase().includes(value); break;
       default: hit = `${key}:${quoted ?? bare}`.length > 0 && test.fqn.toLowerCase().includes(`${key}:${value}`);
     }
     return not ? !hit : hit;
@@ -234,4 +415,7 @@ function stackLinks(stack) {
   return [...stack.matchAll(/ in (.+?):line (\d+)/g)].map((m) => ({ start: m.index + 4, end: m.index + m[0].length, file: m[1], line: +m[2] }));
 }
 
-module.exports = { buildProject, parseTrx, filterFor, chunks, splitName, isTestProject, targetPath, listTests, runTests, stateOf, groupState, groupTests, matchesFilter, stackLinks, durationMs };
+module.exports = {
+  VsTest, mtpDiscover, mtpRun, readNode, bridgePath, buildProject, splitName, partsOf, isTestProject, projectInfo, pathKey, kill,
+  stateOf, groupState, mergeResult, groupTests, matchesFilter, stackLinks,
+};

@@ -1,4 +1,8 @@
-# What the .vsix leaves out; server/, debugger/ and node_modules/ go in.
+# What the .vsix leaves out; server/, debugger/, testbridge/out/ and node_modules/ go in.
+testbridge/*.cs
+testbridge/*.csproj
+testbridge/bin/**
+testbridge/obj/**
 test/**
 scripts/**
 debugger-port/**
