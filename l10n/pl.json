@@ -486,8 +486,6 @@
   "Alphabetical": "Alfabetycznie",
   "Select a file, folder or project in the Solution Explorer.": "Zaznacz plik, folder lub projekt w Eksploratorze rozwiązań.",
   "Test Explorer": "Eksplorator testów",
-  "Error List": "Lista błędów",
-  "Output": "Dane wyjściowe",
   "Test Detail Summary": "Podsumowanie szczegółów testu",
   "Tests": "Testy",
   "Build the solution to discover all available tests. Click \"Run All\" to build, discover and run all tests in the solution.": "Skompiluj rozwiązanie, aby odkryć wszystkie dostępne testy. Kliknij pozycję „Uruchom wszystkie”, aby skompilować, odkryć i uruchomić wszystkie testy w rozwiązaniu.",

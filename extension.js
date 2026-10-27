@@ -20,7 +20,6 @@ const { registerCompat } = require('./compat');
 const { registerTaskRunner } = require('./task-runner');
 const { registerStartup } = require('./startup');
 const { registerTestExplorer } = require('./test-explorer');
-const { registerPanelStrip } = require('./panel-strip');
 const { launchProgress } = require('./build-progress');
 const { readSolution } = require('./solution');
 const { TranslatingAdapter } = require('./debug-l10n');
@@ -356,7 +355,6 @@ async function activate(context) {
   const taskRunner = registerTaskRunner(context, findSolution);
   const startup = registerStartup(context, findSolution, launch);
   const testExplorer = registerTestExplorer(context, findSolution, startup.startup);
-  const panelStrip = registerPanelStrip(context, [taskRunner.view, testExplorer.explorer.view]);
   launch.provider.startup = startup.startup;
   solutionView.provider.startup = startup.startup;
   const configurationManager = registerConfigurationManager(context, findSolution, startup.startup);
@@ -364,7 +362,7 @@ async function activate(context) {
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, testExplorer, panelStrip, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {
