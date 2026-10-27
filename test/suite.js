@@ -1655,6 +1655,16 @@ async function run() {
   if (process.env.SCREENSHOT) await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-loading.png'));
   await Promise.race([api.whenReady(), sleep(300000)]);
   const lines = [`projects loaded after ${((Date.now() - t0) / 1000).toFixed(1)} s`];
+  // While Razor's views are still being prepared, F5 and a test run are refused (no debug session, no run).
+  let blocked;
+  if (!api.loading()?.done) {
+    let session;
+    const d = vscode.debug.onDidStartDebugSession((x) => (session = x));
+    const started = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], api.startup.startupEntry());
+    await api.testExplorer.explorer.runIn([{}], false);
+    d.dispose();
+    blocked = { ok: !started && !session && !api.testExplorer.explorer.running, got: `while "${api.loading()?.now()}": start ${started}, session ${session?.name}, tests running ${api.testExplorer.explorer.running}` };
+  }
   // What the bottom right said while the server started and loaded the solution, then while Razor made its views ready,
   // and that it closed once Razor answered.
   for (let i = 0; i < 1200 && !api.loading()?.done; i++) await sleep(250);
@@ -1663,6 +1673,10 @@ async function run() {
     && said.some((l) => l.startsWith('Przygotowywanie widoków Razor (.cshtml)…')) && /^Rozwiązanie WebApp wczytane w \d+ s/.test(said[said.length - 1]);
   lines.push(`${loadingOk ? 'PASS' : 'FAIL'}  loading: the bottom right says it until the projects are loaded and Razor answers: ${[...new Set(said.map((l) => l.replace(/\d+ s$/, 'N s')))].join(' | ')}`);
   let failedLoading = loadingOk ? 0 : 1;
+  if (blocked) {
+    lines.push(`${blocked.ok ? 'PASS' : 'FAIL'}  loading: F5 and test runs wait until it has loaded: ${blocked.got}`);
+    failedLoading += blocked.ok ? 0 : 1;
+  }
   // Once it has closed, a .cshtml opened then answers at once: Razor's hover on C# and its colours.
   const razorCheck = defaultChecks.find((c) => c.kind === 'hover');
   if (!process.env.CHECKS_FILE && razorCheck) {

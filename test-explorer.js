@@ -338,6 +338,7 @@ class TestExplorer {
 
   async runIn(tests, debug) {
     if (!tests.length) return void vscode.window.showInformationMessage(T.none);
+    if (this.loading?.()) return void vscode.window.showWarningMessage(t('The solution is still loading: {0} Starting and running tests are possible once it is ready.', this.loading()));
     if (this.runner || this.running) return void vscode.window.showWarningMessage(T.running);
     if (vscode.debug.activeDebugSession) return void vscode.window.showWarningMessage(T.whileDebugging);
     this.running = true;

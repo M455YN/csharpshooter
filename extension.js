@@ -66,6 +66,7 @@ function startLoading() {
   const handle = {
     lines: progress.lines,
     done: false,
+    now: () => stage,
     stage(text) {
       stage = text;
       show();
@@ -356,6 +357,8 @@ async function activate(context) {
   const startup = registerStartup(context, findSolution, launch);
   const testExplorer = registerTestExplorer(context, findSolution, startup.startup);
   launch.provider.startup = startup.startup;
+  // While the solution loads (its Razor views included), a start or a test run waits for it: what loads, else ''.
+  launch.provider.loading = testExplorer.explorer.loading = () => (loading && !loading.done ? loading.now() : '');
   solutionView.provider.startup = startup.startup;
   const configurationManager = registerConfigurationManager(context, findSolution, startup.startup);
   const markStartup = async () => solutionView.provider.setStartup(await startup.startup.project());

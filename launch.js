@@ -166,6 +166,10 @@ class LaunchProfiles {
 
   /** A configuration that names a project: built, its program found, its profile's environment and URLs applied. */
   async resolveDebugConfigurationWithSubstitutedVariables(folder, config) {
+    if (this.loading?.()) {
+      vscode.window.showWarningMessage(t('The solution is still loading: {0} Starting and running tests are possible once it is ready.', this.loading()));
+      return undefined;
+    }
     const asked = config;
     // "CSharpShooter": the startup project with its active profile and framework, as VS's F5 runs it.
     if (config.request === 'launch' && config.startupProject && this.startup) {
