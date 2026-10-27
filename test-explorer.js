@@ -1,11 +1,14 @@
 // Visual Studio 2026's Test Explorer: the solution's test projects' tests as a tree (Projekt, przestrzeń nazw, klasa by
 // default; or by class, namespace, project, state, duration), Uruchom wszystkie, Uruchom, Debuguj, Anuluj, Wyszukaj with
-// VS's filters (Class:, Namespace:, Project:, State:, FullName:), the counts, and the Test Detail Summary under it (source,
-// duration, message, stack trace with links, output). Tests are found in the built assemblies (vstest's list), run by
-// `dotnet test` with a filter, and debugged by attaching to the test host that VSTEST_HOST_DEBUG makes wait.
+// VS's filters (Class:, Namespace:, Project:, State:, FullName:), the counts, and the Test Detail Summary beside it (source,
+// duration, message, stack trace with links, output). As VS does: VSTest's projects are found and run by vstest.console
+// through its translation layer (test-engine.js, testbridge/), Microsoft.Testing.Platform's in their server mode, the
+// results shown as they come; Debuguj attaches the debugger to the test host when it asks, and runs nothing in it until
+// the debugger has set its breakpoints (the adapter's configurationDone).
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const { t, table } = require('./l10n');
 const engine = require('./test-engine');
 const { buildArgs } = require('./startup');
@@ -114,8 +117,12 @@ class TestExplorer {
     this.filter = '';
     this.queued = new Set();
     this.active = new Set();
-    this.runner = undefined; // { cancel } of the dotnet test going now
+    this.runner = undefined; // { cancel } of the run going now
     this.cancelled = false;
+    this.vstest = new engine.VsTest((level, message) => this.output.appendLine(message.trimEnd()));
+    this.sessions = new Set(); // the debug sessions of the run going now
+    this.configured = new Map(); // a test run's debug session tag -> resolve, once its adapter has its breakpoints
+    this.runSeen = new Set(); // the tests given a result in the run going now
     this.last = undefined; // { keys, debug }: what Repeat runs
     this.loaded = undefined;
     this.watchers = [];
@@ -133,26 +140,46 @@ class TestExplorer {
     return this.loaded;
   }
 
+  /** The test projects' tests found again: all of them, or only those of the project files in `only`. */
   async discover(only) {
     const solution = await this.findSolution();
     const files = solution ? flatten(readSolution(solution)).filter((p) => /\.(cs|vb|fs)proj$/i.test(p) && fs.existsSync(p) && engine.isTestProject(p)) : [];
     const projects = files.map((file) => ({ file }));
     const previous = new Map(this.projects.map((p) => [p.file.toLowerCase(), p]));
+    const again = only && new Set(only.map((f) => f.toLowerCase()));
+    const fresh = [];
     await Promise.all(projects.map(async (p) => {
       const old = previous.get(p.file.toLowerCase());
-      if (old && only && !same(p.file, only)) return Object.assign(p, old); // only one project is looked at again
+      if (old && again && !again.has(p.file.toLowerCase())) return Object.assign(p, old); // only some projects are looked at again
       p.name = path.basename(p.file, path.extname(p.file));
       const settings = await this.startup.buildSettings(p.file);
       const frameworks = (/<TargetFrameworks?>([^<]+)</.exec(fs.readFileSync(p.file, 'utf8'))?.[1] || '').split(';').map((f) => f.trim()).filter(Boolean);
       p.framework = frameworks.length > 1 ? frameworks[0] : undefined; // a multi-targeted project is tested for its first framework
-      p.dll = await engine.targetPath(p.file, settings, p.framework);
+      Object.assign(p, await engine.projectInfo(p.file, settings, p.framework));
       p.tests = [];
-      if (p.dll && fs.existsSync(p.dll)) {
-        const started = Date.now();
-        p.tests = (await engine.listTests(p.dll)).map((fqn) => ({ key: `${p.file.toLowerCase()}|${fqn}`, fqn, project: p.file, projectName: p.name }));
-        this.output.appendLine(`${T.discovered(p.tests.length, p.name)} (${formatDuration(Date.now() - started)})`);
+      if (p.dll && fs.existsSync(p.dll)) fresh.push(p);
+    }));
+    const started = Date.now();
+    const vstest = fresh.filter((p) => !p.mtp);
+    if (vstest.length) {
+      try {
+        const bySource = new Map(vstest.map((p) => [engine.pathKey(p.dll), p]));
+        for (const found of await this.vstest.discover(vstest.map((p) => p.dll), path.dirname(solution))) {
+          const p = bySource.get(engine.pathKey(found.source));
+          if (p) p.tests.push(this.testOf(p, found));
+        }
+      } catch (error) {
+        this.output.appendLine(error.message);
+      }
+    }
+    await Promise.all(fresh.filter((p) => p.mtp).map(async (p) => {
+      try {
+        p.tests = (await engine.mtpDiscover(p.dll, { log: (level, message) => this.output.appendLine(message) })).map((found) => this.testOf(p, found));
+      } catch (error) {
+        this.output.appendLine(error.message);
       }
     }));
+    for (const p of fresh) this.output.appendLine(`${T.discovered(p.tests.length, p.name)} (${formatDuration(Date.now() - started)})`);
     this.projects = projects.sort((a, b) => a.name.localeCompare(b.name));
     this.files.clear();
     this.tests = this.projects.flatMap((p) => p.tests);
@@ -161,13 +188,22 @@ class TestExplorer {
     this.refresh();
   }
 
+  /** A test as the tree knows it, from what VSTest or the Testing Platform found (its id is theirs: a test case's id, a
+   *  node's uid). */
+  testOf(project, found) {
+    return {
+      key: `${project.file.toLowerCase()}|${found.id}`, id: found.id, fqn: found.fqn, name: found.name, file: found.file, line: found.line,
+      type: found.type, method: found.method, project: project.file, projectName: project.name, mtp: !!project.mtp,
+    };
+  }
+
   /** A rebuilt assembly shows its tests again, as VS discovers after a build. */
   watch() {
     for (const w of this.watchers) w.dispose();
     this.watchers = this.projects.filter((p) => p.dll).map((p) => {
       const w = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(path.dirname(p.dll), path.basename(p.dll)));
       let timer;
-      const again = () => { clearTimeout(timer); timer = setTimeout(() => !this.runner && this.discover(p.file), 1500); };
+      const again = () => { clearTimeout(timer); timer = setTimeout(() => !this.running && this.discover([p.file]), 1500); };
       w.onDidChange(again);
       w.onDidCreate(again);
       return w;
@@ -245,9 +281,11 @@ class TestExplorer {
     };
   }
 
-  /** The source of a test: its class and its method in the project's .cs files (the first class of that name). */
+  /** The source of a test: where its framework says it is, else its class and its method in the project's .cs files (the
+   *  first class of that name). */
   locate(test) {
-    const { className, method } = engine.splitName(test.fqn);
+    if (test.file && test.line > 0 && fs.existsSync(test.file)) return { file: test.file, line: test.line };
+    const { className, method } = engine.partsOf(test);
     const cls = className.split('+').pop();
     let files = this.files.get(test.project);
     if (!files) {
@@ -312,51 +350,57 @@ class TestExplorer {
     this.output.show(true);
     this.output.appendLine(T.startRun);
     const started = Date.now();
-    const seen = { run: 0, passed: 0, failed: 0, skipped: 0 };
     let buildFailed = false;
+    this.runSeen = new Set();
     try {
-      const byProject = new Map();
-      for (const x of tests) byProject.set(x.project, [...(byProject.get(x.project) || []), x]);
-      for (const [file, list] of byProject) {
+      // What is run is built first, as VS builds before it runs, and its tests found again (a build may add or lose some).
+      const files = [...new Set(tests.map((x) => x.project))];
+      for (const file of files) {
         if (this.cancelled) break;
         const project = this.projects.find((p) => p.file === file);
-        const all = list.length === project.tests.length;
-        const batches = all ? [undefined] : engine.chunks(list.map((x) => x.fqn));
-        const args = buildArgs(await this.startup.buildSettings(file));
-        for (const [i, fqns] of batches.entries()) {
-          if (this.cancelled) break;
-          const now = fqns ? list.filter((x) => fqns.includes(x.fqn)) : list;
-          for (const x of now) { this.queued.delete(x.key); this.active.add(x.key); }
-          this.refresh();
-          const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(file));
-          let session;
-          if (debug) this.output.appendLine(T.startDebug);
-          this.runner = engine.runTests({ project: file, args, fqns, noBuild: i > 0, debug, framework: project.framework }, {
-            onOutput: (text) => this.output.append(text),
-            onAttach: async (pid) => {
-              const started = await vscode.debug.startDebugging(folder, { type: 'csharpshooter', request: 'attach', name: `${T.view}: ${project.name}`, processId: pid, justMyCode: true });
-              if (!started) { vscode.window.showErrorMessage(T.cannotAttach); this.runner.cancel(); }
-              session = vscode.debug.activeDebugSession;
-            },
-          });
-          const ended = vscode.debug.onDidTerminateDebugSession((s) => s === session && this.runner?.cancel());
-          const { code, results } = await this.runner.done;
-          ended.dispose();
-          this.runner = undefined;
-          if (session) await vscode.debug.stopDebugging(session);
-          if (!results.size && code !== 0 && !this.cancelled) buildFailed = true;
-          for (const [fqn, r] of results) {
-            const key = `${file.toLowerCase()}|${fqn}`;
-            this.results.set(key, r);
-            seen.run++;
-            seen[r.outcome]++;
-          }
-          for (const x of now) this.active.delete(x.key);
-          this.refresh();
-        }
-        await this.discover(file); // a build may have found tests, or lost some
+        const code = await engine.buildProject(file, buildArgs(await this.startup.buildSettings(file)), { framework: project?.framework }, (text) => this.output.append(text));
+        if (code !== 0) buildFailed = true;
       }
+      if (!buildFailed && !this.cancelled) {
+        await this.discover(files);
+        const now = new Map(this.tests.map((x) => [x.key, x]));
+        const chosen = tests.map((x) => now.get(x.key)).filter(Boolean);
+        this.queued = new Set(chosen.map((x) => x.key));
+        this.refresh();
+        const whole = (p, list) => list.filter((x) => x.project === p.file).length === p.tests.length;
+        const vstest = chosen.filter((x) => !x.mtp);
+        if (vstest.length && !this.cancelled) {
+          const projects = this.projects.filter((p) => vstest.some((x) => x.project === p.file));
+          const bySource = new Map(projects.map((p) => [engine.pathKey(p.dll), p]));
+          this.runner = { cancel: () => this.vstest.cancel() };
+          const ended = await this.vstest.run({ ...(projects.every((p) => whole(p, vstest)) ? { sources: projects.map((p) => p.dll) } : { ids: vstest.map((x) => x.id) }), debug }, {
+            results: (list) => list.forEach((r) => this.record(bySource.get(engine.pathKey(r.source)), r)),
+            running: (list) => list.forEach((r) => this.started(bySource.get(engine.pathKey(r.source)), r)),
+            attach: ({ pid, sources }) => this.attach(pid, sources?.map((s) => bySource.get(engine.pathKey(s))?.name).filter(Boolean).join(', ') || String(pid)),
+            launch: (start) => this.launchAndAttach(start),
+          });
+          if (ended?.error) this.output.appendLine(ended.error);
+        }
+        for (const p of this.projects.filter((q) => q.mtp && chosen.some((x) => x.project === q.file))) {
+          if (this.cancelled) break;
+          const mine = chosen.filter((x) => x.project === p.file);
+          this.runner = engine.mtpRun(p.dll, whole(p, mine) ? undefined : mine, {
+            results: (list) => list.forEach((r) => this.record(p, r)),
+            running: (list) => list.forEach((r) => this.started(p, r)),
+            log: (level, message) => this.output.appendLine(message),
+            attach: debug ? (pid) => this.attach(pid, p.name) : undefined,
+          });
+          await this.runner.done;
+        }
+      }
+    } catch (error) {
+      this.output.appendLine(error.message);
+      if (!this.cancelled) vscode.window.showErrorMessage(error.message.split('\n')[0]);
     } finally {
+      this.finishing = true;
+      for (const session of this.sessions) await vscode.debug.stopDebugging(session);
+      this.sessions.clear();
+      this.finishing = false;
       this.queued.clear();
       this.active.clear();
       this.running = false;
@@ -364,10 +408,78 @@ class TestExplorer {
       vscode.commands.executeCommand('setContext', 'csharpShooter.tests.running', false);
       this.refresh();
     }
+    const seen = { run: this.runSeen.size, passed: 0, failed: 0, skipped: 0 };
+    for (const key of this.runSeen) seen[this.results.get(key)?.outcome || 'skipped']++;
     const summary = [seen.run, formatDuration(Date.now() - started), seen.passed, seen.failed, seen.skipped];
     this.output.appendLine((this.cancelled ? T.abortRun : T.endRun)(...summary));
     if (buildFailed) vscode.window.showErrorMessage(T.buildFailed);
     else if (!this.cancelled) vscode.window.setStatusBarMessage(T.statusRun(seen.run, seen.passed, seen.failed, seen.skipped), 15000);
+  }
+
+  /** The test of a result or a test VSTest or the Testing Platform told of; one not found before (a test made at run
+   *  time) joins its project's tests. */
+  testFor(project, found) {
+    if (!project) return undefined;
+    const key = `${project.file.toLowerCase()}|${found.id}`;
+    let test = this.tests.find((x) => x.key === key);
+    if (!test) {
+      test = this.testOf(project, found);
+      project.tests.push(test);
+      this.tests.push(test);
+    }
+    return test;
+  }
+
+  /** A result as it comes: the test's, or added to the one it already has in this run (a theory's rows). */
+  record(project, r) {
+    const test = this.testFor(project, r);
+    if (!test) return;
+    const one = { outcome: r.outcome, duration: r.duration || 0, message: r.message || '', stack: r.stack || '', stdout: r.stdout || '', stderr: r.stderr || '' };
+    if (this.runSeen.has(test.key) && this.results.has(test.key)) engine.mergeResult(this.results.get(test.key), one);
+    else this.results.set(test.key, one);
+    this.runSeen.add(test.key);
+    this.active.delete(test.key);
+    this.queued.delete(test.key);
+    this.refreshSoon();
+  }
+
+  started(project, found) {
+    const test = this.testFor(project, found);
+    if (!test || this.runSeen.has(test.key)) return;
+    this.queued.delete(test.key);
+    this.active.add(test.key);
+    this.refreshSoon();
+  }
+
+  /** Results come many to a second: the tree is drawn again a moment after the first of them. */
+  refreshSoon() {
+    if (this.redraw) return;
+    this.redraw = setTimeout(() => { this.redraw = undefined; this.refresh(); }, 150);
+  }
+
+  /** The debugger attached to a test host, as VS attaches when VSTest asks it: true once the debugger has it and its
+   *  breakpoints are set (the adapter answered configurationDone), so the tests that run next stop at them. */
+  async attach(pid, name) {
+    const tag = `csharpshooter-tests-${pid}-${Date.now()}`;
+    const configured = new Promise((resolve) => this.configured.set(tag, resolve));
+    this.output.appendLine(T.startDebug);
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    const ok = await vscode.debug.startDebugging(folder, { type: 'csharpshooter', request: 'attach', name: `${T.view}: ${name}`, processId: pid, justMyCode: true, testRun: tag });
+    if (!ok) {
+      this.configured.delete(tag);
+      vscode.window.showErrorMessage(T.cannotAttach);
+      return false;
+    }
+    await Promise.race([configured, new Promise((resolve) => setTimeout(resolve, 30000))]);
+    this.configured.delete(tag);
+    return true;
+  }
+
+  /** A test host VSTest asks the IDE to start: started here, then attached to. */
+  async launchAndAttach(start) {
+    const child = spawn(start.file, [start.args || ''], { cwd: start.cwd || undefined, env: { ...process.env, ...(start.env || {}) }, windowsVerbatimArguments: true, windowsHide: true });
+    child.on('error', () => {});
+    return (await this.attach(child.pid, path.basename(start.file))) ? child.pid : -1;
   }
 
   cancel() {
@@ -390,10 +502,10 @@ class TestExplorer {
     descend(symbols);
     const method = chain.reverse().find((s) => s.kind === vscode.SymbolKind.Method);
     const cls = chain.find((s) => s.kind === vscode.SymbolKind.Class || s.kind === vscode.SymbolKind.Struct);
-    const named = (x, name) => new RegExp(`(^|[.+])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`).test(engine.splitName(x.fqn).fullClass);
+    const named = (x, name) => new RegExp(`(^|[.+])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`).test(engine.partsOf(x).fullClass);
     if (method && cls) {
       const m = method.name.replace(/\(.*$/, '');
-      const found = mine.filter((x) => named(x, cls.name) && engine.splitName(x.fqn).method === m);
+      const found = mine.filter((x) => named(x, cls.name) && engine.partsOf(x).method === m);
       if (found.length) return found;
     }
     return cls ? mine.filter((x) => named(x, cls.name)) : [];
@@ -418,7 +530,7 @@ class TestExplorer {
   }
 }
 
-/** The Test Detail Summary: a webview under the tree that follows its selection. */
+/** The Test Detail Summary: a webview beside the tree (in the bottom panel, as VS) that follows its selection. */
 class DetailsView {
   constructor(explorer) {
     this.explorer = explorer;
@@ -487,11 +599,24 @@ function registerTestExplorer(context, findSolution, startup) {
   const ensure = () => (explorer.loaded ||= explorer.load());
   context.subscriptions.push(explorer.view.onDidChangeVisibility((e) => e.visible && ensure()));
   if (explorer.view.visible) ensure();
-  context.subscriptions.push({ dispose: () => explorer.watchers.forEach((w) => w.dispose()) });
+  context.subscriptions.push({ dispose: () => { explorer.watchers.forEach((w) => w.dispose()); explorer.vstest.dispose(); } });
+  // A test run's debug session: its breakpoints set lets the test host go on; the person stopping it stops the run.
+  context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('csharpshooter', {
+    createDebugAdapterTracker(session) {
+      const tag = session.configuration.testRun;
+      if (!tag) return undefined;
+      explorer.sessions.add(session);
+      return {
+        onDidSendMessage: (m) => m.type === 'response' && m.command === 'configurationDone' && explorer.configured.get(tag)?.(),
+        onWillReceiveMessage: (m) => m.type === 'request' && m.command === 'disconnect' && explorer.running && !explorer.finishing && explorer.cancel(),
+      };
+    },
+  }));
+  context.subscriptions.push(vscode.debug.onDidTerminateDebugSession((s) => explorer.sessions.delete(s)));
 
   const register = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn));
   const nodesOf = (node, selected) => (node ? (selected?.includes(node) ? selected : [node]) : undefined);
-  register('csharpShooter.tests.show', async () => { await vscode.commands.executeCommand('workbench.view.extension.csharpShooter'); await ensure(); });
+  register('csharpShooter.tests.show', async () => { await vscode.commands.executeCommand('workbench.view.extension.csharpShooterTests'); await ensure(); });
   register('csharpShooter.tests.runAll', async () => { await ensure(); await explorer.prepare(); return explorer.runIn(explorer.visible(), false); });
   register('csharpShooter.tests.debugAll', async () => { await ensure(); await explorer.prepare(); return explorer.runIn(explorer.visible(), true); });
   register('csharpShooter.tests.run', (node, selected) => explorer.runIn(explorer.testsOf(nodesOf(node, selected)), false));

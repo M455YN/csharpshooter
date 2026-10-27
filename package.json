@@ -137,6 +137,13 @@
           "title": "%container.solutionExplorer%",
           "icon": "media/solution-explorer.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "csharpShooterTests",
+          "title": "%view.testExplorer%",
+          "icon": "media/test-explorer.svg"
+        }
       ]
     },
     "views": {
@@ -164,18 +171,20 @@
           "name": "%view.taskRunner%",
           "icon": "$(checklist)",
           "initialSize": 6
-        },
+        }
+      ],
+      "csharpShooterTests": [
         {
           "id": "csharpShooter.testExplorer",
           "name": "%view.testExplorer%",
-          "icon": "$(beaker)",
-          "initialSize": 8
+          "icon": "media/test-explorer.svg",
+          "initialSize": 3
         },
         {
           "type": "webview",
           "id": "csharpShooter.testDetails",
           "name": "%view.testDetails%",
-          "initialSize": 5
+          "initialSize": 2
         }
       ]
     },
@@ -1520,11 +1529,13 @@
   },
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",
+    "build-testbridge": "powershell -NoProfile -File scripts/build-testbridge.ps1",
     "test": "node test/runTest.js",
     "check-l10n": "node test/l10n.js",
     "package": "npx -y @vscode/vsce package --allow-missing-repository --skip-license --target win32-x64"
   },
   "dependencies": {
+    "vscode-jsonrpc": "^8.2.0",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {

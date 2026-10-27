@@ -1,5 +1,6 @@
 // Checks the Test Explorer in a real editor, on a workspace whose solution has one xunit test project built in Debug with
-// tests Adds, Fails (fails), Skipped, Theory and Slow in Sample.Tests.Math.CalcTests, and Works in Sample.Tests.OtherTests:
+// tests Adds, Fails (fails), Skipped, Theory (two InlineData rows) and Slow in Sample.Tests.Math.CalcTests, and Works in
+// Sample.Tests.OtherTests:
 //   EDITOR_EXE=<editor exe> WORKSPACE=<that folder> SUITE=test/test-explorer-suite.js node test/runTest.js
 const vscode = require('vscode');
 const assert = require('assert');
@@ -24,11 +25,11 @@ async function run() {
   const names = (nodes) => nodes.map((n) => n.name);
 
   await check('the tests of the built project are found, as Projekt > namespace > class', () => {
-    assert.strictEqual(explorer.tests.length, 6);
+    assert.strictEqual(explorer.tests.length, 7);
     assert.deepStrictEqual(names(explorer.roots), ['Sample.Tests']);
     const namespaces = explorer.roots[0].children;
     assert.deepStrictEqual(names(namespaces), ['Sample.Tests', 'Sample.Tests.Math']);
-    assert.deepStrictEqual(names(namespaces[1].children[0].children), ['Adds', 'Fails', 'Skipped', 'Slow', 'Theory']);
+    assert.deepStrictEqual(names(namespaces[1].children[0].children), ['Adds', 'Fails', 'Skipped', 'Slow', 'Theory(x: 1)', 'Theory(x: 2)']);
     assert.strictEqual(explorer.view.message, undefined);
   });
 
@@ -62,7 +63,7 @@ async function run() {
     assert.strictEqual(state('Skipped'), 'skipped');
     assert.strictEqual(state('Theory'), 'passed');
     assert.match(explorer.results.get(by('Fails').key).message, /Assert\.Equal\(\) Failure/);
-    assert.match(explorer.view.description, /✔ 4 ✖ 1 ⊘ 1/);
+    assert.match(explorer.view.description, /✔ 5 ✖ 1 ⊘ 1/);
     assert.strictEqual(explorer.getTreeItem(explorer.nodes.get(`/project:${by('Fails').project}`)).iconPath.id, 'error');
   });
 
@@ -75,7 +76,7 @@ async function run() {
     assert(d.stack.links.length > 0);
     assert.strictEqual(d.labels.stack, 'Ślad stosu');
     const group = explorer.describe(explorer.roots[0]);
-    assert.strictEqual(group.lines[0], 'Łączna liczba testów: 6');
+    assert.strictEqual(group.lines[0], 'Łączna liczba testów: 7');
   });
 
   await check('Przejdź do testu opens the method', async () => {
@@ -111,6 +112,8 @@ async function run() {
     const reason = await Promise.race([stopped, sleep(60000).then(() => 'timeout')]);
     console.log('stops:', reasons.join(','));
     assert.strictEqual(reason, 'breakpoint');
+    // As a person presses F5: once the editor shows where it stopped.
+    await until('the stop is shown', () => vscode.debug.activeStackItem, 20000);
     await vscode.commands.executeCommand('workbench.action.debug.continue');
     await finished;
     assert.strictEqual(explorer.results.get(adds.key).outcome, 'passed');
