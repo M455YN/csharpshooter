@@ -32,7 +32,7 @@
   "\"{0}\" was started by tasks.json and runs in its own terminal; its output is there, where the Task Runner cannot read it.": "„{0}” uruchomił tasks.json i działa we własnym terminalu; tam są jego dane wyjściowe, których eksplorator nie może odczytać.",
   "Stop it and run it here": "Zatrzymaj je i uruchom tutaj",
   "Show terminal": "Pokaż terminal",
-  "tasks.json already starts {0} as the folder opens (\"{1}\"), so the Project Open binding leaves it out.": "Zadanie {0} uruchamia już tasks.json przy otwarciu folderu („{1}”), więc powiązanie Otwarcie projektu je pomija.",
+  "tasks.json started \"{0}\" as the folder opened; it is stopped, and {1} runs here, as Project Open binds it.": "Zadanie „{0}” uruchomił tasks.json przy otwarciu folderu; zostało zatrzymane, a {1} działa tutaj, jak wiąże je Otwarcie projektu.",
   "Before Build": "Przed kompilacją",
   "After Build": "Po kompilacji",
   "Clean": "Oczyszczanie",

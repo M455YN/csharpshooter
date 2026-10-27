@@ -33,7 +33,7 @@ const T = table({
   inTerminal: '"{0}" was started by tasks.json and runs in its own terminal; its output is there, where the Task Runner cannot read it.',
   takeOver: 'Stop it and run it here',
   showTerminal: 'Show terminal',
-  leftToTasksJson: 'tasks.json already starts {0} as the folder opens ("{1}"), so the Project Open binding leaves it out.',
+  tookOver: 'tasks.json started "{0}" as the folder opened; it is stopped, and {1} runs here, as Project Open binds it.',
 });
 const BINDINGS = [['BeforeBuild', n_('Before Build')], ['AfterBuild', n_('After Build')], ['Clean', n_('Clean')], ['ProjectOpened', n_('Project Open')]];
 const BINDING_LINE = /^(\uFEFF?)\/\/\/\s*<binding\b([^>]*?)\/>[^\r\n]*(\r?\n|$)/;
@@ -114,6 +114,14 @@ class Node extends vscode.TreeItem {
   }
 }
 
+/** Stops a task run and waits for it to end; a run just starting can miss a terminate(), so it is asked again. */
+async function stopRun(execution) {
+  for (let i = 0; i < 60 && execution && vscode.tasks.taskExecutions.includes(execution); i++) {
+    if (i % 4 === 0) execution.terminate();
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
 const icon = (name, color) => new vscode.ThemeIcon(name, color ? new vscode.ThemeColor(color) : undefined);
 const COLLAPSED = vscode.TreeItemCollapsibleState.Collapsed;
 const EXPANDED = vscode.TreeItemCollapsibleState.Expanded;
@@ -134,11 +142,16 @@ class TaskRunner {
     this.cache = new Map(); // gulpfile -> { mtime, result }
     this.running = new Map(); // `${file}|${task}` -> TaskExecution
     this.consoles = new Map(); // `${file}|${task}` -> the console tab of its last run: { key, task, cwd, commandLine, env, text, running, code }
-    this.others = new Map(); // `${file}|${task}` -> { file, task, execution }: a run tasks.json started, whose output its terminal has
     this.selected = undefined; // the gulpfile the Bindings tab shows: the tree's selection's, else the first
     this.tabs = new ConsoleView(this);
     this.output = vscode.window.createOutputChannel(T.view);
     this.lastExit = undefined; // { task, code }: what the tests read
+    this.said = []; // the output's lines, what the tests read
+  }
+
+  say(line) {
+    this.said.push(line);
+    this.output.appendLine(line);
   }
 
   refresh() {
@@ -225,8 +238,8 @@ class TaskRunner {
       folderOf(e.task.execution?.options?.cwd, e.task.scope?.uri?.fsPath), file, name));
   }
 
-  /** tasks.json's tasks that VS Code starts as the folder opens and that run this gulp task, when it starts them at all
-   *  (task.allowAutomaticTasks not off): Project Open leaves those to it, so a watcher never runs twice. */
+  /** tasks.json's task that VS Code starts as the folder opens and that runs this gulp task, when it starts them at all
+   *  (task.allowAutomaticTasks not off): Project Open's run wins over it, so a watcher runs once, its output here. */
   startedByTasksJson(file, name) {
     if (vscode.workspace.getConfiguration('task').get('allowAutomaticTasks') === 'off') return undefined;
     for (const folder of vscode.workspace.workspaceFolders || []) {
@@ -240,9 +253,7 @@ class TaskRunner {
   }
 
   taskNode(kind, file, name, id, bound, place) {
-    const other = this.otherRun(file, name);
-    if (other) this.others.set(`${file}|${name}`, { file, task: name, execution: other });
-    const running = this.running.has(`${file}|${name}`) || !!other;
+    const running = this.running.has(`${file}|${name}`) || !!this.otherRun(file, name);
     const flags = [
       ...Object.entries(bound || {}).filter(([, tasks]) => tasks.includes(name)).map(([event]) => `b:${event}`),
       ...(place && !place.first ? ['up'] : []), ...(place && !place.last ? ['down'] : []),
@@ -320,7 +331,7 @@ class TaskRunner {
     this.refresh();
     // As VS's console ends a run: the task and its exit code, in the Task Runner's output; the status bar says so.
     this.lastExit = { task: name, code };
-    this.output.appendLine(`${new Date().toLocaleTimeString()} ${T.exited(label, code)}`);
+    this.say(`${new Date().toLocaleTimeString()} ${T.exited(label, code)}`);
     vscode.window.setStatusBarMessage(T.ended, 5000);
     return code;
   }
@@ -342,12 +353,19 @@ class TaskRunner {
 
   /** A tasks.json run's tab: its task stopped there and run here, so its output shows in a console tab. */
   async takeOver(key) {
-    const other = this.others.get(key);
-    if (!other) return undefined;
-    other.execution.terminate();
-    for (let i = 0; i < 40 && vscode.tasks.taskExecutions.includes(other.execution); i++) await new Promise((r) => setTimeout(r, 250));
-    this.others.delete(key);
-    return this.run(other.file, other.task);
+    const [file, task] = key.split('|');
+    await stopRun(this.otherRun(file, task));
+    return this.run(file, task);
+  }
+
+  /** A run tasks.json starts as the folder opens, of a gulp task the Task Runner runs already: stopped, ours stays. */
+  stopDuplicate(execution) {
+    for (const c of this.consoles.values()) {
+      if (c.running && execution.task.name === this.startedByTasksJson(c.file, c.task)) {
+        stopRun(execution);
+        this.say(T.tookOver(execution.task.name, `${c.task} (${path.basename(c.cwd)})`));
+      }
+    }
   }
 
   /** A console tab's ×: a run still going is asked about first ("Close Console"), as VS asks, and stopped. */
@@ -369,12 +387,10 @@ class TaskRunner {
     const files = (await this.files()).filter((f) => f.kind === 'gulp' && (!folder || path.dirname(f.file).toLowerCase() === folder.toLowerCase()));
     for (const { file } of files) {
       for (const task of readBindings(fs.readFileSync(file, 'utf8'))[binding] || []) {
-        const byTasksJson = binding === 'ProjectOpened' && this.startedByTasksJson(file, task);
-        if (byTasksJson) {
-          this.output.appendLine(T.leftToTasksJson(`${task} (${path.basename(path.dirname(file))})`, byTasksJson));
-          continue;
-        }
-        const ended = this.run(file, task);
+        // Project Open wins over tasks.json's run of the same task (runOn: folderOpen), started before it.
+        const byTasksJson = binding === 'ProjectOpened' && this.otherRun(file, task) && this.startedByTasksJson(file, task);
+        if (byTasksJson) this.say(T.tookOver(byTasksJson, `${task} (${path.basename(path.dirname(file))})`));
+        const ended = byTasksJson ? this.takeOver(`${file}|${task}`) : this.run(file, task);
         if (wait && (await ended) !== 0) return false;
       }
     }
@@ -416,8 +432,16 @@ class ConsoleView {
 
   /** What it shows (the tests read it). */
   state() {
-    const { consoles, others, selected } = this.runner;
-    for (const [key, o] of others) if (!vscode.tasks.taskExecutions.includes(o.execution) || consoles.get(key)?.running) others.delete(key);
+    const { consoles, selected } = this.runner;
+    // Runs tasks.json started, of the gulp tasks listed: their output is in their terminal.
+    const others = new Map();
+    for (const [file, { result }] of this.runner.cache) {
+      for (const task of result.tasks || []) {
+        const execution = this.runner.otherRun(file, task);
+        if (execution) others.set(`${file}|${task}`, { task, execution });
+      }
+    }
+    this.others = others;
     if (this.current !== 'bindings' && !consoles.has(this.current) && !others.has(this.current)) this.current = 'bindings';
     const events = selected && fs.existsSync(selected) ? this.runner.bindingEvents(selected) : [];
     return {
@@ -565,7 +589,7 @@ class ConsoleView {
       else if (m.type === 'close') this.runner.closeTab(m.key);
       else if (m.type === 'takeOver') this.runner.takeOver(m.key);
       else if (m.type === 'showTerminal') {
-        const name = this.runner.others.get(m.key)?.execution.task.name;
+        const name = this.others?.get(m.key)?.execution.task.name;
         vscode.window.terminals.find((t) => name && t.name.includes(name))?.show();
       }
       else if (m.type === 'move' && m.file) this.runner.moveBinding(m.file, m.binding, m.task, m.delta);
@@ -603,7 +627,10 @@ function registerTaskRunner(context, findSolution) {
   register('csharpShooter.taskRunner.removeBinding', (node) => runner.moveBinding(node.file, node.binding, node.task, 0));
   context.subscriptions.push(runner.output);
   // A run started elsewhere (tasks.json) shows as running here, and stops from here, so the tree follows every start and end.
-  context.subscriptions.push(vscode.tasks.onDidStartTask(() => runner.refresh()), vscode.tasks.onDidEndTask(() => runner.refresh()));
+  context.subscriptions.push(vscode.tasks.onDidStartTask(({ execution }) => {
+    runner.stopDuplicate(execution); // tasks.json's start after Project Open's
+    runner.refresh();
+  }), vscode.tasks.onDidEndTask(() => runner.refresh()));
 
   // Project Open: the bound tasks start as the solution opens (the watchers, mostly), as VS starts them.
   if (setting('projectOpenBindings')) runner.runBindings('ProjectOpened', undefined, false);

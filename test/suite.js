@@ -340,34 +340,41 @@ async function taskRunnerChecks(api) {
   return results;
 }
 
-// With tasks.json's runOn: folderOpen watchers started by the editor: each runs once (Project Open leaves them to
-// tasks.json), the Task Runner shows them running, and stops them.
+// With tasks.json's runOn: folderOpen watchers started by the editor: Project Open's runs win, each watcher runs once,
+// in the Task Runner with its output; a tasks.json run started by hand has a tab, and is taken over from there.
 async function autorunChecks(api) {
   const { runner } = api.taskRunner;
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
   const watchers = ['watchFiles_WebApp', 'watchFiles_ContosoCore', 'watchFiles_ContosoLobby'];
   const runsOf = (w) => vscode.tasks.taskExecutions.filter((e) => e.task.name.includes(w));
-  for (let i = 0; i < 40 && !watchers.every((w) => runsOf(w).length); i++) await sleep(500);
-  await sleep(3000); // and a moment more, for any second run to show
+  const plain = (w) => ([...runner.consoles.values()].find((c) => c.task === w && c.running)?.text || '').replace(/\x1b\[[\d;]*m/g, '');
+  for (let i = 0; i < 60 && !watchers.every((w) => plain(w).includes(`Starting '${w}'`)); i++) await sleep(500);
+  await sleep(5000); // and a moment more, for any second run to show
   const counts = watchers.map((w) => `${w}: ${runsOf(w).map((e) => e.task.name).join(' + ') || 'none'}`);
-  expect("each watcher runs once (tasks.json's, not again by Project Open)", watchers.every((w) => runsOf(w).length === 1), counts.join(' | '));
+  expect("each watcher runs once, the Task Runner's with its output (tasks.json's stopped)",
+    watchers.every((w) => runsOf(w).length === 1 && !runsOf(w)[0].task.name.includes('[Autorun]') && plain(w).includes(`Starting '${w}'`)), `${counts.join(' | ')}; ${runner.said.join(' / ')}`);
   const rows = [];
   for (const f of (await runner.getChildren()).filter((n) => n.kind === 'gulpfile')) {
     const [tasksGroup] = await runner.getChildren(f);
     rows.push(...(await runner.getChildren(tasksGroup)).filter((r) => watchers.includes(r.task)));
   }
-  expect("the Task Runner shows tasks.json's runs as running", rows.length === 3 && rows.every((r) => r.contextValue.startsWith('trTask.running')),
+  expect('the Task Runner shows them running', rows.length === 3 && rows.every((r) => r.contextValue.startsWith('trTask.running')),
     rows.map((r) => `${r.task}: ${r.description || 'idle'}`).join(', '));
-  // Their tabs say the output is in tasks.json's terminal; one taken over runs here, its output in its console tab.
-  const external = runner.tabs.state().tabs.filter((t) => t.external);
+
+  // tasks.json's task run by hand: its tab says its output is in its terminal; taken over, it runs here with its output.
   const taken = rows.find((r) => r.task === 'watchFiles_WebApp');
-  await runner.tabs.select(`${taken.file}|${taken.task}`);
-  runner.takeOver(`${taken.file}|${taken.task}`);
-  const plain = () => (runner.consoles.get(`${taken.file}|${taken.task}`)?.text || '').replace(/\x1b\[[\d;]*m/g, '');
-  for (let i = 0; i < 60 && !plain().includes("Starting 'watchFiles_WebApp'"); i++) await sleep(500);
-  expect("tasks.json's runs have tabs; one taken over shows its output here", external.length === 3 && plain().includes("Starting 'watchFiles_WebApp'") && runsOf('watchFiles_WebApp').length === 1,
-    `${external.map((t) => t.title).join(' | ')}; taken over: ${JSON.stringify(plain().split(/\r?\n/).slice(1, 3))}, runs ${runsOf('watchFiles_WebApp').map((e) => e.task.name).join(' + ')}`);
+  const key = `${taken.file}|${taken.task}`;
+  runner.stop(taken.file, taken.task);
+  for (let i = 0; i < 30 && runsOf('watchFiles_WebApp').length; i++) await sleep(500);
+  const own = (await vscode.tasks.fetchTasks()).find((t) => t.name.includes('watchFiles_WebApp') && t.source === 'Workspace');
+  if (own) await vscode.tasks.executeTask(own);
+  for (let i = 0; i < 20 && !runner.tabs.state().tabs.some((t) => t.key === key && t.external); i++) await sleep(500);
+  const external = runner.tabs.state().tabs.find((t) => t.key === key)?.external;
+  runner.takeOver(key);
+  for (let i = 0; i < 60 && !plain('watchFiles_WebApp').includes("Starting 'watchFiles_WebApp'"); i++) await sleep(500);
+  expect("a tasks.json run by hand has a tab; taken over, its output shows here", !!external && plain('watchFiles_WebApp').includes("Starting 'watchFiles_WebApp'") && runsOf('watchFiles_WebApp').length === 1,
+    `tab: ${external ? 'yes' : 'none'}; runs ${runsOf('watchFiles_WebApp').map((e) => e.task.name).join(' + ')}; ${JSON.stringify(plain('watchFiles_WebApp').slice(-200))}`);
   for (const r of rows) await vscode.commands.executeCommand('csharpShooter.taskRunner.stop', r);
   for (let i = 0; i < 30 && watchers.some((w) => runsOf(w).length); i++) await sleep(500);
   expect('and stops them', watchers.every((w) => !runsOf(w).length), watchers.map((w) => `${w}: ${runsOf(w).length}`).join(', '));
