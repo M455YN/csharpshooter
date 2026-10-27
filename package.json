@@ -2,7 +2,7 @@
   "name": "csharpshooter",
   "displayName": "CSharpShooter",
   "description": "%description%",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "publisher": "M455YN",
   "author": {
     "name": "Mateusz Afelt"
@@ -24,7 +24,7 @@
     "Programming Languages",
     "Debuggers"
   ],
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
   "activationEvents": [
     "workspaceContains:**/*.sln",
     "workspaceContains:**/*.slnx",
@@ -1555,7 +1555,9 @@
     "build-testbridge": "powershell -NoProfile -File scripts/build-testbridge.ps1",
     "test": "node test/runTest.js",
     "check-l10n": "node test/l10n.js",
-    "package": "npx -y @vscode/vsce package --allow-missing-repository --skip-license --target win32-x64"
+    "bundle": "npx -y esbuild@0.25.12 extension.js --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js --log-level=warning",
+    "vscode:prepublish": "npm run bundle",
+    "package": "npx -y @vscode/vsce package --allow-missing-repository --skip-license --no-dependencies --target win32-x64"
   },
   "dependencies": {
     "vscode-jsonrpc": "^8.2.0",

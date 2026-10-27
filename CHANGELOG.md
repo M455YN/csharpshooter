@@ -4,7 +4,15 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.1] - 2026-10-27
+
+### Changed
+
+- The extension's code ships as one bundle, `dist/extension.js` (esbuild, `npm run bundle`, run by vsce before it packages), instead of 194 JavaScript files; the sources and `node_modules` stay out of the .vsix, which holds about 350 files fewer and no longer gets vsce's "you should bundle your extension" warning.
+
+### Fixed
+
+- The Configuration Manager no longer throws when it is refreshed after its tab was closed.
 
 ## [0.4.0] - 2026-10-27
 
