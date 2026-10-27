@@ -123,10 +123,12 @@ async function run() {
   await check('Anuluj ends a run', async () => {
     const slow = explorer.tests.find((x) => x.fqn.endsWith('.Slow'));
     const finished = explorer.runIn([slow], false);
-    await until('run started', () => explorer.runner);
+    await until('the test running', () => explorer.active.has(slow.key));
+    const cancelled = Date.now();
     explorer.cancel();
     await finished;
     assert.strictEqual(explorer.running, false);
+    assert(Date.now() - cancelled < 10000, `the run ended ${Date.now() - cancelled} ms after Anuluj (Slow sleeps 20 s)`);
   });
 }
 

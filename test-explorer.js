@@ -358,8 +358,11 @@ class TestExplorer {
       for (const file of files) {
         if (this.cancelled) break;
         const project = this.projects.find((p) => p.file === file);
-        const code = await engine.buildProject(file, buildArgs(await this.startup.buildSettings(file)), { framework: project?.framework }, (text) => this.output.append(text));
-        if (code !== 0) buildFailed = true;
+        const code = await engine.buildProject(file, buildArgs(await this.startup.buildSettings(file)), {
+          framework: project?.framework, started: (cancel) => { this.runner = { cancel }; },
+        }, (text) => this.output.append(text));
+        this.runner = undefined;
+        if (code !== 0 && !this.cancelled) buildFailed = true;
       }
       if (!buildFailed && !this.cancelled) {
         await this.discover(files);

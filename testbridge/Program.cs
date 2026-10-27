@@ -25,8 +25,10 @@ public static class Program
     private static readonly object Writing = new();
     private static readonly ConcurrentDictionary<string, TaskCompletionSource<JsonNode?>> Asked = new();
     private static readonly ConcurrentDictionary<Guid, TestCase> Cases = new();
+    private static readonly TimeSpan AbortAfter = TimeSpan.FromSeconds(2);
     private static int asking;
     private static VsTestConsoleWrapper? console;
+    private static RunHandler? running;
 
     public static int Main(string[] args)
     {
@@ -167,6 +169,7 @@ public static class Program
         bool debug = (bool?)parameters["debug"] ?? false;
         string settings = SettingsOf(parameters);
         var handler = new RunHandler();
+        running = handler;
         var options = new TestPlatformOptions();
         if (parameters["ids"] is JsonArray ids)
         {
@@ -206,13 +209,27 @@ public static class Program
             }
         }
         handler.Done.Wait();
+        running = null;
         return new JsonObject { ["aborted"] = handler.Aborted, ["canceled"] = handler.Canceled, ["error"] = handler.Error, ["elapsed"] = handler.Elapsed };
     }
 
+    /// <summary>Cancel as a person means it: VSTest is asked to stop after the test running now, and a run that has not
+    /// ended a moment later (a long test, an adapter that runs on) is aborted, its test host ended.</summary>
     private static JsonNode? Cancel()
     {
         console?.CancelTestRun();
         console?.CancelDiscovery();
+        RunHandler? run = running;
+        if (run is not null)
+        {
+            _ = Task.Run(() =>
+            {
+                if (!run.Done.Wait(AbortAfter))
+                {
+                    console?.AbortTestRun();
+                }
+            });
+        }
         return true;
     }
 
