@@ -106,6 +106,7 @@ function registerConfigurationManager(context, findSolution, startup) {
     };
     const show = async () => {
       const state = await load();
+      if (!panel) return undefined; // closed while the solution was read (a refresh after the tab went)
       if (!state) return error(T.noSolution);
       const { model, settings } = state;
       const k = config.key(settings.configuration, settings.platform);

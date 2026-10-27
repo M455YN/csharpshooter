@@ -9,3 +9,5 @@ testbridge/out/
 .vscode-test/
 # Local name map for the tests (NAMES_FILE)
 test/names.local.json
+# npm run bundle
+dist/

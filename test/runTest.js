@@ -31,6 +31,8 @@ const { runTests } = require('@vscode/test-electron');
     suite = path.join(profile, 'suite.js');
     fs.writeFileSync(suite, source);
   }
+  // The extension runs from dist/extension.js (package.json's main): bundled from the sources first, as the .vsix is.
+  if (!process.env.EXTENSION_PATH) require('child_process').execSync('npm run bundle', { cwd: path.resolve(__dirname, '..'), stdio: 'inherit' });
   try {
     await runTests({
       vscodeExecutablePath: exe,
@@ -39,7 +41,8 @@ const { runTests } = require('@vscode/test-electron');
       extensionTestsPath: suite,
       // A profile and extensions folder of its own: only this extension runs.
       launchArgs: [workspace, '--user-data-dir', path.join(profile, 'data'), '--extensions-dir', path.join(profile, 'ext'), '--disable-workspace-trust'],
-      extensionTestsEnv: { ...process.env },
+      // The sources' own modules the checks use (solution-config.js, write-file.js); a .vsix holds only the bundle.
+      extensionTestsEnv: { ...process.env, CSHARPSHOOTER_SOURCES: path.resolve(__dirname, '..') },
     });
   } finally {
     if (process.env.LAUNCH_PROFILES === 'always') {

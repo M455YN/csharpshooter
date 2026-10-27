@@ -650,7 +650,7 @@ function registerTaskRunner(context, findSolution) {
 
   // Project Open: the bound tasks start as the solution opens (the watchers, mostly), as VS starts them.
   if (setting('projectOpenBindings')) runner.runBindings('ProjectOpened', undefined, false);
-  return { runner, view, readBindings, writeBindings };
+  return { runner, view, readBindings, writeBindings, buildBindings };
 }
 
 /** For builds: Before Build / After Build / Clean bindings of a project folder's gulpfiles, when buildBindings is on. */

@@ -357,7 +357,7 @@ async function taskRunnerChecks(api) {
   const filesIn = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? filesIn(path.join(dir, e.name)) : [path.join(dir, e.name)])) : []);
   const built = new Map(filesIn(wwwroot).map((f) => [f, fs.readFileSync(f)]));
   try {
-    const { buildBindings } = require(path.join(api.extensionPath, 'task-runner.js'));
+    const { buildBindings } = api.taskRunner; // the running extension's (dist/extension.js), not a second copy of the module
     const t0 = Date.now();
     const ok = await buildBindings('BeforeBuild', path.dirname(sb.file));
     expect('a run ends saying its exit code', runner.lastExit?.task === 'beforeBuild' && runner.lastExit.code === 0,
@@ -1224,7 +1224,7 @@ async function propertiesChecks(api) {
 async function configurationManagerChecks(api) {
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
-  const config = require(path.join(api.extensionPath, 'solution-config'));
+  const config = require(path.join(process.env.CSHARPSHOOTER_SOURCES, 'solution-config'));
   const startup = api.startup.startup;
   const settings = await startup.solutionSettings();
   const files = [settings.solution, ...config.read(settings.solution).projects.map((p) => p.file)];
@@ -1277,7 +1277,7 @@ async function configurationManagerChecks(api) {
     }
   } finally {
     panel.dispose();
-    for (const [f, data] of before) require(path.join(api.extensionPath, 'write-file')).writeFileWhenFree(f, data, 200);
+    for (const [f, data] of before) require(path.join(process.env.CSHARPSHOOTER_SOURCES, 'write-file')).writeFileWhenFree(f, data, 200);
     await startup.setSolutionSettings({ configuration: settings.configuration, platform: settings.platform });
   }
   expect('the solution and its project files put back as they were', [...before].every(([f, data]) => Buffer.compare(data, fs.readFileSync(f)) === 0), `${before.size} files`);
@@ -1328,7 +1328,7 @@ async function propertiesWindowChecks(api) {
     const project = win.state.sheet?.rows.map((r) => `${r.title}=${r.value}`).join(', ');
     expect("a folder's and a project's rows", folder?.startsWith('Nazwa folderu=') && project?.startsWith(`Nazwa pliku=${path.basename(lib.file)}, Folder projektu=`), `${folder} | ${project}`);
   } finally {
-    require(path.join(api.extensionPath, 'write-file')).writeFileWhenFree(lib.file, before, 200);
+    require(path.join(process.env.CSHARPSHOOTER_SOURCES, 'write-file')).writeFileWhenFree(lib.file, before, 200);
     fs.rmSync(file, { force: true });
   }
   expect('the project file put back as it was', Buffer.compare(before, fs.readFileSync(lib.file)) === 0, 'byte for byte');

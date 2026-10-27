@@ -44,8 +44,9 @@ With `server/` and `debugger/` in place (above):
 npm run package
 ```
 
-This gives `csharpshooter-win32-x64-<version>.vsix` (about 70 MB: the server, the debugger and the extension's
-`node_modules`; `.vscodeignore` leaves out the tests, scripts, the port and `.pdb` files). It is a `win32-x64` package,
+This gives `csharpshooter-win32-x64-<version>.vsix` (about 70 MB: the server, the debugger and the extension's code as
+one bundle, `dist/extension.js`, which vsce has `npm run bundle` make first with esbuild; `.vscodeignore` leaves out the
+sources, `node_modules`, the tests, scripts, the port and `.pdb` files). `npm test` bundles before it runs too. It is a `win32-x64` package,
 since the server and the debugger in it are built for Windows x64; for another system, run
 `node scripts/fetch-server.js 5.11.0 <rid>` and `scripts/build-debugger.ps1 -Runtime <rid>`, and change `--target` in
 `package.json`'s `package` script.

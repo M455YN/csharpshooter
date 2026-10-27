@@ -96,7 +96,8 @@ class Item extends vscode.TreeItem {
 // Codicons in Visual Studio's colours: purple solution, green C# project, blue web project and packages, yellow folders.
 const icon = (name, color) => new vscode.ThemeIcon(name, color ? new vscode.ThemeColor(color) : undefined);
 // A folder gets an SVG of its own: the 'folder' codicon is the file icon theme's folder, which Seti draws as nothing.
-const YELLOW_FOLDER = vscode.Uri.file(path.join(__dirname, 'media', 'folder.svg'));
+// From dist/extension.js (the bundle the .vsix runs) media/ is one folder up.
+const YELLOW_FOLDER = vscode.Uri.file(path.join(__dirname, path.basename(__dirname) === 'dist' ? '..' : '', 'media', 'folder.svg'));
 const FOLDER_ICONS = { properties: icon('tools', 'charts.blue'), wwwroot: icon('globe', 'charts.blue') };
 const folderIcon = (name) => FOLDER_ICONS[name.toLowerCase()] || YELLOW_FOLDER;
 

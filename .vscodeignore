@@ -1,4 +1,8 @@
-# What the .vsix leaves out; server/, debugger/, testbridge/out/ and node_modules/ go in.
+# What the .vsix leaves out; server/, debugger/ and testbridge/out/ go in. The code is dist/extension.js, one bundle of the
+# sources and node_modules (npm run bundle, before vsce packages), so neither goes in as files.
+*.js
+node_modules/**
+.github/**
 testbridge/*.cs
 testbridge/*.csproj
 testbridge/bin/**
@@ -10,4 +14,3 @@ debugger-port/**
 .vscode-test/**
 *.vsix
 **/*.pdb
-node_modules/@vscode/test-electron/**
