@@ -164,6 +164,18 @@
           "name": "%view.taskRunner%",
           "icon": "$(checklist)",
           "initialSize": 6
+        },
+        {
+          "id": "csharpShooter.testExplorer",
+          "name": "%view.testExplorer%",
+          "icon": "$(beaker)",
+          "initialSize": 8
+        },
+        {
+          "type": "webview",
+          "id": "csharpShooter.testDetails",
+          "name": "%view.testDetails%",
+          "initialSize": 5
         }
       ]
     },
@@ -425,6 +437,95 @@
         "command": "csharpShooter.solution.manageNuGetSolution",
         "title": "%command.solution.manageNuGetSolution%",
         "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.tests.show",
+        "title": "%command.tests.show%",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.runAll",
+        "title": "%command.tests.runAll%",
+        "icon": "$(run-all)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.debugAll",
+        "title": "%command.tests.debugAll%",
+        "icon": "$(debug-alt)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.run",
+        "title": "%command.tests.run%",
+        "icon": "$(play)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.debug",
+        "title": "%command.tests.debug%",
+        "icon": "$(debug-alt)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.runFailed",
+        "title": "%command.tests.runFailed%",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.runInContext",
+        "title": "%command.tests.runInContext%",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.debugInContext",
+        "title": "%command.tests.debugInContext%",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.repeat",
+        "title": "%command.tests.repeat%",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.cancel",
+        "title": "%command.tests.cancel%",
+        "icon": "$(debug-stop)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.refresh",
+        "title": "%command.tests.refresh%",
+        "icon": "$(refresh)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.groupBy",
+        "title": "%command.tests.groupBy%",
+        "icon": "$(list-tree)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.filter",
+        "title": "%command.tests.filter%",
+        "icon": "$(search)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.clearFilter",
+        "title": "%command.tests.clearFilter%",
+        "icon": "$(clear-all)",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.clearResults",
+        "title": "%command.tests.clearResults%",
+        "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.tests.goToTest",
+        "title": "%command.tests.goToTest%",
+        "category": "%category.Test%"
       }
     ],
     "menus": {
@@ -448,6 +549,56 @@
           "command": "csharpShooter.taskRunner.refresh",
           "when": "view == csharpShooter.taskRunner",
           "group": "navigation@1"
+        },
+        {
+          "command": "csharpShooter.tests.runAll",
+          "when": "view == csharpShooter.testExplorer && !csharpShooter.tests.running",
+          "group": "navigation@1"
+        },
+        {
+          "command": "csharpShooter.tests.cancel",
+          "when": "view == csharpShooter.testExplorer && csharpShooter.tests.running",
+          "group": "navigation@2"
+        },
+        {
+          "command": "csharpShooter.tests.groupBy",
+          "when": "view == csharpShooter.testExplorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "csharpShooter.tests.filter",
+          "when": "view == csharpShooter.testExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "csharpShooter.tests.refresh",
+          "when": "view == csharpShooter.testExplorer",
+          "group": "navigation@5"
+        },
+        {
+          "command": "csharpShooter.tests.clearFilter",
+          "when": "view == csharpShooter.testExplorer && csharpShooter.tests.filtered",
+          "group": "navigation@6"
+        },
+        {
+          "command": "csharpShooter.tests.debugAll",
+          "when": "view == csharpShooter.testExplorer",
+          "group": "1_run@1"
+        },
+        {
+          "command": "csharpShooter.tests.runFailed",
+          "when": "view == csharpShooter.testExplorer",
+          "group": "1_run@2"
+        },
+        {
+          "command": "csharpShooter.tests.repeat",
+          "when": "view == csharpShooter.testExplorer",
+          "group": "1_run@3"
+        },
+        {
+          "command": "csharpShooter.tests.clearResults",
+          "when": "view == csharpShooter.testExplorer",
+          "group": "2_results@1"
         }
       ],
       "view/item/context": [
@@ -580,6 +731,31 @@
           "command": "csharpShooter.configurationManager",
           "when": "view == csharpShooter.solution && viewItem == solution",
           "group": "9_properties@1"
+        },
+        {
+          "command": "csharpShooter.tests.run",
+          "when": "view == csharpShooter.testExplorer && viewItem =~ /./",
+          "group": "inline@1"
+        },
+        {
+          "command": "csharpShooter.tests.debug",
+          "when": "view == csharpShooter.testExplorer && viewItem =~ /./",
+          "group": "inline@2"
+        },
+        {
+          "command": "csharpShooter.tests.run",
+          "when": "view == csharpShooter.testExplorer && viewItem =~ /./",
+          "group": "1_run@1"
+        },
+        {
+          "command": "csharpShooter.tests.debug",
+          "when": "view == csharpShooter.testExplorer && viewItem =~ /./",
+          "group": "1_run@2"
+        },
+        {
+          "command": "csharpShooter.tests.goToTest",
+          "when": "view == csharpShooter.testExplorer && viewItem == test",
+          "group": "2_navigate@1"
         }
       ],
       "csharpShooter.solution.add": [
@@ -1196,6 +1372,41 @@
         "key": "alt+enter",
         "command": "csharpShooter.solution.properties",
         "when": "focusedView == 'csharpShooter.solution' && config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+e t",
+        "command": "csharpShooter.tests.show",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+r a",
+        "command": "csharpShooter.tests.runAll",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+r ctrl+a",
+        "command": "csharpShooter.tests.debugAll",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+r t",
+        "command": "csharpShooter.tests.runInContext",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "ctrl+r ctrl+t",
+        "command": "csharpShooter.tests.debugInContext",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus"
+      },
+      {
+        "key": "ctrl+r l",
+        "command": "csharpShooter.tests.repeat",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+r f",
+        "command": "csharpShooter.tests.runFailed",
+        "when": "config.csharpShooter.visualStudioKeybindings"
       }
     ],
     "languages": [
