@@ -1,0 +1,118 @@
+# Released from a tag (v0.3.0): the same build as build.yml (the C# server from nuget.org, the debugger from Passenger's source
+# with the port's patch, then the .vsix with both inside), published to Open VSX and the Visual Studio Marketplace, then
+# attached to a GitHub Release with the .vsix and the latest CHANGELOG entry as its notes.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Passenger's port builds with the .NET 10 SDK (global.json: 10.0.100, latest feature band).
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read version
+        id: meta
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "vsix=csharpshooter-win32-x64-${VERSION}.vsix" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "push" ] && [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version v${VERSION}"
+            exit 1
+          fi
+
+      - name: Install
+        run: npm ci
+
+      - name: Texts (each English one with its Polish)
+        run: npm run check-l10n
+
+      - name: Project Properties rules and project-file edits
+        run: node test/property-rules.js
+
+      - name: Configuration Manager (.sln and .slnx as vs-solutionpersistence writes them)
+        run: node test/solution-config.js
+
+      - name: Properties window (file, folder and project rules; project-file edits)
+        run: node test/item-properties.js
+
+      - name: Server (roslyn-language-server, win-x64)
+        run: node scripts/fetch-server.js 5.11.0 win-x64
+
+      - name: Debugger (Passenger for .NET 10, win-x64)
+        shell: pwsh
+        run: ./scripts/build-debugger.ps1 -Runtime win-x64
+
+      - name: Test bridge (vstest.console through its translation layer, for the Test Explorer)
+        shell: pwsh
+        run: ./scripts/build-testbridge.ps1
+
+      - name: Package VSIX
+        run: npm run package
+
+      - name: Release notes
+        run: node .github/scripts/latest-changelog.js
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN || secrets.OVSX_PAT }}
+        shell: bash
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "Missing OPEN_VSX_TOKEN. Create a token at https://open-vsx.org/user-settings/tokens"
+            exit 1
+          fi
+          echo "OPEN_VSX_TOKEN is present (${#OVSX_PAT} characters)."
+          npx --yes ovsx create-namespace M455YN || echo "Namespace M455YN already exists or could not be created; continuing to publish."
+          npx --yes ovsx publish "${{ steps.meta.outputs.vsix }}" --skip-duplicate
+
+      - name: Publish to Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "Missing VS_MARKETPLACE_TOKEN."
+            echo "This must be an Azure DevOps PAT (not an Open VSX token): Marketplace -> Manage, Organization = All accessible organizations."
+            echo "If https://dev.azure.com has no Personal access tokens menu, create a free Azure DevOps organization first, then User icon -> Personal access tokens."
+            exit 1
+          fi
+          echo "VS_MARKETPLACE_TOKEN is present (${#VSCE_PAT} characters)."
+          npx --yes @vscode/vsce verify-pat M455YN
+          npx --yes @vscode/vsce publish --packagePath "${{ steps.meta.outputs.vsix }}" --skip-duplicate
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          VSIX: ${{ steps.meta.outputs.vsix }}
+        shell: bash
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes
+          fi
+          gh release create "$TAG" \
+            --title "${VERSION}" \
+            --notes-file release-notes.md \
+            --target "${GITHUB_SHA}" \
+            "$VSIX"
