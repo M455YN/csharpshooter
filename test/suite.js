@@ -424,20 +424,26 @@ async function runViewProbe() {
   return [];
 }
 
-// launch.json with the launch profiles in it (csharpShooter.launchProfilesInLaunchJson: always): listed in Run and Debug
-// as VS lists them, the workspace's own entries kept, and one started by its name as F5 starts the selected one.
+// launch.json with CSharpShooter's entry in it (csharpShooter.launchProfilesInLaunchJson: always): only "Projekt startowy
+// (CSharpShooter)", VS's start button, the workspace's own entries kept, and it started by its name as F5 starts it.
 async function launchJsonChecks() {
   const results = [];
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
   const configs = () => vscode.workspace.getConfiguration('launch', vscode.workspace.workspaceFolders[0].uri).get('configurations') || [];
   for (let i = 0; i < 40 && !configs().some((c) => c.type === 'csharpshooter'); i++) await sleep(500);
+  // From a launch.json without CSharpShooter's entries (runTest.js puts the file back): only the startup entry comes.
+  const folder = vscode.workspace.workspaceFolders[0];
+  await vscode.workspace.getConfiguration('launch', folder.uri).update('configurations', configs().filter((c) => c.type !== 'csharpshooter'), vscode.ConfigurationTarget.WorkspaceFolder);
+  const added = await vscode.commands.executeCommand('csharpShooter.addLaunchProfiles');
   const names = configs().map((c) => c.name);
-  expect('launch profiles are in launch.json, the existing entry kept',
-    ['Projekt startowy (CSharpShooter)', 'WebApp: WebApp Development', 'WebApp: WebApp Development VSCode', 'Contoso.Lobby: Contoso.Lobby Development'].every((n) => names.includes(n)) && configs()[0].type === 'coreclr',
-    names.join(' | '));
-  const entry = configs().find((c) => c.name === 'WebApp: WebApp Development');
-  expect('an entry names the project relative to the folder', entry?.project === '${workspaceFolder}/WebApp/WebApp.csproj' && entry.launchProfile === 'WebApp Development',
-    JSON.stringify(entry));
+  expect('only the startup entry is added to launch.json (no project profiles), first, the existing entries kept after it',
+    JSON.stringify(added) === '["Projekt startowy (CSharpShooter)"]' && names.filter((n) => configs().find((c) => c.name === n).type === 'csharpshooter').length === 1
+    && names[0] === 'Projekt startowy (CSharpShooter)' && configs()[1]?.type === 'coreclr', `added ${JSON.stringify(added)}: ${names.join(' | ')}`);
+  // F5 and Ctrl+F5 run it whatever Run and Debug has selected (VS Code gives an extension no way to select an entry there).
+  const keys = vscode.extensions.all.find((e) => e.packageJSON.name === 'csharpshooter')?.packageJSON.contributes.keybindings || [];
+  const bound = (key, command) => keys.some((k) => k.key === key && k.command === command && k.when === '!inDebugMode');
+  expect('F5 and Ctrl+F5 start the startup project, as in VS', bound('f5', 'csharpShooter.startup.start') && bound('ctrl+f5', 'csharpShooter.startup.startWithoutDebugging'),
+    keys.filter((k) => /^(ctrl\+)?f5$/.test(k.key)).map((k) => `${k.key}: ${k.command} (${k.when})`).join(', '));
   if (process.env.SCREENSHOT) {
     await vscode.commands.executeCommand('workbench.view.debug');
     vscode.commands.executeCommand('workbench.action.debug.selectandstart');
@@ -445,12 +451,13 @@ async function launchJsonChecks() {
     await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-launch-json.png'));
     await vscode.commands.executeCommand('workbench.action.closeQuickOpen');
   }
-  // Started by its name, as F5 starts the configuration the dropdown has selected; its build is skipped here.
+  // Started as F5 starts it; its build skipped here (build: false), so the projects' build outputs stay as they were.
   let session;
   const started = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((s) => (d.dispose(), r(s))); });
-  const ok = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], 'WebApp: WebApp Development');
+  const entry = configs().find((c) => c.name === 'Projekt startowy (CSharpShooter)');
+  const ok = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], { ...entry, build: false });
   session = ok ? await Promise.race([started, sleep(240000).then(() => null)]) : null;
-  expect('started by its name, as F5 does', session?.type === 'csharpshooter' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
+  expect('started as F5 starts it: the startup project with its active profile', session?.type === 'csharpshooter' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
     session ? `${session.type} session "${session.name}", ASPNETCORE_ENVIRONMENT=${session.configuration.env?.ASPNETCORE_ENVIRONMENT}` : 'no session');
   if (session) {
     const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((x) => x.id === session.id && (d.dispose(), r())); });

@@ -180,12 +180,14 @@ nothing changed has no need of. A start while another build runs (the Solution E
 then checks.
 
 The Run and Debug dropdown lists only `launch.json`'s configurations (an extension's own wait behind *.NET
-(CSharpShooter)...* in Select and Start Debugging), so CSharpShooter offers, once per workspace, to add the profiles to
-`.vscode/launch.json` as entries like the one below; *Add Launch Profiles to Run and Debug* in the Command Palette adds
-the missing ones at any time. `csharpShooter.launchProfilesInLaunchJson`: `ask` (default), `always`, `never`. The
-file's other entries are left as they are.
-
-In `launch.json`:
+(CSharpShooter)...* in Select and Start Debugging), so CSharpShooter offers, once per workspace, to add one entry to
+`.vscode/launch.json`, first: *Projekt startowy (CSharpShooter)*, VS's start button. It runs the startup project with
+its active profile, chosen from the status bar's start button, whose list has only the startup project's profiles, as
+VS's has. F5 and Ctrl+F5 run it whatever Run and Debug has selected (VS Code gives an extension no way to select an
+entry there), as in VS; while debugging F5 continues, and with no .NET project they do what VS Code's own do. *Add the Startup Project to Run and Debug* in the Command Palette adds it at any time;
+`csharpShooter.launchProfilesInLaunchJson`: `ask` (default), `always`, `never`. The projects' profiles are not
+written there (the other projects' stay under *.NET (CSharpShooter)...*), and the file's other entries are left as they
+are. A profile of any project can still be an entry of its own, written by hand:
 
 ```json
 { "name": "WebApp Development", "type": "csharpshooter", "request": "launch",

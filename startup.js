@@ -282,7 +282,9 @@ function registerStartup(context, findSolution, launch) {
   const folderOf = (project) => vscode.workspace.getWorkspaceFolder(vscode.Uri.file(project)) || vscode.workspace.workspaceFolders?.[0];
   const start = async (noDebug) => {
     const now = await startup.current();
-    if (!now) return false;
+    // F5 / Ctrl+F5 come here (VS's: the startup project, whatever Run and Debug has selected); with no .NET project to
+    // start, they do what VS Code's own do.
+    if (!now) return vscode.commands.executeCommand(noDebug ? 'workbench.action.debug.run' : 'workbench.action.debug.start');
     return vscode.debug.startDebugging(folderOf(now.project), startupEntry(), { noDebug });
   };
 

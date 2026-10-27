@@ -1386,6 +1386,16 @@
         "when": "!inDebugMode || debugType == 'csharpshooter'"
       },
       {
+        "key": "f5",
+        "command": "csharpShooter.startup.start",
+        "when": "!inDebugMode"
+      },
+      {
+        "key": "ctrl+f5",
+        "command": "csharpShooter.startup.startWithoutDebugging",
+        "when": "!inDebugMode"
+      },
+      {
         "key": "f4",
         "command": "csharpShooter.propertiesWindow.show",
         "when": "focusedView == 'csharpShooter.solution' && config.csharpShooter.visualStudioKeybindings"
