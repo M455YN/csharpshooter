@@ -30,6 +30,9 @@ const T = table({
   moveUp: 'Move Up',
   moveDown: 'Move Down',
   remove: 'Remove',
+  inTerminal: '"{0}" was started by tasks.json and runs in its own terminal; its output is there, where the Task Runner cannot read it.',
+  takeOver: 'Stop it and run it here',
+  showTerminal: 'Show terminal',
   leftToTasksJson: 'tasks.json already starts {0} as the folder opens ("{1}"), so the Project Open binding leaves it out.',
 });
 const BINDINGS = [['BeforeBuild', n_('Before Build')], ['AfterBuild', n_('After Build')], ['Clean', n_('Clean')], ['ProjectOpened', n_('Project Open')]];
@@ -131,6 +134,7 @@ class TaskRunner {
     this.cache = new Map(); // gulpfile -> { mtime, result }
     this.running = new Map(); // `${file}|${task}` -> TaskExecution
     this.consoles = new Map(); // `${file}|${task}` -> the console tab of its last run: { key, task, cwd, commandLine, env, text, running, code }
+    this.others = new Map(); // `${file}|${task}` -> { file, task, execution }: a run tasks.json started, whose output its terminal has
     this.selected = undefined; // the gulpfile the Bindings tab shows: the tree's selection's, else the first
     this.tabs = new ConsoleView(this);
     this.output = vscode.window.createOutputChannel(T.view);
@@ -236,7 +240,9 @@ class TaskRunner {
   }
 
   taskNode(kind, file, name, id, bound, place) {
-    const running = this.running.has(`${file}|${name}`) || !!this.otherRun(file, name);
+    const other = this.otherRun(file, name);
+    if (other) this.others.set(`${file}|${name}`, { file, task: name, execution: other });
+    const running = this.running.has(`${file}|${name}`) || !!other;
     const flags = [
       ...Object.entries(bound || {}).filter(([, tasks]) => tasks.includes(name)).map(([event]) => `b:${event}`),
       ...(place && !place.first ? ['up'] : []), ...(place && !place.last ? ['down'] : []),
@@ -334,6 +340,16 @@ class TaskRunner {
     (this.running.get(key) ?? this.otherRun(file, name))?.terminate();
   }
 
+  /** A tasks.json run's tab: its task stopped there and run here, so its output shows in a console tab. */
+  async takeOver(key) {
+    const other = this.others.get(key);
+    if (!other) return undefined;
+    other.execution.terminate();
+    for (let i = 0; i < 40 && vscode.tasks.taskExecutions.includes(other.execution); i++) await new Promise((r) => setTimeout(r, 250));
+    this.others.delete(key);
+    return this.run(other.file, other.task);
+  }
+
   /** A console tab's ×: a run still going is asked about first ("Close Console"), as VS asks, and stopped. */
   async closeTab(key) {
     const tab = this.consoles.get(key);
@@ -400,15 +416,19 @@ class ConsoleView {
 
   /** What it shows (the tests read it). */
   state() {
-    const { consoles, selected } = this.runner;
-    if (this.current !== 'bindings' && !consoles.has(this.current)) this.current = 'bindings';
+    const { consoles, others, selected } = this.runner;
+    for (const [key, o] of others) if (!vscode.tasks.taskExecutions.includes(o.execution) || consoles.get(key)?.running) others.delete(key);
+    if (this.current !== 'bindings' && !consoles.has(this.current) && !others.has(this.current)) this.current = 'bindings';
     const events = selected && fs.existsSync(selected) ? this.runner.bindingEvents(selected) : [];
     return {
       type: 'state', current: this.current,
-      labels: { bindings: T.bindings, close: T.close, moveUp: T.moveUp, moveDown: T.moveDown, remove: T.remove },
+      labels: { bindings: T.bindings, close: T.close, moveUp: T.moveUp, moveDown: T.moveDown, remove: T.remove, takeOver: T.takeOver, showTerminal: T.showTerminal },
       file: selected, gulpfile: selected ? path.basename(selected) : '', folder: selected ? path.basename(path.dirname(selected)) : '',
       events: events.map((e) => ({ binding: e.binding, label: e.label, tasks: e.tasks })),
-      tabs: [...consoles.values()].map((c) => ({ key: c.key, title: c.running ? T.tabRunning(c.task) : c.task, tooltip: `${c.cwd}> ${c.commandLine}` })),
+      tabs: [
+        ...[...consoles.values()].filter((c) => !others.has(c.key)).map((c) => ({ key: c.key, title: c.running ? T.tabRunning(c.task) : c.task, tooltip: `${c.cwd}> ${c.commandLine}` })),
+        ...[...others].map(([key, o]) => ({ key, title: T.tabRunning(o.task), tooltip: o.execution.task.name, external: T.inTerminal(o.execution.task.name) })),
+      ],
     };
   }
 
@@ -441,6 +461,7 @@ class ConsoleView {
   .x { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 2px; font-size: 14px; line-height: 1; }
   .x:hover { background: var(--vscode-toolbar-hoverBackground); }
   #body { flex: 1; overflow: auto; }
+  a { color: var(--vscode-textLink-foreground); cursor: pointer; } a:hover { text-decoration: underline; }
   .row { display: flex; align-items: center; padding: 1px 0; cursor: default; }
   .row:hover { background: var(--vscode-list-hoverBackground); }
   .twisty { width: 16px; text-align: center; cursor: pointer; opacity: .8; }
@@ -485,10 +506,15 @@ class ConsoleView {
     const tab = (key, title, tooltip, closable) => '<div class="tab' + (state.current === key ? ' on' : '') + '" data-key="' + esc(key) + '" title="' + esc(tooltip) + '">' + title +
       (closable ? '<button class="x" data-close="' + esc(key) + '" title="' + esc(state.labels.close) + '">\\u00d7</button>' : '') + '</div>';
     document.getElementById('tabs').innerHTML = tab('bindings', '\\u{1F517}\\uFE0E ' + esc(state.labels.bindings), state.labels.bindings, false) +
-      state.tabs.map((t) => tab(t.key, esc(t.title), t.tooltip, true)).join('');
+      state.tabs.map((t) => tab(t.key, esc(t.title), t.tooltip, !t.external)).join('');
   };
   const renderBody = () => {
     const body = document.getElementById('body');
+    const external = state.tabs.find((t) => t.key === state.current)?.external;
+    if (external) {
+      body.innerHTML = '<div style="padding:6px 10px">' + esc(external) + '<p><a data-act="takeOver">' + esc(state.labels.takeOver) + '</a> · <a data-act="showTerminal">' + esc(state.labels.showTerminal) + '</a></p></div>';
+      return;
+    }
     if (state.current !== 'bindings') {
       const atEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 4;
       body.innerHTML = '<pre>' + ansi(texts[state.current] || '') + '</pre>';
@@ -513,6 +539,8 @@ class ConsoleView {
   let pending = false;
   const later = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; renderBody(); }); } };
   document.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]');
+    if (act) return vscode.postMessage({ type: act.dataset.act, key: state.current });
     const close = e.target.closest('[data-close]');
     if (close) return vscode.postMessage({ type: 'close', key: close.dataset.close });
     const toggle = e.target.closest('[data-toggle]');
@@ -535,6 +563,11 @@ class ConsoleView {
         for (const c of this.runner.consoles.values()) this.webview?.postMessage({ type: 'text', key: c.key, text: c.text });
       } else if (m.type === 'select') this.select(m.key);
       else if (m.type === 'close') this.runner.closeTab(m.key);
+      else if (m.type === 'takeOver') this.runner.takeOver(m.key);
+      else if (m.type === 'showTerminal') {
+        const name = this.runner.others.get(m.key)?.execution.task.name;
+        vscode.window.terminals.find((t) => name && t.name.includes(name))?.show();
+      }
       else if (m.type === 'move' && m.file) this.runner.moveBinding(m.file, m.binding, m.task, m.delta);
     });
   }
