@@ -95,9 +95,11 @@ async function run() {
   await check('Anuluj ends a run', async () => {
     const finished = explorer.runIn(project().tests, false);
     await until('run started', () => explorer.runner, 300000);
+    const cancelled = Date.now();
     explorer.cancel();
     await finished;
     assert.strictEqual(explorer.running, false);
+    assert(Date.now() - cancelled < 10000, `the run ended ${Date.now() - cancelled} ms after Anuluj`);
   });
 }
 

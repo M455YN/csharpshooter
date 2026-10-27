@@ -68,10 +68,12 @@ async function projectInfo(project, { configuration, platform }, framework) {
   }
 }
 
-/** `dotnet build` of a project, its output given to onOutput; resolves the exit code. */
-function buildProject(project, args, { framework } = {}, onOutput = () => {}) {
+/** `dotnet build` of a project, its output given to onOutput; resolves the exit code. `started(cancel)` is given what
+ *  ends the build. */
+function buildProject(project, args, { framework, started = () => {} } = {}, onOutput = () => {}) {
   return new Promise((resolve) => {
     const child = spawn('dotnet', ['build', project, ...args, ...(framework ? ['-f', framework] : []), '--nologo'], { cwd: path.dirname(project), windowsHide: true });
+    started(() => child.exitCode === null && kill(child.pid));
     child.stdout.on('data', (d) => onOutput(d.toString()));
     child.stderr.on('data', (d) => onOutput(d.toString()));
     child.on('error', () => resolve(-1));
