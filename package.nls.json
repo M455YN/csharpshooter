@@ -48,6 +48,7 @@
   "view.search": "Search",
   "view.solution": "Solution Explorer",
   "view.taskRunner": "Task Runner Explorer",
+  "view.taskRunnerConsole": "Bindings and Output",
   "submenu.solution.add": "Add",
   "submenu.taskRunner.bindings": "Bindings",
   "config.solution": "Solution (.sln/.slnx) to load. Empty: the first one found in the workspace.",

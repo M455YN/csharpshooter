@@ -48,6 +48,7 @@
   "view.search": "Wyszukaj",
   "view.solution": "Solution Explorer",
   "view.taskRunner": "Eksplorator modułu uruchamiającego zadania",
+  "view.taskRunnerConsole": "Powiązania i dane wyjściowe",
   "submenu.solution.add": "Dodaj",
   "submenu.taskRunner.bindings": "Powiązania",
   "config.solution": "Rozwiązanie (.sln/.slnx) do wczytania. Puste: pierwsze znalezione w obszarze roboczym.",

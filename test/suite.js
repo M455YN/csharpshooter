@@ -245,11 +245,11 @@ async function taskRunnerChecks(api) {
   const where = files.map((f) => `${label(f)} (${f.description})`);
   expect('gulpfiles of the projects', ['WebApp', 'Contoso.Core', 'Contoso.Lobby'].every((p) => files.some((f) => f.description === p && f.kind === 'gulpfile')), where.join(', '));
   const sb = files.find((f) => f.description === 'WebApp' && f.kind === 'gulpfile');
-  const [tasksGroup, bindingsGroup] = await runner.getChildren(sb);
+  const [tasksGroup] = await runner.getChildren(sb);
   const taskRows = await runner.getChildren(tasksGroup);
   const tasks = taskRows.map(label);
   expect('tasks, as gulp lists them', ['beforeBuild', 'watchFiles_WebApp', 'minAllControlsSiteJS'].every((t) => tasks.includes(t)), tasks.join(', '));
-  const bindings = await runner.getChildren(bindingsGroup);
+  const bindings = runner.bindingEvents(sb.file);
   const shown = bindings.map((b) => `${label(b)}: ${b.tasks.join(', ')}`);
   expect('bindings from the /// <binding> line', shown.includes('Przed kompilacją (1): beforeBuild') && shown.includes('Otwarcie projektu (1): watchFiles_WebApp'), shown.join(' | '));
 
@@ -257,19 +257,34 @@ async function taskRunnerChecks(api) {
   expect('a task shows the events it is bound to (the Bindings menu checks them)',
     marks.includes('beforeBuild [b:BeforeBuild]') && marks.includes('watchFiles_WebApp [b:ProjectOpened]'), marks.join(', '));
 
+  // As VS registers its tool window: in the bottom panel, the tree and the Bindings/console tabs side by side.
+  const contributes = vscode.extensions.all.find((e) => e.extensionPath.toLowerCase() === api.extensionPath.toLowerCase())?.packageJSON.contributes;
+  const inPanel = !!contributes?.viewsContainers.panel.some((c) => c.id === 'csharpShooterTaskRunner')
+    && contributes.views.csharpShooterTaskRunner.map((v) => v.id).join() === 'csharpShooter.taskRunner,csharpShooter.taskRunnerConsole';
+  await vscode.commands.executeCommand('csharpShooter.taskRunner.focus');
+  await sleep(500);
+  expect('in the bottom panel, as VS docks it', inPanel && api.taskRunner.view.visible, `panel container ${inPanel ? 'yes' : 'NO'}, tree visible ${api.taskRunner.view.visible}`);
+
   // Project Open: started as the workspace opened.
   for (let i = 0; i < 20 && runner.running.size < 3; i++) await sleep(500);
   const watching = [...runner.running.keys()].map((k) => k.split('|')[1]);
-  // As VS runs them: node_modules\.bin first on PATH, gulp with --color.
-  const exec = vscode.tasks.taskExecutions.find((e) => e.task.name.startsWith('watchFiles_WebApp'))?.task.execution;
-  const pathValue = exec && Object.entries(exec.options?.env || {}).find(([k]) => k.toUpperCase() === 'PATH')?.[1];
+  // As VS runs them: cmd.exe /c gulp -b "<folder>" --color --gulpfile "<gulpfile>" <task>, node_modules\.bin first on PATH.
+  const tab = [...runner.consoles.values()].find((c) => c.task === 'watchFiles_WebApp');
+  const pathValue = tab && Object.entries(tab.env).find(([k]) => k.toUpperCase() === 'PATH')?.[1];
   const binDir = path.join(path.dirname(sb.file), 'node_modules', '.bin');
-  expect('runs with node_modules\\.bin first on PATH and --color', exec && exec.args.includes('--color') && pathValue?.startsWith(binDir),
-    exec ? `${exec.process} ${exec.args.map((a) => path.basename(a)).join(' ')}; PATH starts ${pathValue?.slice(0, binDir.length)}` : 'no execution');
+  const vsLine = `cmd.exe /c gulp -b "${path.dirname(sb.file)}" --color --gulpfile "${sb.file.split(path.sep).join('/')}" watchFiles_WebApp`;
+  expect("runs VS's command line, node_modules\\.bin first on PATH", tab?.commandLine === vsLine && pathValue?.startsWith(binDir),
+    tab ? `${tab.commandLine}; PATH starts ${pathValue?.slice(0, binDir.length)}` : 'no console');
   expect('Project Open bindings started with the workspace', ['watchFiles_WebApp', 'watchFiles_ContosoCore', 'watchFiles_ContosoLobby'].every((w) => watching.includes(w)), watching.join(', '));
+  const plain = () => (tab?.text || '').replace(/\x1b\[[\d;]*m/g, '');
+  for (let i = 0; i < 40 && !plain().includes("Starting 'watchFiles_WebApp'"); i++) await sleep(500);
+  const tabs = runner.tabs.state().tabs;
+  expect('a running task has a console tab with its output, as VS\'s "(uruchomione)" tab',
+    tabs.find((t) => t.key === tab?.key)?.title === 'watchFiles_WebApp (uruchomione)' && plain().startsWith(`${path.dirname(sb.file)}> cmd.exe /c gulp`) && plain().includes("Starting 'watchFiles_WebApp'"),
+    `tabs: ${tabs.map((t) => t.title).join(' | ')}; ${JSON.stringify(plain().split(/\r?\n/).slice(0, 3))}`);
   if (process.env.SCREENSHOT) {
-    await vscode.commands.executeCommand('workbench.view.extension.csharpShooter');
-    await vscode.commands.executeCommand('csharpShooter.taskRunner.focus');
+    runner.tabs.select(tab.key);
+    await sleep(1000);
     await screenshot(process.env.SCREENSHOT.replace(/\.png$/i, '-task-runner.png'));
   }
   for (const key of [...runner.running.keys()]) runner.stop(...key.split('|'));
@@ -287,8 +302,7 @@ async function taskRunnerChecks(api) {
 
     const lobbyNode = (await runner.getChildren()).find((f) => f.file === lobby);
     const afterBuild = async () => {
-      const [, group] = await runner.getChildren(lobbyNode);
-      const event = (await runner.getChildren(group)).find((b) => b.binding === 'AfterBuild');
+      const event = runner.bindingEvents(lobbyNode.file).find((b) => b.binding === 'AfterBuild');
       return event.tasks.length ? await runner.getChildren(event) : [];
     };
     for (const task of ['beforeBuild', 'watchFiles_ContosoLobby']) {

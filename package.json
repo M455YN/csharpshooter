@@ -143,6 +143,11 @@
           "id": "csharpShooterTests",
           "title": "%view.testExplorer%",
           "icon": "media/test-explorer.svg"
+        },
+        {
+          "id": "csharpShooterTaskRunner",
+          "title": "%view.taskRunner%",
+          "icon": "media/task-runner.svg"
         }
       ]
     },
@@ -165,12 +170,20 @@
           "id": "csharpShooter.propertiesWindow",
           "name": "%view.propertiesWindow%",
           "initialSize": 8
-        },
+        }
+      ],
+      "csharpShooterTaskRunner": [
         {
           "id": "csharpShooter.taskRunner",
           "name": "%view.taskRunner%",
-          "icon": "$(checklist)",
-          "initialSize": 6
+          "icon": "media/task-runner.svg",
+          "initialSize": 1
+        },
+        {
+          "type": "webview",
+          "id": "csharpShooter.taskRunnerConsole",
+          "name": "%view.taskRunnerConsole%",
+          "initialSize": 3
         }
       ],
       "csharpShooterTests": [

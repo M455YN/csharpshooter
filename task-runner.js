@@ -1,11 +1,14 @@
-// Task Runner Explorer, after Visual Studio's: each gulpfile's tasks and each package.json's scripts, run and stopped from
-// the tree, and the gulpfile's bindings (the "/// <binding ... />" line VS writes): Project Open runs as the solution
-// opens, Before Build, After Build and Clean around CSharpShooter's builds when csharpShooter.taskRunner.buildBindings is on.
+// Task Runner Explorer, after Visual Studio's: a tool window in the bottom panel (VS registers it Tabbed with the Output
+// window, Orientation Bottom). On the left each gulpfile's tasks and each package.json's scripts, run and stopped from the
+// tree; on the right tabs: Bindings (the "/// <binding ... />" line VS writes) and a console per task run, which shows what
+// VS's does: "<folder>> cmd.exe /c gulp -b ... --color --gulpfile ... <task>" and the task's coloured output. Project Open
+// runs as the solution opens, Before Build, After Build and Clean around CSharpShooter's builds when
+// csharpShooter.taskRunner.buildBindings is on.
 const vscode = require('vscode');
 const { t, n_, table } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 // Labels as Visual Studio's Task Runner Explorer has them (its Resources and Resources.pl), in English and Polish.
 const T = table({
@@ -18,6 +21,15 @@ const T = table({
   ended: 'Task ended',
   exited: 'Task {0} exited with exit code {1}',
   listFailed: 'Failed to run "{0}"...',
+  tabRunning: '{0} (running)',
+  terminated: 'Process terminated with code {0}.',
+  closeConsole: 'Close Console',
+  terminateQuestion: 'This process has not exited. Do you want to terminate it?',
+  terminate: 'Terminate',
+  close: 'Close',
+  moveUp: 'Move Up',
+  moveDown: 'Move Down',
+  remove: 'Remove',
   leftToTasksJson: 'tasks.json already starts {0} as the folder opens ("{1}"), so the Project Open binding leaves it out.',
 });
 const BINDINGS = [['BeforeBuild', n_('Before Build')], ['AfterBuild', n_('After Build')], ['Clean', n_('Clean')], ['ProjectOpened', n_('Project Open')]];
@@ -118,12 +130,24 @@ class TaskRunner {
     this.onDidChangeTreeData = this.changed.event;
     this.cache = new Map(); // gulpfile -> { mtime, result }
     this.running = new Map(); // `${file}|${task}` -> TaskExecution
+    this.consoles = new Map(); // `${file}|${task}` -> the console tab of its last run: { key, task, cwd, commandLine, env, text, running, code }
+    this.selected = undefined; // the gulpfile the Bindings tab shows: the tree's selection's, else the first
+    this.tabs = new ConsoleView(this);
     this.output = vscode.window.createOutputChannel(T.view);
     this.lastExit = undefined; // { task, code }: what the tests read
   }
 
   refresh() {
     this.changed.fire();
+    this.tabs.update();
+  }
+
+  /** A gulpfile's events as VS's Bindings tab lists them, each with its bound tasks (getChildren gives their rows). */
+  bindingEvents(file) {
+    const bound = readBindings(fs.readFileSync(file, 'utf8'));
+    return BINDINGS.map(([name, label]) => new Node('binding', `${t(label)} (${(bound[name] || []).length})`, (bound[name] || []).length ? EXPANDED : NONE, {
+      id: `tr:${file}#bindings/${name}`, file, binding: name, tasks: bound[name] || [], iconPath: icon('symbol-event'),
+    }));
   }
 
   getTreeItem(node) {
@@ -153,18 +177,21 @@ class TaskRunner {
 
   async getChildren(node) {
     if (!node) {
-      return (await this.files()).map(({ kind, file }) => new Node(kind === 'gulp' ? 'gulpfile' : 'packageJson',
+      const files = await this.files();
+      if (!files.some((f) => f.file === this.selected)) {
+        this.selected = files.find((f) => f.kind === 'gulp')?.file;
+        this.tabs.update();
+      }
+      return files.map(({ kind, file }) => new Node(kind === 'gulp' ? 'gulpfile' : 'packageJson',
         `${path.basename(file)}`, EXPANDED, {
           id: `tr:${file}`, file, description: path.basename(path.dirname(file)), resourceUri: vscode.Uri.file(file), tooltip: file,
           iconPath: kind === 'gulp' ? icon('symbol-event', 'charts.red') : icon('package', 'charts.green'),
           contextValue: kind === 'gulp' ? 'trGulpfile' : 'trPackageJson',
         }));
     }
+    // As VS's tree: the gulpfile, its Tasks; its bindings are the Bindings tab's (bindingEvents).
     if (node.kind === 'gulpfile') {
-      return [
-        new Node('tasksGroup', T.tasks, EXPANDED, { id: `${node.id}#tasks`, file: node.file, iconPath: icon('checklist') }),
-        new Node('bindingsGroup', T.bindings, COLLAPSED, { id: `${node.id}#bindings`, file: node.file, iconPath: icon('link') }),
-      ];
+      return [new Node('tasksGroup', T.tasks, EXPANDED, { id: `${node.id}#tasks`, file: node.file, iconPath: icon('checklist') })];
     }
     if (node.kind === 'packageJson') {
       return npmScripts(node.file).map((s) => this.taskNode('script', node.file, s, `${node.id}/${s}`));
@@ -177,12 +204,6 @@ class TaskRunner {
       if (!result.tasks.length) return [new Node('none', T.noTasks, NONE, { id: `${node.id}/none` })];
       const bound = readBindings(fs.readFileSync(node.file, 'utf8'));
       return result.tasks.map((t) => this.taskNode('task', node.file, t, `${node.id}/${t}`, bound));
-    }
-    if (node.kind === 'bindingsGroup') {
-      const bound = readBindings(fs.readFileSync(node.file, 'utf8'));
-      return BINDINGS.map(([name, label]) => new Node('binding', `${t(label)} (${(bound[name] || []).length})`, (bound[name] || []).length ? EXPANDED : NONE, {
-        id: `${node.id}/${name}`, file: node.file, binding: name, tasks: bound[name] || [], iconPath: icon('symbol-event'),
-      }));
     }
     if (node.kind === 'binding') {
       return node.tasks.map((t, i) => this.taskNode('bound', node.file, t, `${node.id}/${t}`, undefined,
@@ -228,46 +249,102 @@ class TaskRunner {
     });
   }
 
-  /** Runs a task in a terminal of its own; resolves once it ends (a watch task: when stopped), with its exit code. */
+  /** Runs a task as VS does, its output in a console tab of its own (and in the task's terminal); resolves once it ends
+   *  (a watch task: when stopped), with its exit code. */
   async run(file, name, kind = 'task') {
     const key = `${file}|${name}`;
     if (this.running.has(key) || this.otherRun(file, name)) return undefined; // one run of a task at a time, whoever started it
     const dir = path.dirname(file);
-    const local = path.join(dir, 'node_modules', 'gulp', 'bin', 'gulp.js');
-    // As VS runs it: node_modules\.bin first on PATH, gulp with --color (its terminal shows the colours).
-    const options = { cwd: dir, env: toolsEnv(dir) };
-    const exec = kind === 'script' ? new vscode.ShellExecution('npm', ['run', name], options)
-      : fs.existsSync(local) ? new vscode.ProcessExecution('node', [local, name, '--color', '--gulpfile', file], options)
-        : new vscode.ShellExecution('npx', ['gulp', name, '--color', '--gulpfile', file], options);
+    // VS's command line (its gulp task runner's "/c gulp -b \"{0}\" --color --gulpfile \"{1}\" {2}", through cmd.exe), with
+    // node_modules\.bin first on PATH; the gulpfile's path with forward slashes, as VS gives it.
+    const args = kind === 'script' ? `npm run ${name}` : `gulp -b "${dir}" --color --gulpfile "${file.replace(/\\/g, '/')}" ${name}`;
+    const [shell, shellArgs] = process.platform === 'win32' ? ['cmd.exe', ['/c', args]] : ['sh', ['-c', args]];
+    const env = { ...process.env, ...toolsEnv(dir) };
+    const tab = { key, file, task: name, cwd: dir, commandLine: `${shell} ${shellArgs.join(' ')}`, env, text: '', running: true, code: undefined };
+    const print = (text) => {
+      tab.text = (tab.text + text).slice(-500000);
+      this.tabs.append(key, text);
+    };
+    this.consoles.delete(key); // a run again: its tab comes last, as a new one
+    this.consoles.set(key, tab);
+    print(`${dir}> ${tab.commandLine}\r\n`); // as VS's console starts: "{0}> {1}"
+
+    let ended;
+    const exited = new Promise((resolve) => (ended = resolve));
+    const write = new vscode.EventEmitter();
+    const closed = new vscode.EventEmitter();
+    const pty = {
+      onDidWrite: write.event,
+      onDidClose: closed.event,
+      open: () => {
+        const child = spawn(shell, shellArgs, { cwd: dir, env, windowsHide: true, windowsVerbatimArguments: true });
+        tab.child = child;
+        const out = (data) => {
+          const text = data.toString().replace(/(?<!\r)\n/g, '\r\n');
+          print(text);
+          write.fire(text);
+        };
+        child.stdout.on('data', out);
+        child.stderr.on('data', out);
+        child.on('error', (e) => out(`${e.message}\n`));
+        child.on('close', (code) => {
+          out(`${tab.stopped ? T.terminated(code ?? 1) : T.exited(name, code ?? '?')}\n`);
+          closed.fire(code ?? 1);
+          ended(code ?? 1);
+        });
+      },
+      close: () => this.kill(tab),
+    };
     const label = `${name} (${path.basename(dir)})`;
-    const task = new vscode.Task({ type: 'shell', task: label }, vscode.TaskScope.Workspace, label, 'Task Runner', exec);
-    task.presentationOptions = { reveal: vscode.TaskRevealKind.Silent, panel: vscode.TaskPanelKind.Dedicated };
+    const task = new vscode.Task({ type: 'shell', task: label }, vscode.TaskScope.Workspace, label, 'Task Runner', new vscode.CustomExecution(async () => pty));
+    task.presentationOptions = { reveal: vscode.TaskRevealKind.Never, panel: vscode.TaskPanelKind.Dedicated };
     task.isBackground = /watch/i.test(name);
     const execution = await vscode.tasks.executeTask(task);
     this.running.set(key, execution);
     this.refresh();
-    // While it starts, as VS says it: once its process runs (a watcher runs on for good), the message goes.
-    const status = vscode.window.setStatusBarMessage(`$(sync~spin) ${T.started(name)}`, 30000);
-    const started = vscode.tasks.onDidStartTaskProcess((e) => e.execution === execution && (started.dispose(), status.dispose()));
-    return new Promise((resolve) => {
-      const done = vscode.tasks.onDidEndTaskProcess((e) => {
-        if (e.execution !== execution) return;
-        done.dispose();
-        started.dispose();
-        status.dispose();
-        this.running.delete(key);
-        this.refresh();
-        // As VS's console ends a run: the task and its exit code, in the Task Runner's output; the status bar says so.
-        this.lastExit = { task: name, code: e.exitCode };
-        this.output.appendLine(`${new Date().toLocaleTimeString()} ${T.exited(label, e.exitCode ?? '?')}`);
-        vscode.window.setStatusBarMessage(T.ended, 5000);
-        resolve(e.exitCode);
-      });
-    });
+    this.tabs.select(key);
+    // While it starts, as VS says it; a moment later the message goes (a watcher runs on for good).
+    const status = vscode.window.setStatusBarMessage(`$(sync~spin) ${T.started(name)}`, 3000);
+    const code = await exited;
+    status.dispose();
+    tab.running = false;
+    tab.code = code;
+    tab.child = undefined;
+    this.running.delete(key);
+    this.refresh();
+    // As VS's console ends a run: the task and its exit code, in the Task Runner's output; the status bar says so.
+    this.lastExit = { task: name, code };
+    this.output.appendLine(`${new Date().toLocaleTimeString()} ${T.exited(label, code)}`);
+    vscode.window.setStatusBarMessage(T.ended, 5000);
+    return code;
+  }
+
+  /** Stops a run with its whole process tree, as VS does (taskkill /F /T /PID). */
+  kill(tab) {
+    if (!tab.child || tab.child.exitCode !== null) return;
+    tab.stopped = true;
+    if (process.platform === 'win32') execFile('taskkill', ['/F', '/T', '/PID', String(tab.child.pid)], { windowsHide: true }, () => {});
+    else tab.child.kill();
   }
 
   stop(file, name) {
-    (this.running.get(`${file}|${name}`) ?? this.otherRun(file, name))?.terminate();
+    const key = `${file}|${name}`;
+    const tab = this.consoles.get(key);
+    if (tab?.running) return this.kill(tab);
+    (this.running.get(key) ?? this.otherRun(file, name))?.terminate();
+  }
+
+  /** A console tab's ×: a run still going is asked about first ("Close Console"), as VS asks, and stopped. */
+  async closeTab(key) {
+    const tab = this.consoles.get(key);
+    if (!tab) return;
+    if (tab.running) {
+      const answer = await vscode.window.showWarningMessage(T.closeConsole, { modal: true, detail: T.terminateQuestion }, T.terminate);
+      if (answer !== T.terminate) return;
+      this.kill(tab);
+    }
+    this.consoles.delete(key);
+    this.tabs.update();
   }
 
   /** Bound tasks of the gulpfiles in a folder (a project's) or everywhere: started, and for a build's bindings awaited,
@@ -312,12 +389,170 @@ class TaskRunner {
   }
 }
 
+/** The right half of VS's tool window: the Bindings tab (the selected gulpfile's events and bound tasks, moved and
+ *  removed from there) and a console tab per task run, "{0} (running)" while it runs, closed with its ×. */
+class ConsoleView {
+  constructor(runner) {
+    this.runner = runner;
+    this.webview = undefined;
+    this.current = 'bindings'; // the tab shown: 'bindings' or a console's key
+  }
+
+  /** What it shows (the tests read it). */
+  state() {
+    const { consoles, selected } = this.runner;
+    if (this.current !== 'bindings' && !consoles.has(this.current)) this.current = 'bindings';
+    const events = selected && fs.existsSync(selected) ? this.runner.bindingEvents(selected) : [];
+    return {
+      type: 'state', current: this.current,
+      labels: { bindings: T.bindings, close: T.close, moveUp: T.moveUp, moveDown: T.moveDown, remove: T.remove },
+      file: selected, gulpfile: selected ? path.basename(selected) : '', folder: selected ? path.basename(path.dirname(selected)) : '',
+      events: events.map((e) => ({ binding: e.binding, label: e.label, tasks: e.tasks })),
+      tabs: [...consoles.values()].map((c) => ({ key: c.key, title: c.running ? T.tabRunning(c.task) : c.task, tooltip: `${c.cwd}> ${c.commandLine}` })),
+    };
+  }
+
+  update() {
+    this.webview?.postMessage(this.state());
+  }
+
+  append(key, text) {
+    this.webview?.postMessage({ type: 'append', key, text });
+  }
+
+  select(key) {
+    this.current = key;
+    this.update();
+  }
+
+  resolveWebviewView(view) {
+    this.webview = view.webview;
+    view.webview.options = { enableScripts: true };
+    view.onDidDispose(() => (this.webview = undefined));
+    const nonce = [...Array(24)].map(() => Math.random().toString(36)[2]).join('');
+    view.webview.html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font: var(--vscode-font-size) var(--vscode-font-family); color: var(--vscode-foreground); }
+  #tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--vscode-panel-border, transparent); }
+  .tab { display: flex; align-items: center; gap: 4px; padding: 3px 8px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; }
+  .tab:hover { background: var(--vscode-list-hoverBackground); }
+  .tab.on { border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--vscode-focusBorder)); color: var(--vscode-panelTitle-activeForeground, inherit); }
+  .x { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 2px; font-size: 14px; line-height: 1; }
+  .x:hover { background: var(--vscode-toolbar-hoverBackground); }
+  #body { flex: 1; overflow: auto; }
+  .row { display: flex; align-items: center; padding: 1px 0; cursor: default; }
+  .row:hover { background: var(--vscode-list-hoverBackground); }
+  .twisty { width: 16px; text-align: center; cursor: pointer; opacity: .8; }
+  .event { font-weight: 600; } .count { margin-left: 4px; opacity: .8; font-weight: normal; }
+  .gulp { color: var(--vscode-charts-red); margin-right: 4px; }
+  .acts { margin-left: 12px; visibility: hidden; } .row:hover .acts { visibility: visible; }
+  .acts button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 4px; }
+  .acts button:hover { background: var(--vscode-toolbar-hoverBackground); }
+  pre { margin: 0; padding: 2px 6px; min-height: 100%; box-sizing: border-box; white-space: pre-wrap; word-break: break-all;
+    font: var(--vscode-editor-font-size, 13px) Consolas, var(--vscode-editor-font-family), monospace;
+    background: var(--vscode-terminal-background, var(--vscode-panel-background)); color: var(--vscode-terminal-foreground, var(--vscode-foreground)); }
+  .c30 { color: var(--vscode-terminal-ansiBlack); } .c31 { color: var(--vscode-terminal-ansiRed); } .c32 { color: var(--vscode-terminal-ansiGreen); }
+  .c33 { color: var(--vscode-terminal-ansiYellow); } .c34 { color: var(--vscode-terminal-ansiBlue); } .c35 { color: var(--vscode-terminal-ansiMagenta); }
+  .c36 { color: var(--vscode-terminal-ansiCyan); } .c37 { color: var(--vscode-terminal-ansiWhite); } .c90 { color: var(--vscode-terminal-ansiBrightBlack); }
+  .c91 { color: var(--vscode-terminal-ansiBrightRed); } .c92 { color: var(--vscode-terminal-ansiBrightGreen); } .c93 { color: var(--vscode-terminal-ansiBrightYellow); }
+  .c94 { color: var(--vscode-terminal-ansiBrightBlue); } .c95 { color: var(--vscode-terminal-ansiBrightMagenta); } .c96 { color: var(--vscode-terminal-ansiBrightCyan); }
+  .c97 { color: var(--vscode-terminal-ansiBrightWhite); } .b { font-weight: bold; }
+</style></head><body><div id="tabs"></div><div id="body"></div>
+<script nonce="${nonce}">
+  const vscode = acquireVsCodeApi();
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => '&#' + c.charCodeAt(0) + ';');
+  let state = { tabs: [], events: [], labels: {}, current: 'bindings' };
+  const texts = {}; // console key -> its text, ANSI colours and all
+  const collapsed = new Set();
+  // The console's colours: SGR codes as spans (gulp's --color).
+  const ansi = (text) => {
+    let out = '', fg = '', bold = false;
+    for (const part of text.replace(/\\r\\n/g, '\\n').split(/(\\x1b\\[[\\d;]*m)/)) {
+      const m = /^\\x1b\\[([\\d;]*)m$/.exec(part);
+      if (!m) {
+        if (part) out += (fg || bold) ? '<span class="' + (fg ? 'c' + fg : '') + (bold ? ' b' : '') + '">' + esc(part) + '</span>' : esc(part);
+        continue;
+      }
+      for (const c of (m[1] || '0').split(';').map(Number)) {
+        if (c === 0) { fg = ''; bold = false; } else if (c === 1) bold = true; else if (c === 22) bold = false;
+        else if (c === 39) fg = ''; else if ((c >= 30 && c <= 37) || (c >= 90 && c <= 97)) fg = c;
+      }
+    }
+    return out.replace(/\\x1b\\[[\\d;]*[A-Za-z]/g, '');
+  };
+  const renderTabs = () => {
+    const tab = (key, title, tooltip, closable) => '<div class="tab' + (state.current === key ? ' on' : '') + '" data-key="' + esc(key) + '" title="' + esc(tooltip) + '">' + title +
+      (closable ? '<button class="x" data-close="' + esc(key) + '" title="' + esc(state.labels.close) + '">\\u00d7</button>' : '') + '</div>';
+    document.getElementById('tabs').innerHTML = tab('bindings', '\\u{1F517}\\uFE0E ' + esc(state.labels.bindings), state.labels.bindings, false) +
+      state.tabs.map((t) => tab(t.key, esc(t.title), t.tooltip, true)).join('');
+  };
+  const renderBody = () => {
+    const body = document.getElementById('body');
+    if (state.current !== 'bindings') {
+      const atEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 4;
+      body.innerHTML = '<pre>' + ansi(texts[state.current] || '') + '</pre>';
+      if (atEnd) body.scrollTop = body.scrollHeight;
+      return;
+    }
+    const L = state.labels;
+    body.innerHTML = state.events.map((e) => {
+      const open = e.tasks.length && !collapsed.has(e.binding);
+      let html = '<div class="row event"><span class="twisty" data-toggle="' + e.binding + '">' + (e.tasks.length ? (open ? '\\u25e2' : '\\u25b7') : '') + '</span>' +
+        esc(e.label.replace(/ \\(\\d+\\)$/, '')) + '<span class="count">(' + e.tasks.length + ')</span></div>';
+      if (open) {
+        html += '<div class="row" style="padding-left:16px"><span class="twisty">\\u25e2</span><span class="gulp">\\u25c6</span>' + esc(state.gulpfile) + '</div>';
+        html += e.tasks.map((t, i) => '<div class="row" style="padding-left:48px">' + esc(t) + '<span class="acts">' +
+          (i ? '<button data-move="-1" data-binding="' + e.binding + '" data-task="' + esc(t) + '" title="' + esc(L.moveUp) + '">\\u2191</button>' : '') +
+          (i < e.tasks.length - 1 ? '<button data-move="1" data-binding="' + e.binding + '" data-task="' + esc(t) + '" title="' + esc(L.moveDown) + '">\\u2193</button>' : '') +
+          '<button data-move="0" data-binding="' + e.binding + '" data-task="' + esc(t) + '" title="' + esc(L.remove) + '">\\u2715</button></span></div>').join('');
+      }
+      return html;
+    }).join('');
+  };
+  let pending = false;
+  const later = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; renderBody(); }); } };
+  document.addEventListener('click', (e) => {
+    const close = e.target.closest('[data-close]');
+    if (close) return vscode.postMessage({ type: 'close', key: close.dataset.close });
+    const toggle = e.target.closest('[data-toggle]');
+    if (toggle) { collapsed.has(toggle.dataset.toggle) ? collapsed.delete(toggle.dataset.toggle) : collapsed.add(toggle.dataset.toggle); return renderBody(); }
+    const move = e.target.closest('[data-move]');
+    if (move) return vscode.postMessage({ type: 'move', file: state.file, binding: move.dataset.binding, task: move.dataset.task, delta: +move.dataset.move });
+    const tab = e.target.closest('.tab');
+    if (tab) vscode.postMessage({ type: 'select', key: tab.dataset.key });
+  });
+  window.addEventListener('message', ({ data: m }) => {
+    if (m.type === 'state') { state = m; for (const k of Object.keys(texts)) if (!m.tabs.some((t) => t.key === k)) delete texts[k]; renderTabs(); renderBody(); }
+    else if (m.type === 'text') { texts[m.key] = m.text; if (m.key === state.current) later(); }
+    else if (m.type === 'append') { texts[m.key] = (texts[m.key] || '') + m.text; if (m.key === state.current) later(); }
+  });
+  vscode.postMessage({ type: 'ready' });
+</script></body></html>`;
+    view.webview.onDidReceiveMessage((m) => {
+      if (m.type === 'ready') {
+        this.update();
+        for (const c of this.runner.consoles.values()) this.webview?.postMessage({ type: 'text', key: c.key, text: c.text });
+      } else if (m.type === 'select') this.select(m.key);
+      else if (m.type === 'close') this.runner.closeTab(m.key);
+      else if (m.type === 'move' && m.file) this.runner.moveBinding(m.file, m.binding, m.task, m.delta);
+    });
+  }
+}
+
 let runner;
 
 function registerTaskRunner(context, findSolution) {
   runner = new TaskRunner(findSolution);
   const view = vscode.window.createTreeView('csharpShooter.taskRunner', { treeDataProvider: runner, showCollapseAll: true });
-  context.subscriptions.push(view);
+  // The Bindings tab follows the tree: the gulpfile of the row selected, as VS's follows its project list.
+  view.onDidChangeSelection(({ selection: [node] }) => {
+    if (node?.file && /gulpfile\.[cm]?js$/i.test(node.file) && node.file !== runner.selected) {
+      runner.selected = node.file;
+      runner.tabs.update();
+    }
+  });
+  context.subscriptions.push(view, vscode.window.registerWebviewViewProvider('csharpShooter.taskRunnerConsole', runner.tabs, { webviewOptions: { retainContextWhenHidden: true } }));
   const watcher = vscode.workspace.createFileSystemWatcher('**/{[gG]ulpfile.{js,mjs,cjs},package.json}');
   for (const ev of [watcher.onDidCreate, watcher.onDidDelete, watcher.onDidChange]) ev((u) => !/node_modules/.test(u.fsPath) && runner.refresh());
   context.subscriptions.push(watcher);
