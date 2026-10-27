@@ -2,10 +2,18 @@
   "name": "csharpshooter",
   "displayName": "CSharpShooter",
   "description": "%description%",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "M455YN",
   "author": {
     "name": "Mateusz Afelt"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/M455YN/csharpshooter.git"
+  },
+  "homepage": "https://github.com/M455YN/csharpshooter#readme",
+  "bugs": {
+    "url": "https://github.com/M455YN/csharpshooter/issues"
   },
   "icon": "media/icon.png",
   "license": "MIT",
