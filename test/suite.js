@@ -264,6 +264,15 @@ async function taskRunnerChecks(api) {
   await vscode.commands.executeCommand('csharpShooter.taskRunner.focus');
   await sleep(500);
   expect('in the bottom panel, as VS docks it', inPanel && api.taskRunner.view.visible, `panel container ${inPanel ? 'yes' : 'NO'}, tree visible ${api.taskRunner.view.visible}`);
+  // The panel closed, its tool windows are tabs at the bottom, as VS's auto-hide channel; one clicked opens it again.
+  const openStrip = api.panelStrip.shown;
+  await vscode.commands.executeCommand('workbench.action.closePanel');
+  await sleep(500);
+  const closedStrip = api.panelStrip.shown;
+  await vscode.commands.executeCommand(api.panelStrip.items[2].command);
+  await sleep(500);
+  expect('with the panel closed, its windows are tabs at the bottom (VS auto-hide)', !openStrip && closedStrip && !api.panelStrip.shown && api.taskRunner.view.visible,
+    `open: ${openStrip ? 'tabs' : 'none'}; closed: ${closedStrip ? api.panelStrip.items.map((i) => i.text).join(' | ') : 'none'}; clicked: tree visible ${api.taskRunner.view.visible}`);
 
   // Project Open: started as the workspace opened.
   for (let i = 0; i < 20 && runner.running.size < 3; i++) await sleep(500);
