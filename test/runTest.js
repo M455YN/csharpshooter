@@ -24,7 +24,7 @@ const { runTests } = require('@vscode/test-electron');
   const launchJson = path.join(workspace, '.vscode', 'launch.json');
   const launchBefore = fs.existsSync(launchJson) ? fs.readFileSync(launchJson) : null;
   // NAMES_FILE: [["WebApp", "<your web project>"], ...], the suite's sample names swapped for your solution's, in order.
-  let suite = path.resolve(__dirname, 'suite.js');
+  let suite = path.resolve(__dirname, '..', process.env.SUITE || 'test/suite.js'); // SUITE: another suite, e.g. test/test-explorer-suite.js
   if (process.env.NAMES_FILE) {
     const pairs = JSON.parse(fs.readFileSync(process.env.NAMES_FILE, 'utf8'));
     const source = pairs.reduce((s, [from, to]) => s.split(from).join(to), fs.readFileSync(suite, 'utf8'));
