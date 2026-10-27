@@ -1673,6 +1673,8 @@ async function run() {
     && said.some((l) => l.startsWith('Przygotowywanie widoków Razor (.cshtml)…')) && /^Rozwiązanie WebApp wczytane w \d+ s/.test(said[said.length - 1]);
   lines.push(`${loadingOk ? 'PASS' : 'FAIL'}  loading: the bottom right says it until the projects are loaded and Razor answers: ${[...new Set(said.map((l) => l.replace(/\d+ s$/, 'N s')))].join(' | ')}`);
   let failedLoading = loadingOk ? 0 : 1;
+  const took = api.loading()?.timings;
+  if (took) lines.push(`INFO  loading took: server ${(took.server / 1000).toFixed(1)} s, projects ${(took.projects / 1000).toFixed(1)} s, Razor ${(took.razor / 1000).toFixed(1)} s`);
   if (blocked) {
     lines.push(`${blocked.ok ? 'PASS' : 'FAIL'}  loading: F5 and test runs wait until it has loaded: ${blocked.got}`);
     failedLoading += blocked.ok ? 0 : 1;
