@@ -431,14 +431,18 @@ async function launchJsonChecks() {
   const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
   const configs = () => vscode.workspace.getConfiguration('launch', vscode.workspace.workspaceFolders[0].uri).get('configurations') || [];
   for (let i = 0; i < 40 && !configs().some((c) => c.type === 'csharpshooter'); i++) await sleep(500);
+  // An entry with the earlier, Polish-only name ("Projekt startowy (CSharpShooter)") is renamed as the folder opens.
+  for (let i = 0; i < 20 && configs().some((c) => c.name === 'Projekt startowy (CSharpShooter)'); i++) await sleep(500);
+  const opened = configs().filter((c) => c.type === 'csharpshooter' && c.startupProject).map((c) => c.name);
+  expect('the startup entry is named "CSharpShooter", in both languages (the earlier name renamed)', opened.join() === 'CSharpShooter', opened.join(' | '));
   // From a launch.json without CSharpShooter's entries (runTest.js puts the file back): only the startup entry comes.
   const folder = vscode.workspace.workspaceFolders[0];
   await vscode.workspace.getConfiguration('launch', folder.uri).update('configurations', configs().filter((c) => c.type !== 'csharpshooter'), vscode.ConfigurationTarget.WorkspaceFolder);
   const added = await vscode.commands.executeCommand('csharpShooter.addLaunchProfiles');
   const names = configs().map((c) => c.name);
   expect('only the startup entry is added to launch.json (no project profiles), first, the existing entries kept after it',
-    JSON.stringify(added) === '["Projekt startowy (CSharpShooter)"]' && names.filter((n) => configs().find((c) => c.name === n).type === 'csharpshooter').length === 1
-    && names[0] === 'Projekt startowy (CSharpShooter)' && configs()[1]?.type === 'coreclr', `added ${JSON.stringify(added)}: ${names.join(' | ')}`);
+    JSON.stringify(added) === '["CSharpShooter"]' && names.filter((n) => configs().find((c) => c.name === n).type === 'csharpshooter').length === 1
+    && names[0] === 'CSharpShooter' && configs()[1]?.type === 'coreclr', `added ${JSON.stringify(added)}: ${names.join(' | ')}`);
   // F5 and Ctrl+F5 run it whatever Run and Debug has selected (VS Code gives an extension no way to select an entry there).
   const keys = vscode.extensions.all.find((e) => e.packageJSON.name === 'csharpshooter')?.packageJSON.contributes.keybindings || [];
   const bound = (key, command) => keys.some((k) => k.key === key && k.command === command && k.when === '!inDebugMode');
@@ -454,7 +458,7 @@ async function launchJsonChecks() {
   // Started as F5 starts it; its build skipped here (build: false), so the projects' build outputs stay as they were.
   let session;
   const started = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((s) => (d.dispose(), r(s))); });
-  const entry = configs().find((c) => c.name === 'Projekt startowy (CSharpShooter)');
+  const entry = configs().find((c) => c.name === 'CSharpShooter');
   const ok = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], { ...entry, build: false });
   session = ok ? await Promise.race([started, sleep(240000).then(() => null)]) : null;
   expect('started as F5 starts it: the startup project with its active profile', session?.type === 'csharpshooter' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
@@ -524,7 +528,7 @@ async function startupChecks(api) {
     const started = new Promise((r) => { const d = vscode.debug.onDidStartDebugSession((s) => (d.dispose(), r(s))); });
     const ok = await vscode.debug.startDebugging(folder, api.startup.startupEntry());
     let session = ok ? await Promise.race([started, sleep(240000).then(() => null)]) : null;
-    expect('F5 on "Projekt startowy (CSharpShooter)" runs the startup project with its active profile',
+    expect('F5 on "CSharpShooter" runs the startup project with its active profile',
       session?.name === 'WebApp: WebApp Development' && session.configuration.env?.ASPNETCORE_ENVIRONMENT === 'Development',
       session ? `${session.type} session "${session.name}", ASPNETCORE_ENVIRONMENT=${session.configuration.env?.ASPNETCORE_ENVIRONMENT}` : 'no session');
     if (session) {

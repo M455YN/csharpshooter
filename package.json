@@ -1083,7 +1083,7 @@
           {
             "label": "%debugger.snippet0%",
             "body": {
-              "name": "Projekt startowy (CSharpShooter)",
+              "name": "CSharpShooter",
               "type": "csharpshooter",
               "request": "launch",
               "startupProject": true

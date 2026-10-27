@@ -1,7 +1,7 @@
 // Startup project and active launch profile, as Visual Studio keeps them: the solution's startup project (read from VS's
 // own .vs/<solution>/v*/.suo, then kept per workspace), and each project's active profile in its .csproj.user
 // (<ActiveDebugProfile>, the file and element VS reads and writes, so a choice made here or there holds in both).
-// F5 on the "Projekt startowy (CSharpShooter)" entry, the status bar and the Solution Explorer follow them.
+// F5 on the "CSharpShooter" entry, the status bar and the Solution Explorer follow them.
 const vscode = require('vscode');
 const { table } = require('./l10n');
 const path = require('path');
@@ -9,7 +9,7 @@ const fs = require('fs');
 const config = require('./solution-config');
 
 const TYPE = 'csharpshooter';
-const ENTRY_NAME = 'Projekt startowy (CSharpShooter)';
+const ENTRY_NAME = 'CSharpShooter';
 // VS's own words for these (CommonIDE and ManagedProjectSystem resources), in English and Polish (l10n/pl.json).
 const T = table({
   startupMark: 'startup project',

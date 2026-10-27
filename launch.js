@@ -167,7 +167,7 @@ class LaunchProfiles {
   /** A configuration that names a project: built, its program found, its profile's environment and URLs applied. */
   async resolveDebugConfigurationWithSubstitutedVariables(folder, config) {
     const asked = config;
-    // "Projekt startowy (CSharpShooter)": the startup project with its active profile and framework, as VS's F5 runs it.
+    // "CSharpShooter": the startup project with its active profile and framework, as VS's F5 runs it.
     if (config.request === 'launch' && config.startupProject && this.startup) {
       const now = await this.startup.current();
       if (!now) {
@@ -402,7 +402,7 @@ function browserOpener(state) {
   };
 }
 
-/** The "Projekt startowy (CSharpShooter)" entry, for each folder whose launch.json lacks it. VS Code lists only
+/** The "CSharpShooter" entry, for each folder whose launch.json lacks it. VS Code lists only
  *  launch.json's configurations in the Run and Debug dropdown; this one entry is VS's start button: F5 on it runs the
  *  startup project with its active profile, chosen (as in VS's list, which has only the startup project's profiles) from
  *  the status bar's start button. The other projects' profiles stay under ".NET (CSharpShooter)...". */
@@ -430,6 +430,13 @@ async function addProfileEntries(missing) {
 
 /** As a folder opens: asks once (csharpShooter.launchProfilesInLaunchJson: ask), adds silently (always) or leaves it (never). */
 async function offerProfileEntries(context) {
+  // The entry's earlier name, Polish only, becomes the one both languages read.
+  for (const folder of vscode.workspace.workspaceFolders || []) {
+    const launch = vscode.workspace.getConfiguration('launch', folder.uri);
+    const own = launch.inspect('configurations')?.workspaceFolderValue || [];
+    const old = (c) => c.type === TYPE && c.startupProject && c.name === 'Projekt startowy (CSharpShooter)';
+    if (own.some(old)) await launch.update('configurations', own.map((c) => (old(c) ? { ...c, name: require('./startup').ENTRY_NAME } : c)), vscode.ConfigurationTarget.WorkspaceFolder);
+  }
   const mode = vscode.workspace.getConfiguration('csharpShooter').get('launchProfilesInLaunchJson');
   if (mode === 'never' || context.workspaceState.get('csharpShooter.launchProfilesDeclined')) return;
   const missing = await missingProfileEntries();

@@ -142,8 +142,8 @@ does too), then kept per workspace; the active profile is the project's `.csproj
   runs; use this one.
 - **Solution Explorer**: the startup project says *projekt startowy*; *Ustaw jako projekt startowy* on a runnable
   project (an Exe or a web project; a class library gets VS's "cannot be run directly" message).
-- **Run and Debug**: the entry *Projekt startowy (CSharpShooter)* (`"startupProject": true`) always runs the startup
-  project with its active profile; select it once and F5 / Ctrl+F5 do what they do in VS. Ctrl+F5 runs the program
+- **Run and Debug**: the entry *CSharpShooter* (`"startupProject": true`) always runs the startup
+  project with its active profile; F5 / Ctrl+F5 run it whatever is selected, as in VS. Ctrl+F5 runs the program
   without the debugger, in a terminal of its own, and opens the browser as F5 does.
 
 Not yet: several startup projects at once (VS's `.slnLaunch` launch profiles).
@@ -181,7 +181,7 @@ then checks.
 
 The Run and Debug dropdown lists only `launch.json`'s configurations (an extension's own wait behind *.NET
 (CSharpShooter)...* in Select and Start Debugging), so CSharpShooter offers, once per workspace, to add one entry to
-`.vscode/launch.json`, first: *Projekt startowy (CSharpShooter)*, VS's start button. It runs the startup project with
+`.vscode/launch.json`, first: *CSharpShooter*, VS's start button. It runs the startup project with
 its active profile, chosen from the status bar's start button, whose list has only the startup project's profiles, as
 VS's has. F5 and Ctrl+F5 run it whatever Run and Debug has selected (VS Code gives an extension no way to select an
 entry there), as in VS; while debugging F5 continues, and with no .NET project they do what VS Code's own do. *Add the Startup Project to Run and Debug* in the Command Palette adds it at any time;
