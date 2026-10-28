@@ -163,6 +163,15 @@ async function startServer(context) {
     output.appendLine('Projects loaded.');
     readyResolve();
     timings.projects = Date.now() - t0 - (timings.server ?? 0);
+    // A restore that landed while the projects loaded (its assets written before the server watched obj) is told the server
+    // now, so their packages resolve in this window, as Passenger 0.2.3 tells it: else they stay unresolved until something
+    // else in the project changes.
+    const restored = projectFiles.flatMap((p) => ['project.assets.json', `${path.basename(p)}.nuget.g.props`, `${path.basename(p)}.nuget.g.targets`]
+      .map((f) => path.join(path.dirname(p), 'obj', f))).filter((f) => { try { return fs.statSync(f).mtimeMs >= t0; } catch { return false; } });
+    if (restored.length) {
+      output.appendLine(`Restored while the projects loaded: ${restored.join(', ')}`);
+      client.sendNotification('workspace/didChangeWatchedFiles', { changes: restored.map((f) => ({ uri: toServerUri(vscode.Uri.file(f)), type: 2 })) });
+    }
     // C# and F12 answer now, but Razor first generates the C# of a project's views (on a web project with many .cshtml,
     // tens of seconds), and until then a .cshtml has no colours, completion or hover: the notice stays up for that.
     const notice = loading;
