@@ -2,7 +2,7 @@
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
-.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its main after 0.2.0). No C# Dev Kit and no `vsdbg`,
+.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its main on the way to 0.2.3). No C# Dev Kit and no `vsdbg`,
 so nothing here carries Visual Studio's licence terms, except the two closed Microsoft assemblies the Roslyn package
 ships (`Microsoft.VisualStudio.Telemetry`, `Microsoft.VisualStudio.Utilities.Internal`; Razor's MEF parts need them, and
 the server runs with `--telemetryLevel off`).
@@ -22,9 +22,10 @@ npm run fetch-monaco
 without its TypeScript, CSS, HTML and JSON workers (6.6 MB). `fetch-sqltools` downloads Microsoft's SQL Tools Service (below under *SQL*) into `sqltools/`, without its own copy of
 .NET, the migration tool and the texts of languages other than English and Polish (139 MB instead of 337 MB).
 
-The debugger is Passenger's, its main after the 0.2.0 release (commit `39a3600` of 2026-10-26, which the script fetches:
-0.2.0 and the fixes since, among them an evaluation that calls a method taking a nested type, and the engine's hangs on
-a stop, terminate or failed attach), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
+The debugger is Passenger's, its main on the way to 0.2.3 (commit `b9aee83` of 2026-10-28, which the script fetches:
+0.2.2 and the fixes since, among them pointers shown as their address and type, C# 15 unions as the value they hold,
+steps over an `await` in .NET 11's runtime-async methods, clearer word on an evaluation that does not end, with
+`PASSENGER_WAIT_SCALE` to give a slow machine longer, and Hot Reload moving running frames to the new code), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
 on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
 
 ```bash
@@ -468,6 +469,19 @@ build it before packaging). `CSHARPSHOOTER_VSTEST_LOG=<file>` keeps vstest.conso
 Not like VS: test discovery from source before a build (VS's Real-Time Discovery), playlists, code coverage, a test's
 child processes under the debugger.
 
+## .http files
+
+An `.http` or `.rest` file is coloured as HTTP (REST Client's grammar) and has **Wyślij żądanie** above each request, as
+Visual Studio 2026's HTTP editor has it (Ctrl+Alt+S at the cursor too). Requests are apart by `###`: a request line
+(`GET {{host}}/items/1`), headers up to a blank line, a body after it. `@name = value` defines a file variable;
+`{{name}}` puts it in, else the HTTP environment's value; `{{$guid}}`, `{{$randomInt 1 10}}`, `{{$timestamp}}`,
+`{{$datetime iso8601}}` and `{{$processEnv NAME}}` are there too. The environments are `http-client.env.json` beside
+the file or above it (with `http-client.env.json.user` overriding, and `$shared` in each), chosen from **env: <none>**
+in the status bar (F6 with Visual Studio's keys). The response opens in the **Odpowiedź** panel beside the file: *Kod
+stanu*, *Czas*, *Rozmiar*, and the *Treść* (JSON indented), *Nagłówki* and *Nieprzetworzone* tabs; a request still
+running has *Anuluj*. The texts are VS's own (WebTools' Rest editor). Not like VS (yet): no request list (F4), no
+Azure Key Vault or user secrets in environments.
+
 ## SQL
 
 `.sql` files are query windows as in SQL Server Management Studio 22: T-SQL IntelliSense from the database the window
@@ -551,7 +565,7 @@ Runs the checks in `test/suite.js` in a real editor against a real solution (wri
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 ```
 
-`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_NUGET`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES`, `SKIP_PROPERTIES`, `SKIP_PROPERTIES_WINDOW`, `SKIP_CONFIGURATION_MANAGER` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
+`SKIP_DEBUG=1` skips the debugging check (`SKIP_SEARCH`, `SKIP_EVERYWHERE`, `SKIP_NUGET`, `SKIP_LAUNCH`, `SKIP_TASK_RUNNER`, `SKIP_MICROSOFT`, `SKIP_THEMES`, `SKIP_PROPERTIES`, `SKIP_PROPERTIES_WINDOW`, `SKIP_CONFIGURATION_MANAGER`, `SKIP_HTTP` the others); `CHECKS_FILE=checks.json` replaces the checks. The checks name a sample
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.

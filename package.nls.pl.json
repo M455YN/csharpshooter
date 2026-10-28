@@ -125,5 +125,7 @@
   "command.sql.changeConnection": "Zmień połączenie...",
   "command.sqlExplorer.filter": "Ustawienia filtru...",
   "command.sqlExplorer.clearFilter": "Usuń filtr",
-  "editor.sql": "Edytor SQL"
+  "editor.sql": "Edytor SQL",
+  "command.http.send": "Wyślij żądanie",
+  "command.http.environment": "Wybierz środowisko HTTP"
 }

@@ -478,6 +478,17 @@
         "category": "%category.Solution%"
       },
       {
+        "command": "csharpShooter.http.send",
+        "title": "%command.http.send%",
+        "category": "HTTP",
+        "icon": "$(play)"
+      },
+      {
+        "command": "csharpShooter.http.environment",
+        "title": "%command.http.environment%",
+        "category": "HTTP"
+      },
+      {
         "command": "csharpShooter.configurationManager",
         "title": "%command.configurationManager%",
         "category": "%category.Solution%"
@@ -1650,6 +1661,16 @@
         "when": "!inDebugMode || debugType == 'csharpshooter'"
       },
       {
+        "key": "f6",
+        "command": "csharpShooter.http.environment",
+        "when": "editorLangId == http && config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+alt+s",
+        "command": "csharpShooter.http.send",
+        "when": "editorLangId == http"
+      },
+      {
         "key": "f5",
         "command": "csharpShooter.startup.start",
         "when": "!inDebugMode"
@@ -1727,6 +1748,18 @@
     ],
     "languages": [
       {
+        "id": "http",
+        "aliases": [
+          "HTTP",
+          "REST"
+        ],
+        "extensions": [
+          ".http",
+          ".rest"
+        ],
+        "configuration": "./syntaxes/http.language-configuration.json"
+      },
+      {
         "id": "aspnetcorerazor",
         "aliases": [
           "ASP.NET Razor",
@@ -1744,6 +1777,17 @@
       }
     ],
     "grammars": [
+      {
+        "language": "http",
+        "scopeName": "source.http",
+        "path": "./syntaxes/http.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.json": "json",
+          "text.xml": "xml",
+          "source.shell": "shellscript",
+          "source.graphql": "graphql"
+        }
+      },
       {
         "language": "aspnetcorerazor",
         "scopeName": "text.aspnetcorerazor",

@@ -21,6 +21,7 @@ const { registerTaskRunner } = require('./task-runner');
 const { registerStartup } = require('./startup');
 const { registerTestExplorer } = require('./test-explorer');
 const { registerSql } = require('./sql');
+const { registerHttpFiles } = require('./http-file');
 const { launchProgress } = require('./build-progress');
 const { readSolution } = require('./solution');
 const { TranslatingAdapter } = require('./debug-l10n');
@@ -371,11 +372,12 @@ async function activate(context) {
   solutionView.provider.startup = startup.startup;
   const configurationManager = registerConfigurationManager(context, findSolution, startup.startup);
   const sql = registerSql(context);
+  const httpFiles = registerHttpFiles(context);
   const markStartup = async () => solutionView.provider.setStartup(await startup.startup.project());
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, sql, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, httpFiles, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, sql, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {

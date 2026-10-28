@@ -4,8 +4,8 @@ CSharpShooter bundles two programs it did not write, and one file; some of its c
 
 ## The .NET debugger (`debugger/`)
 
-The debug adapter of [Passenger](https://github.com/Zaneris/passenger), its main after 0.2.0, ported to .NET 10 by
-`debugger-port/net10.patch` (commit `39a3600`). Its licence and the notices for what it carries in turn are copied beside it by
+The debug adapter of [Passenger](https://github.com/Zaneris/passenger), its main on the way to 0.2.3, ported to .NET 10 by
+`debugger-port/net10.patch` (commit `b9aee83`). Its licence and the notices for what it carries in turn are copied beside it by
 `scripts/build-debugger.ps1` (`debugger/LICENSE.Passenger.txt`, `debugger/THIRD_PARTY_NOTICES.Passenger.md`).
 
 ```
@@ -70,6 +70,12 @@ How an .sln's and an .slnx's configurations are read and written, ported from Mi
 [vs-solutionpersistence](https://github.com/microsoft/vs-solutionpersistence) (`ConfigurationRuleFollower`,
 `SolutionConfigurationMap`'s rules, `ProjectTypeTable.BuiltInTypes`, the .sln writer's `ProjectConfigurationPlatforms`).
 MIT License, Copyright (c) Microsoft Corporation; the licence text is the MIT one above.
+
+## The HTTP grammar (`syntaxes/http.tmLanguage.json`, `syntaxes/http.language-configuration.json`)
+
+REST Client's TextMate grammar and language configuration for `.http` and `.rest` files
+([Huachao/vscode-restclient](https://github.com/Huachao/vscode-restclient), `syntaxes/`), unchanged. MIT License,
+Copyright (c) 2016 - present Huachao Mao; the licence text is the MIT one above.
 
 ## The Razor grammar (`syntaxes/aspnetcorerazor.tmLanguage.json`)
 

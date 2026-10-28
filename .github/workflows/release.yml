@@ -55,6 +55,9 @@ jobs:
       - name: Properties window (file, folder and project rules; project-file edits)
         run: node test/item-properties.js
 
+      - name: .http files (requests, variables, environments)
+        run: node test/http-requests.js
+
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js 5.11.0 win-x64
 

@@ -1633,6 +1633,46 @@ async function upToDateChecks(api, projectPath) {
   return results;
 }
 
+// An .http file as VS 2026's HTTP editor has it: HTTP, "Wyślij żądanie" above each request, a request sent with the file's
+// variables and the chosen HTTP environment, its response in the "Odpowiedź" panel. A file and server of the test's own.
+async function httpFileChecks(api) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const http = require('http');
+  const os = require('os');
+  const server = http.createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ path: req.url, token: req.headers['x-token'] || null }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shooter-http-'));
+  const file = path.join(dir, 'api.http');
+  fs.writeFileSync(path.join(dir, 'http-client.env.json'), JSON.stringify({ dev: { token: 'from-dev' } }));
+  fs.writeFileSync(file, `@host = http://127.0.0.1:${server.address().port}\n\nGET {{host}}/items/1\nX-Token: {{token}}\n\n###\n\nGET {{host}}/missing/{{nothing}}\n`);
+  try {
+    const doc = await vscode.workspace.openTextDocument(file);
+    await vscode.window.showTextDocument(doc);
+    const lenses = (await vscode.commands.executeCommand('vscode.executeCodeLensProvider', doc.uri)) || [];
+    const titles = lenses.filter((l) => l.command?.command === 'csharpShooter.http.send').map((l) => `${l.range.start.line}:${l.command.title}`);
+    expect('an .http file is HTTP, with "Wyślij żądanie" above each request', doc.languageId === 'http' && titles.join() === '2:$(play) Wyślij żądanie,7:$(play) Wyślij żądanie', `${doc.languageId}: ${titles.join(' | ')}`);
+    await vscode.commands.executeCommand('csharpShooter.http.environment', 'dev');
+    const sent = await vscode.commands.executeCommand('csharpShooter.http.send', doc.uri, 2);
+    expect('sent with the file\'s variables and the HTTP environment\'s, the response read', sent?.response?.status === 200 && JSON.parse(sent.response.body).token === 'from-dev' && JSON.parse(sent.response.body).path === '/items/1',
+      JSON.stringify(sent?.response ? { status: sent.response.status, body: sent.response.body } : sent));
+    const failed = await vscode.commands.executeCommand('csharpShooter.http.send', doc.uri, 7);
+    expect('an undefined variable is said as VS says it', failed?.error === 'Zmienna „nothing” nie jest zdefiniowana.', failed?.error);
+    await sleep(1000); // the panel's tab, once the window has drawn it
+    const tab = vscode.window.tabGroups.all.flatMap((g) => g.tabs).find((t) => t.label === 'Odpowiedź');
+    expect('the response panel beside the file', !!tab, vscode.window.tabGroups.all.flatMap((g) => g.tabs).map((t) => t.label).join(', '));
+    await vscode.commands.executeCommand('csharpShooter.http.environment', '');
+  } finally {
+    server.close();
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  return results;
+}
+
 // Roslyn's References CodeLens above a member, clicked: its client command roslyn.client.peekReferences opens the
 // references in a peek, as many as the lens counts.
 async function referencesLensChecks() {
@@ -1857,6 +1897,12 @@ async function run() {
     for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.http || (!process.env.CHECKS_FILE && process.env.SKIP_HTTP !== '1')) {
+    for (const r of await httpFileChecks(api)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  .http: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.upToDate || (!process.env.CHECKS_FILE && process.env.SKIP_UP_TO_DATE !== '1')) {
