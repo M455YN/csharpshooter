@@ -58,6 +58,12 @@ jobs:
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js 5.11.0 win-x64
 
+      - name: SQL Tools Service (.sql IntelliSense and connections, win-x64)
+        run: node scripts/fetch-sqltools.js 6.0.20261023.1 win-x64
+
+      - name: Monaco editor (the SQL editor page)
+        run: node scripts/fetch-monaco.js 0.55.1
+
       - name: Debugger (Passenger for .NET 10, win-x64)
         shell: pwsh
         run: ./scripts/build-debugger.ps1 -Runtime win-x64
