@@ -4,6 +4,12 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-10-28
+
+### Added
+
+- An `IISExpress` launch profile runs under IIS Express, as Visual Studio 2026 runs it, when IIS Express is installed. The site goes into the solution's `.vs/<solution>/config/applicationhost.config` (Visual Studio's own file) with the bindings of `iisSettings.iisExpress` and the `windowsAuthentication` and `anonymousAuthentication` of `iisSettings`, so Windows authentication (Negotiate/NTLM) works as under Visual Studio. The project folder's `web.config` hands requests to `AspNetCoreModuleV2`, which starts the built app with the profile's environment variables. The debugger attaches to `iisexpress.exe` (in-process hosting) as the runtime starts, so breakpoints in `Startup` are hit, or to the module's child process (out-of-process hosting). Stopping debugging ends IIS Express. Without IIS Express the profile still runs on Kestrel at the IIS Express URLs.
+
 ## [0.4.1] - 2026-10-27
 
 ### Changed
