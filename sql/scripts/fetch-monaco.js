@@ -36,6 +36,16 @@ function download(from, to) {
   for (const f of fs.readdirSync(path.join(to, 'vs', 'assets'))) {
     if (/^(ts|css|html|json)\.worker/.test(f)) fs.rmSync(path.join(to, 'vs', 'assets', f));
   }
+  // Nor the other languages' code, which Monaco loads only once a model of that language is made: each chunk its
+  // registrations name ("../abap-D-t0cyap", "../cssMode-…"), all but SQL's (vsce warned of 116 JavaScript files).
+  const vs = path.join(to, 'vs');
+  const registrations = [path.join(vs, 'basic-languages', 'monaco.contribution.js'),
+    ...fs.readdirSync(path.join(vs, 'language')).map((l) => path.join(vs, 'language', l, 'monaco.contribution.js'))].filter((f) => fs.existsSync(f));
+  for (const file of registrations) {
+    for (const [, chunk] of fs.readFileSync(file, 'utf8').matchAll(/"\.\.\/(?:\.\.\/)?([A-Za-z0-9_]+-[A-Za-z0-9_-]{8})"/g)) {
+      if (!/^sql-/.test(chunk) && fs.existsSync(path.join(vs, `${chunk}.js`))) fs.rmSync(path.join(vs, `${chunk}.js`));
+    }
+  }
   fs.rmSync(work, { recursive: true, force: true });
   console.log(`Monaco ${version} in ${to}`);
 })().catch((e) => { console.error(e.message); process.exit(1); });
