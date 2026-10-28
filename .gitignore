@@ -1,6 +1,7 @@
 node_modules/
 # Fetched and built, not sources: npm run fetch-server, scripts/build-debugger.ps1, scripts/build-testbridge.ps1
 server/
+sqltools/
 debugger/
 testbridge/bin/
 testbridge/obj/
@@ -11,3 +12,4 @@ testbridge/out/
 test/names.local.json
 # npm run bundle
 dist/
+media/monaco/

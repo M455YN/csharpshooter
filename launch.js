@@ -14,14 +14,17 @@ const iisExpress = require('./iis-express');
 
 const TYPE = 'csharpshooter';
 
-/** launchSettings.json as JSON, which allows comments and trailing commas as VS writes and reads it. */
+/** JSON with comments and trailing commas, as VS writes and reads launchSettings.json and appsettings.json. */
+function parseJsonc(text) {
+  return JSON.parse(text.replace(/^\uFEFF/, '')
+    .replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str || '')
+    .replace(/,(\s*[}\]])/g, '$1'));
+}
+
 function readLaunchSettings(project) {
   const file = path.join(path.dirname(project), 'Properties', 'launchSettings.json');
   if (!fs.existsSync(file)) return null;
-  const text = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')
-    .replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str || '')
-    .replace(/,(\s*[}\]])/g, '$1');
-  return JSON.parse(text);
+  return parseJsonc(fs.readFileSync(file, 'utf8'));
 }
 
 /** Profiles that run the project: Project on Kestrel, IISExpress under IIS Express as VS runs it (iis-express.js), or on
@@ -594,4 +597,4 @@ function registerLaunch(context) {
   return { provider, state, running, onDidChangeRunning: state.changed.event, runnableProfiles, runnableProjects };
 }
 
-module.exports = { registerLaunch, readLaunchSettings, runnableProfiles, runnableProjects, urlsOf };
+module.exports = { registerLaunch, readLaunchSettings, parseJsonc, runnableProfiles, runnableProjects, urlsOf };

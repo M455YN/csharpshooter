@@ -20,6 +20,8 @@ const { runTests } = require('@vscode/test-electron');
     'csharpShooter.launchProfilesInLaunchJson': process.env.LAUNCH_PROFILES === 'always' ? 'always' : 'never',
     // The checks read Visual Studio's Polish texts; one of them switches to English and back.
     'csharpShooter.uiLanguage': 'pl',
+    // .sql files open in VS Code's text editor for the checks; the SQL editor page has its own, opened with openWith.
+    'workbench.editorAssociations': { '*.sql': 'default' },
   }));
   const launchJson = path.join(workspace, '.vscode', 'launch.json');
   const launchBefore = fs.existsSync(launchJson) ? fs.readFileSync(launchJson) : null;

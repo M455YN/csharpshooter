@@ -39,6 +39,23 @@ Microsoft's `roslyn-language-server` package from nuget.org, under MIT, with its
 `Microsoft.VisualStudio.Telemetry` and `Microsoft.VisualStudio.Utilities.Internal`, under Microsoft's Visual Studio
 licence terms; Razor's support loads them, and the server runs with `--telemetryLevel off`.
 
+## The SQL Tools Service (`sqltools/`)
+
+Microsoft's [sqltoolsservice](https://github.com/microsoft/sqltoolsservice) release `Microsoft.SqlTools.ServiceLayer`
+(win-x64, net10.0), under MIT, Copyright (c) Microsoft Corporation, with its own `sqltools/Notice.txt` for what it
+carries (SqlClient, SMO and ScriptDom under MIT, DacFx under Microsoft's DacFx licence terms, which allow it to be
+distributed with an application). `scripts/fetch-sqltools.js` leaves out its own copy of .NET, the migration tool and
+the texts of languages other than English and Polish. The Connect dialog of `.sql` files (`sql-connect-dialog.js`) is laid out as SQL Server Management Studio 22's, with
+its words for the same things (`Microsoft.SqlServer.ConnectionDlg.UI` and `SqlEditors` resources) in Polish and English;
+no SSMS code or file ships with this extension, and SSMS's `RegSrvr17.xml` is only read where SSMS is installed.
+
+## The Monaco editor (`media/monaco/`)
+
+Microsoft's [monaco-editor](https://github.com/microsoft/monaco-editor) 0.55.1 from npm (its `min/vs`), under MIT,
+Copyright (c) 2016 - present Microsoft Corporation, with its licence in `media/monaco/LICENSE` (copied by
+`scripts/fetch-monaco.js`). The SQL editor page's layout follows [vsc-ms-sql-manager](https://github.com/jakubkozera/vsc-ms-sql-manager)
+(MIT, Copyright (c) Jakub Kozera); none of its code is copied.
+
 ## The project Properties page's and Properties window's rules (`rules/`, `rules/pl/`)
 
 The XAML rules of the .NET project system's property pages ([dotnet/project-system](https://github.com/dotnet/project-system),

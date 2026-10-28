@@ -37,7 +37,9 @@
     "onDebugInitialConfigurations",
     "onDebugResolve:coreclr",
     "onDebugResolve:dotnet",
-    "workspaceContains:**/[gG]ulpfile.js"
+    "workspaceContains:**/[gG]ulpfile.js",
+    "onLanguage:sql",
+    "onCustomEditor:csharpShooter.sqlEditor"
   ],
   "contributes": {
     "configuration": {
@@ -57,6 +59,11 @@
           "type": "string",
           "default": "",
           "description": "%config.debuggerPath%"
+        },
+        "csharpShooter.sqlToolsPath": {
+          "type": "string",
+          "default": "",
+          "description": "%config.sqlToolsPath%"
         },
         "csharpShooter.razorViewsInDesignTime": {
           "type": "boolean",
@@ -136,6 +143,11 @@
           "id": "csharpShooter",
           "title": "%container.solutionExplorer%",
           "icon": "media/solution-explorer.svg"
+        },
+        {
+          "id": "csharpShooterSql",
+          "title": "%container.sqlObjectExplorer%",
+          "icon": "media/sql-server-explorer.svg"
         }
       ],
       "panel": [
@@ -148,6 +160,11 @@
           "id": "csharpShooterTaskRunner",
           "title": "%view.taskRunner%",
           "icon": "media/task-runner.svg"
+        },
+        {
+          "id": "csharpShooterSqlResults",
+          "title": "%view.sqlResults%",
+          "icon": "media/sql-results.svg"
         }
       ]
     },
@@ -170,6 +187,13 @@
           "id": "csharpShooter.propertiesWindow",
           "name": "%view.propertiesWindow%",
           "initialSize": 8
+        }
+      ],
+      "csharpShooterSql": [
+        {
+          "id": "csharpShooter.sqlObjectExplorer",
+          "name": "%view.sqlObjectExplorer%",
+          "icon": "media/sql-server.svg"
         }
       ],
       "csharpShooterTaskRunner": [
@@ -198,6 +222,14 @@
           "id": "csharpShooter.testDetails",
           "name": "%view.testDetails%",
           "initialSize": 2
+        }
+      ],
+      "csharpShooterSqlResults": [
+        {
+          "type": "webview",
+          "id": "csharpShooter.sqlResults",
+          "name": "%view.sqlResults%",
+          "when": "csharpShooter.sqlResultsInPanel"
         }
       ]
     },
@@ -548,6 +580,99 @@
         "command": "csharpShooter.tests.goToTest",
         "title": "%command.tests.goToTest%",
         "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.sql.connect",
+        "title": "%command.sql.connect%",
+        "icon": "$(plug)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.disconnect",
+        "title": "%command.sql.disconnect%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.changeDatabase",
+        "title": "%command.sql.changeDatabase%",
+        "icon": "$(database)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.newQuery",
+        "title": "%command.sql.newQuery%",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.execute",
+        "title": "%command.sql.execute%",
+        "icon": "$(play)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.cancelQuery",
+        "title": "%command.sql.cancelQuery%",
+        "icon": "$(debug-stop)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.addServer",
+        "title": "%command.sqlExplorer.addServer%",
+        "icon": "$(add)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.refresh",
+        "title": "%command.sqlExplorer.refresh%",
+        "icon": "$(refresh)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.newQuery",
+        "title": "%command.sql.newQuery%",
+        "icon": "$(new-file)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.selectTop",
+        "title": "%command.sqlExplorer.selectTop%",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.disconnect",
+        "title": "%command.sql.disconnect%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.remove",
+        "title": "%command.sqlExplorer.remove%",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.parse",
+        "title": "%command.sql.parse%",
+        "icon": "$(check)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.changeConnection",
+        "title": "%command.sql.changeConnection%",
+        "icon": "$(arrow-swap)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.filter",
+        "title": "%command.sqlExplorer.filter%",
+        "icon": "$(filter)",
+        "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sqlExplorer.clearFilter",
+        "title": "%command.sqlExplorer.clearFilter%",
+        "icon": "$(clear-all)",
+        "category": "%category.Sql%"
       }
     ],
     "menus": {
@@ -621,6 +746,16 @@
           "command": "csharpShooter.tests.clearResults",
           "when": "view == csharpShooter.testExplorer",
           "group": "2_results@1"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.addServer",
+          "when": "view == csharpShooter.sqlObjectExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.refresh",
+          "when": "view == csharpShooter.sqlObjectExplorer",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -778,6 +913,51 @@
           "command": "csharpShooter.tests.goToTest",
           "when": "view == csharpShooter.testExplorer && viewItem == test",
           "group": "2_navigate@1"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.addServer",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem == sqlRoot",
+          "group": "1_add"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.newQuery",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem =~ /^sqlServer|^sqlNode (Database|Table|View|StoredProcedure|ScalarValuedFunction|TableValuedFunction|Folder)$/",
+          "group": "1_query@1"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.selectTop",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem =~ /^sqlNode (Table|View)$/",
+          "group": "1_query@2"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.refresh",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem =~ /^sql(Server|Node)/",
+          "group": "8_refresh"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.disconnect",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem == 'sqlServer connected'",
+          "group": "9_server@1"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.remove",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem =~ /^sqlServer/",
+          "group": "9_server@2"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.filter",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem =~ / filterable/",
+          "group": "2_filter@1"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.clearFilter",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem =~ / filtered/",
+          "group": "2_filter@2"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.filter",
+          "when": "view == csharpShooter.sqlObjectExplorer && viewItem =~ / filterable/",
+          "group": "inline"
         }
       ],
       "csharpShooter.solution.add": [
@@ -894,6 +1074,58 @@
         {
           "command": "csharpShooter.solution.manageNuGet",
           "when": "false"
+        },
+        {
+          "command": "csharpShooter.sql.connect",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "csharpShooter.sql.disconnect",
+          "when": "editorLangId == sql && csharpShooter.sqlConnected"
+        },
+        {
+          "command": "csharpShooter.sql.changeDatabase",
+          "when": "editorLangId == sql && csharpShooter.sqlConnected"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.newQuery",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.selectTop",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.disconnect",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.remove",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.sql.execute",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "csharpShooter.sql.cancelQuery",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "csharpShooter.sql.parse",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "csharpShooter.sql.changeConnection",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.filter",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.sqlExplorer.clearFilter",
+          "when": "false"
         }
       ],
       "csharpShooter.taskRunner.bindings": [
@@ -948,6 +1180,38 @@
           "command": "csharpShooter.visualizeData",
           "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "csharpShooter.sql.execute",
+          "when": "editorLangId == sql && !csharpShooter.sqlRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "csharpShooter.sql.cancelQuery",
+          "when": "editorLangId == sql && csharpShooter.sqlRunning",
+          "group": "navigation@2"
+        },
+        {
+          "command": "csharpShooter.sql.parse",
+          "when": "editorLangId == sql",
+          "group": "navigation@3"
+        },
+        {
+          "command": "csharpShooter.sql.connect",
+          "when": "editorLangId == sql && !csharpShooter.sqlConnected",
+          "group": "navigation@4"
+        },
+        {
+          "command": "csharpShooter.sql.disconnect",
+          "when": "editorLangId == sql && csharpShooter.sqlConnected",
+          "group": "navigation@5"
+        },
+        {
+          "command": "csharpShooter.sql.changeConnection",
+          "when": "editorLangId == sql && csharpShooter.sqlConnected",
+          "group": "navigation@6"
         }
       ]
     },
@@ -1439,6 +1703,26 @@
         "key": "ctrl+r f",
         "command": "csharpShooter.tests.runFailed",
         "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+shift+e",
+        "command": "csharpShooter.sql.execute",
+        "when": "editorLangId == sql && editorTextFocus"
+      },
+      {
+        "key": "f5",
+        "command": "csharpShooter.sql.execute",
+        "when": "editorLangId == sql && editorTextFocus"
+      },
+      {
+        "key": "alt+pausebreak",
+        "command": "csharpShooter.sql.cancelQuery",
+        "when": "editorLangId == sql"
+      },
+      {
+        "key": "ctrl+f5",
+        "command": "csharpShooter.sql.parse",
+        "when": "editorLangId == sql && editorTextFocus"
       }
     ],
     "languages": [
@@ -1535,6 +1819,9 @@
           "comments": "off",
           "strings": "on"
         }
+      },
+      "[sql]": {
+        "editor.codeLensFontSize": 14
       }
     },
     "themes": [
@@ -1548,10 +1835,24 @@
         "uiTheme": "vs",
         "path": "./themes/visual-studio-2026-light-color-theme.json"
       }
+    ],
+    "customEditors": [
+      {
+        "viewType": "csharpShooter.sqlEditor",
+        "displayName": "%editor.sql%",
+        "selector": [
+          {
+            "filenamePattern": "*.sql"
+          }
+        ],
+        "priority": "default"
+      }
     ]
   },
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",
+    "fetch-sqltools": "node scripts/fetch-sqltools.js",
+    "fetch-monaco": "node scripts/fetch-monaco.js",
     "build-testbridge": "powershell -NoProfile -File scripts/build-testbridge.ps1",
     "test": "node test/runTest.js",
     "check-l10n": "node test/l10n.js",
