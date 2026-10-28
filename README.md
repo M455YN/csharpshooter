@@ -205,7 +205,8 @@ same copy again is no change. A file saved during the build makes the next start
 is passed over: VS reads it, but a project that sets it only wants its build steps on every build, which a start with
 nothing changed has no need of. A start while another build runs (the Solution Explorer's, another start's, a
 `tasks.json` `dotnet build`, the NuGet page's) waits for it to end (*Oczekiwanie na zakończenie trwającej kompilacji…*),
-then checks.
+then checks. A Build or Rebuild in the Solution Explorer that succeeds counts as a start's own build (as Passenger 0.2.3's
+launch after a Build), so F5 right after it builds nothing.
 
 The Run and Debug dropdown lists only `launch.json`'s configurations (an extension's own wait behind *.NET
 (CSharpShooter)...* in Select and Start Debugging), so CSharpShooter offers, once per workspace, to add one entry to

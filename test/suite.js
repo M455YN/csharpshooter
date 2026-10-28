@@ -1617,6 +1617,19 @@ async function upToDateChecks(api, projectPath) {
   const waited = await start();
   expect('a start while a dotnet build runs waits for it, then starts', endedFirst && waited.build?.ok && waited.lines[0]?.startsWith('Oczekiwanie na zakończenie trwającej kompilacji'),
     `build ended first ${endedFirst}, ${JSON.stringify(waited.build)}: ${waited.lines.join(' | ')}`);
+  // The Solution Explorer's Build of the project, after a change: the start right after it builds nothing. The app the
+  // last start left running goes first, as it would hold the files the Build writes (VS's Build fails on them too).
+  if (process.platform === 'win32') {
+    const name = path.basename(project, '.csproj').toLowerCase().replace(/'/g, "''");
+    require('child_process').execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+      `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID } | Where-Object { ($_.ExecutablePath -and $_.ExecutablePath.ToLower().EndsWith('\\${name}.exe')) -or ($_.CommandLine -and $_.CommandLine.ToLower().Contains('\\${name}.dll')) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Wait-Process -Id $_.ProcessId -Timeout 15 -ErrorAction SilentlyContinue }`]);
+  }
+  const later = new Date(Date.now() + 2000);
+  fs.utimesSync(source, later, later);
+  await vscode.commands.executeCommand('csharpShooter.solution.build', { kind: 'project', file: project, label: path.basename(project, '.csproj') });
+  const afterBuild = await start();
+  expect("F5 right after the Solution Explorer's Build: no build, \"aktualne\"", afterBuild.build?.ok && afterBuild.build.upToDate && afterBuild.lines.some((l) => l.startsWith('Kompilacja: aktualne')),
+    `${JSON.stringify(afterBuild.build)} in ${afterBuild.seconds} s: ${afterBuild.lines.join(' | ')}`);
   return results;
 }
 

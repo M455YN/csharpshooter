@@ -597,4 +597,29 @@ function registerLaunch(context) {
   return { provider, state, running, onDidChangeRunning: state.changed.event, runnableProfiles, runnableProjects };
 }
 
-module.exports = { registerLaunch, readLaunchSettings, parseJsonc, runnableProfiles, runnableProjects, urlsOf };
+/** A Build or Rebuild made outside a start (the Solution Explorer's): its projects checked before it and, once it succeeds,
+ *  kept as a start's own build is, so F5 right after it builds nothing (as Passenger 0.2.3's launch after a Build). A file
+ *  of a project saved while it builds, or a build that fails, keeps nothing. */
+async function keepBuild(projects, startup) {
+  const kept = [];
+  for (const project of projects) {
+    const settings = (await startup?.buildSettings(project)) || { configuration: 'Debug' };
+    const checked = await upToDate.check(project, settings, startup?.framework(project));
+    const saves = vscode.workspace.onDidSaveTextDocument((d) => upToDate.reads(checked, d.uri.fsPath) && (checked.savedMeanwhile = true));
+    kept.push({ project, settings, checked, saves });
+  }
+  return async (ok) => {
+    for (const { project, settings, checked, saves } of kept) {
+      saves.dispose();
+      let stands = false;
+      try {
+        stands = ok && !checked.savedMeanwhile && upToDate.built(checked, await msbuildProperties(project, settings, startup?.framework(project)));
+      } catch {
+        // its properties unreadable: nothing kept
+      }
+      if (!stands) upToDate.forget(checked);
+    }
+  };
+}
+
+module.exports = { registerLaunch, readLaunchSettings, parseJsonc, runnableProfiles, runnableProjects, urlsOf, keepBuild };

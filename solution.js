@@ -416,8 +416,16 @@ function registerSolutionView(context, findSolution) {
   const register = (id, fn) => context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   register('csharpShooter.solution.refresh', () => provider.refresh());
-  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', async () => buildTask(`build ${item.label}`, ['build', target(item), ...(await settings(item))], path.dirname(target(item))), 'AfterBuild'));
-  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', async () => buildTask(`rebuild ${item.label}`, ['build', '--no-incremental', target(item), ...(await settings(item))], path.dirname(target(item))), 'AfterBuild'));
+  // What it built kept as F5's own build (the project, or each runnable project of the solution), so F5 after it builds nothing.
+  const kept = async (item, args) => {
+    const { keepBuild, runnableProjects } = require('./launch');
+    const done = await keepBuild(item.kind === 'project' ? [item.file] : await runnableProjects(), provider.startup);
+    const code = await buildTask(...args);
+    await done(code === 0);
+    return code;
+  };
+  register('csharpShooter.solution.build', (item) => bound(item, 'BeforeBuild', async () => kept(item, [`build ${item.label}`, ['build', target(item), ...(await settings(item))], path.dirname(target(item))]), 'AfterBuild'));
+  register('csharpShooter.solution.rebuild', (item) => bound(item, 'BeforeBuild', async () => kept(item, [`rebuild ${item.label}`, ['build', '--no-incremental', target(item), ...(await settings(item))], path.dirname(target(item))]), 'AfterBuild'));
   register('csharpShooter.solution.clean', (item) => bound(item, 'Clean', () => terminalTask(`clean ${item.label}`, `dotnet clean "${target(item)}"`, path.dirname(target(item)))));
   // Opublikuj, as VS's folder publish: a profile of the project's (Properties/PublishProfiles/*.pubxml) or a new one, then
   // dotnet publish with it. The configuration is given on the command line (the SDK does not take it from a profile, as
