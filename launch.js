@@ -10,6 +10,7 @@ const { execFile } = require('child_process');
 const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
 const { buildArgs } = require('./startup');
 const upToDate = require('./up-to-date');
+const iisExpress = require('./iis-express');
 
 const TYPE = 'csharpshooter';
 
@@ -23,8 +24,9 @@ function readLaunchSettings(project) {
   return JSON.parse(text);
 }
 
-/** Profiles that run the project: Project as Kestrel, IISExpress also as Kestrel on the IIS Express URLs, since IIS
- *  Express runs only under Visual Studio. Executable, Docker and the rest are not this debugger's. */
+/** Profiles that run the project: Project on Kestrel, IISExpress under IIS Express as VS runs it (iis-express.js), or on
+ *  Kestrel at the IIS Express URLs where IIS Express is not installed. Executable, Docker and the rest are not this
+ *  debugger's. */
 function runnableProfiles(project) {
   const settings = readLaunchSettings(project);
   return Object.entries(settings?.profiles || {})
@@ -45,7 +47,7 @@ function urlsOf({ profile, iis }) {
 function msbuildProperties(project, settings, framework) {
   return new Promise((resolve, reject) => {
     // IntermediateOutputPath and CleanFile: where the build lists what it wrote, which the up-to-date check keeps.
-    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', '-getProperty:IntermediateOutputPath', '-getProperty:CleanFile', `-p:Configuration=${settings.configuration}`,
+    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', '-getProperty:IntermediateOutputPath', '-getProperty:CleanFile', '-getProperty:AspNetCoreHostingModel', `-p:Configuration=${settings.configuration}`,
       ...buildArgs(settings).filter((a) => a.startsWith('-p:')),
       ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
       { cwd: path.dirname(project), windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
@@ -200,6 +202,10 @@ class LaunchProfiles {
     // the session, and gives up when the session ends under it.
     const live = [...(state.sessions || [])].some((s) => s.configuration.project && path.resolve(s.configuration.project).toLowerCase() === key);
     state.lastStopped = live ? [] : await stopRunning(state.programs.get(key));
+    // Its IIS Express, whose in-process app holds the build's files, from a start before or one VS Code left going.
+    if (!live && iisExpress.available() && runnableProfiles(project).some((p) => p.profile.commandName === 'IISExpress')) {
+      state.lastStopped.push(...(await iisExpress.stopFor(project)));
+    }
     // What it is doing, at the bottom right, until the browser opens (or the start is done when there is none to wait for).
     const progress = launchProgress(config.name || path.basename(project, '.csproj'));
     state.lastProgress = progress;
@@ -252,6 +258,7 @@ class LaunchProfiles {
       vscode.window.showErrorMessage(t('No launch profile "{0}" in {1} that runs here.', config.launchProfile, path.basename(project)));
       return undefined;
     }
+    if (entry?.profile.commandName === 'IISExpress' && iisExpress.available()) return this.launchIisExpress(config, project, entry, props, progress, handOver);
     const profile = entry?.profile || {};
     const urls = entry ? urlsOf(entry) : [];
     const env = { ...(profile.environmentVariables || {}), ...(config.env || {}) };
@@ -288,6 +295,86 @@ class LaunchProfiles {
     }
     return resolved;
   }
+
+  /** An IISExpress profile as VS runs it: the site written into applicationhost.config, iisexpress.exe started in a task
+   *  (its console the task's terminal, as VS's tray icon shows it), and the debugger attached to the app: in-process to
+   *  iisexpress.exe itself, which Passenger takes hold of as the module starts its runtime (the browser's first request),
+   *  so breakpoints in Startup are hit; out of process to the module's child, once a request has started it. */
+  async launchIisExpress(config, project, entry, props, progress, handOver) {
+    const state = this.state;
+    const { file, site, pool } = iisExpress.writeConfig(project, readLaunchSettings(project).iisSettings);
+    const model = iisExpress.webConfig(project, props);
+    const program = config.program || props.TargetPath;
+    const env = { ...(entry.profile.environmentVariables || {}), ...(config.env || {}), ...iisExpress.launcher(program) };
+    const urls = urlsOf(entry);
+    const portBusy = urls[0] && (await accepts(urls[0]));
+    if (portBusy) vscode.window.showWarningMessage(t('{0} is already in use by another process; {1} may not start there.', urls[0], path.basename(project, '.csproj')));
+    const browser = entry.profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: entry.profile.launchUrl || '', portBusy } : undefined;
+    if (progress.token.isCancellationRequested) return undefined;
+    progress.report(t('Starting IIS Express…'));
+    const id = String((state.iisExpressIds = (state.iisExpressIds || 0) + 1));
+    const label = config.name || path.basename(project, '.csproj');
+    const task = new vscode.Task({ type: 'process', task: label, iisExpress: id }, vscode.TaskScope.Workspace, `${label} (IIS Express)`, 'CSharpShooter',
+      new vscode.ProcessExecution(iisExpress.EXE, [`/config:${file}`, `/site:${site}`, `/apppool:${pool}`], { cwd: path.dirname(project), env }));
+    task.presentationOptions = { reveal: config.noDebug ? vscode.TaskRevealKind.Always : vscode.TaskRevealKind.Silent, panel: vscode.TaskPanelKind.Dedicated, clear: true };
+    task.isBackground = true;
+    // Its process id, which may be told before executeTask answers: the events are kept until the execution is known.
+    const seen = [];
+    let check;
+    const subscriptions = [
+      vscode.tasks.onDidStartTaskProcess((e) => (seen.push({ execution: e.execution, pid: e.processId }), check?.())),
+      vscode.tasks.onDidEndTask((e) => (seen.push({ execution: e.execution, pid: undefined }), check?.())),
+    ];
+    const execution = await vscode.tasks.executeTask(task);
+    const pid = await new Promise((resolve) => {
+      check = () => {
+        const event = seen.find((s) => s.execution === execution);
+        if (event) resolve(event.pid);
+      };
+      check();
+    }).finally(() => subscriptions.forEach((s) => s.dispose()));
+    (state.iisExpress ||= new Map()).set(id, execution);
+    state.lastIisExpress = { file, site, pool, model, pid };
+    if (!pid) {
+      vscode.window.showErrorMessage(t('IIS Express did not start {0}; see its terminal.', site));
+      return undefined;
+    }
+    this.state.programs.set(project.toLowerCase(), program);
+    if (config.noDebug) {
+      handOver();
+      state.lastRunWithoutDebugging = { name: label, execution };
+      try {
+        await openWhenListening(browser, execution, state, progress);
+      } finally {
+        progress.done();
+      }
+      return undefined;
+    }
+    let processId = pid;
+    if (model === 'outofprocess') {
+      progress.report(t('Starting {0} in IIS Express…', path.basename(project, '.csproj')));
+      await iisExpress.request(urls[0]);
+      processId = await iisExpress.child(pid);
+      if (!processId) {
+        execution.terminate();
+        vscode.window.showErrorMessage(t('IIS Express did not start {0} out of process; see its terminal.', path.basename(project, '.csproj')));
+        return undefined;
+      }
+    }
+    if (progress.token.isCancellationRequested) {
+      execution.terminate();
+      return undefined;
+    }
+    progress.report(t('Starting with the debugger…'));
+    const resolved = { ...config, request: 'attach', processId, __iisExpress: id, __browser: browser };
+    if (browser?.base && !portBusy) {
+      handOver();
+      const progressId = String((state.progressIds = (state.progressIds || 0) + 1));
+      (state.progresses ||= new Map()).set(progressId, progress);
+      resolved.__progress = progressId;
+    }
+    return resolved;
+  }
 }
 
 /** Runs a resolved launch without a debugger: a task running the program (dotnet <dll>, or its apphost), then the
@@ -311,7 +398,11 @@ async function startWithoutDebugging(config, state, progress) {
   task.isBackground = true;
   const execution = await vscode.tasks.executeTask(task);
   state.lastRunWithoutDebugging = { name: label, execution };
-  const browser = config.__browser;
+  await openWhenListening(config.__browser, execution, state, progress);
+}
+
+/** Opens the browser once something accepts connections at its base URL, while the task runs. */
+async function openWhenListening(browser, execution, state, progress) {
   if (!browser?.base || browser.portBusy) return;
   progress.report(listeningMessage(browser.base));
   for (let i = 0; i < 300 && vscode.tasks.taskExecutions.includes(execution) && !progress.token.isCancellationRequested; i++) {
@@ -465,6 +556,8 @@ function registerLaunch(context) {
   context.subscriptions.push(state.changed, vscode.tasks.onDidStartTask(() => state.changed.fire()), vscode.tasks.onDidEndTask(() => state.changed.fire()),
     vscode.debug.onDidStartDebugSession((s) => s.type === TYPE && (state.sessions.add(s), state.changed.fire())),
     vscode.debug.onDidTerminateDebugSession((s) => state.sessions.delete(s) && state.changed.fire()),
+    // IIS Express ends with the debugging of its app, as VS stops it, so the next build can write what the app held.
+    vscode.debug.onDidTerminateDebugSession((s) => s.configuration.__iisExpress && state.iisExpress?.get(s.configuration.__iisExpress)?.terminate()),
     // Uruchom ponownie, as VS's: the app under the debugger ended first (VS Code's own restart builds while it still runs),
     // then the last start again, which stops a start still building and what a run left going before it builds.
     vscode.commands.registerCommand('csharpShooter.restart', async () => {

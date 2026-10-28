@@ -1508,6 +1508,71 @@ async function launchChecks(api, profileName) {
   return results;
 }
 
+// An IISExpress profile under IIS Express, as VS runs it (where iisexpress.exe is installed): the site in
+// .vs/<solution>/config/applicationhost.config with launchSettings.json's authentication, the debugger in iisexpress.exe
+// from its runtime's start (a breakpoint in Startup), and Windows authentication: no answer without credentials, the page
+// with them. checks.iisExpress: { project, profile, breakpoint: { file, needle } }; the request stands in for the browser.
+async function iisExpressChecks(api, { project: projectPath, profile, breakpoint }) {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const { execFile } = require('child_process');
+  const folder = vscode.workspace.workspaceFolders[0];
+  const project = path.join(folder.uri.fsPath, projectPath);
+  const curl = (url, ...args) => new Promise((r) => execFile('curl.exe', ['-s', '-k', '--max-time', '300', '-w', '\n%{http_code}', ...args, url], { windowsHide: true, maxBuffer: 1 << 24 },
+    (e, stdout) => r({ status: +(stdout || '').trim().split('\n').pop(), body: stdout || '' })));
+  const { doc, pos } = await position(breakpoint.file, breakpoint.needle, 0);
+  vscode.debug.addBreakpoints([new vscode.SourceBreakpoint(new vscode.Location(doc.uri, pos))]);
+  let stopped;
+  const stoppedEvent = new Promise((r) => (stopped = r));
+  const name = `${path.basename(project, '.csproj')}: ${profile}`;
+  const tracker = vscode.debug.registerDebugAdapterTrackerFactory('csharpshooter', {
+    createDebugAdapterTracker: (session) => session.name !== name ? undefined
+      : ({ onDidSendMessage: (m) => m.type === 'event' && m.event === 'stopped' && stopped({ ...m.body, session }) }),
+  });
+  try {
+    const started = await vscode.debug.startDebugging(folder, { type: 'csharpshooter', request: 'launch', name, project, launchProfile: profile, launchBrowser: false });
+    const iis = api.launch.state.lastIisExpress;
+    const config = iis && fs.existsSync(iis.file) ? fs.readFileSync(iis.file, 'utf8') : '';
+    const settings = require(path.join(path.dirname(project), 'Properties', 'launchSettings.json')).iisSettings;
+    const location = new RegExp(`<location path="${iis?.site}">[\\s\\S]*?</location>`).exec(config)?.[0] || '';
+    expect('applicationhost.config: the site at the project folder, its authentication from iisSettings', started && iis?.pid
+      && config.includes(`physicalPath="${path.dirname(project)}"`) && location.includes(`<windowsAuthentication enabled="${!!settings.windowsAuthentication}" />`)
+      && location.includes(`<anonymousAuthentication enabled="${settings.anonymousAuthentication !== false}" />`),
+    `${iis?.file}, site ${iis?.site}, iisexpress ${iis?.pid}, ${iis?.model}: ${location.replace(/\s+/g, ' ')}`);
+    if (!started || !iis?.pid) return results;
+    const base = `https://localhost:${settings.iisExpress.sslPort}/`;
+    const anonymous = await curl(base, '-o', 'NUL');
+    expect('without credentials: 401, as IIS answers', settings.anonymousAuthentication !== false || anonymous.status === 401, anonymous.status);
+    const signedIn = curl(base, '--negotiate', '-u', ':');
+    const body = await Promise.race([stoppedEvent, sleep(240000).then(() => null)]);
+    expect(`stops at the breakpoint in ${breakpoint.file} as the app starts`, body, body ? `stopped (${body.reason})` : 'no stop');
+    if (body) {
+      const frame = (await body.session.customRequest('stackTrace', { threadId: body.threadId, levels: 1 })).stackFrames[0];
+      const evaluate = async (expression) => (await body.session.customRequest('evaluate', { expression, frameId: frame.id, context: 'watch' })).result;
+      const host = await evaluate('System.Diagnostics.Process.GetCurrentProcess().ProcessName');
+      const environment = await evaluate('System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")');
+      expect('in IIS Express, with the profile\'s environment', (iis.model !== 'inprocess' || host === '"iisexpress"') && environment === '"Development"', `process ${host}, ASPNETCORE_ENVIRONMENT=${environment}`);
+      await body.session.customRequest('continue', { threadId: body.threadId });
+    }
+    const page = await signedIn;
+    const user = require('os').userInfo().username;
+    expect('with Windows credentials (Negotiate/NTLM): 200, the user signed in', page.status === 200 && page.body.toLowerCase().includes(user.toLowerCase()),
+      `${page.status}, ${page.body.length} bytes, ${user} ${page.body.toLowerCase().includes(user.toLowerCase()) ? 'on the page' : 'not on the page'}`);
+    const session = vscode.debug.activeDebugSession;
+    if (session) await vscode.debug.stopDebugging(session);
+    let gone = false;
+    for (let i = 0; i < 30 && !gone; i++) {
+      await sleep(1000);
+      try { process.kill(iis.pid, 0); } catch { gone = true; }
+    }
+    expect('IIS Express ends with the debugging', gone, gone ? `${iis.pid} ended` : `${iis.pid} still running`);
+  } finally {
+    tracker.dispose();
+    vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
+  }
+  return results;
+}
+
 // F5 with nothing changed starts with no build, as Passenger 0.2.1 does: Ctrl+F5 once (building or not), again (up to
 // date, its properties not read again), and after a source file's time changes (built); then once more while a dotnet build
 // of it runs in a task of its own, which it waits out.
@@ -1785,6 +1850,12 @@ async function run() {
     for (const r of await upToDateChecks(api, checks.upToDate || 'WebApp/WebApp.csproj')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  up to date: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
+    }
+  }
+  if (checks.iisExpress) {
+    for (const r of await iisExpressChecks(api, checks.iisExpress)) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  IIS Express: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.runViewProbe) await runViewProbe();

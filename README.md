@@ -156,9 +156,30 @@ named `Project: Profile`; Solution Explorer → right-click a project → **Star
 no `launch.json` runs the active file's project. As in Visual Studio, the project builds first (`dotnet build`, in a
 task, with its errors in Problems), runs from MSBuild's `TargetPath` with the profile's environment variables,
 `commandLineArgs` and `applicationUrl` (as `ASPNETCORE_URLS`), and when the profile has `launchBrowser` the browser opens
-at `launchUrl` once the app listens: its port accepts a connection, or its console says "Now listening on". An
-`IISExpress` profile runs on Kestrel at the IIS Express URLs (`iisSettings`), since IIS Express runs only under Visual
-Studio. If the profile's port is taken before the start, a warning says so.
+at `launchUrl` once the app listens: its port accepts a connection, or its console says "Now listening on". If the
+profile's port is taken before the start, a warning says so.
+
+An `IISExpress` profile runs under IIS Express, as Visual Studio runs it, when IIS Express is installed
+(`C:\Program Files\IIS Express\iisexpress.exe`):
+
+- **The site.** It goes into the solution's `.vs/<solution>/config/applicationhost.config`, the file VS writes, or one made
+  from IIS Express's template. The site keeps the name and id VS gave it. Its bindings come from
+  `iisSettings.iisExpress` (`applicationUrl`, `sslPort`). Its `windowsAuthentication` and `anonymousAuthentication` come
+  from `iisSettings`, so Windows authentication (Negotiate/NTLM) is IIS's, as under VS.
+- **The app.** IIS Express reads the project folder's `web.config`, which hands requests to `AspNetCoreModuleV2`. VS writes
+  this file when it is missing, and so does CSharpShooter, using the project's `AspNetCoreHostingModel`. The module starts
+  the built app from `LAUNCHER_PATH`/`LAUNCHER_ARGS`, and the app gets the profile's environment variables.
+- **Starting it.** `iisexpress.exe /config:… /site:… /apppool:…` runs in a task, whose terminal is IIS Express's console.
+- **Debugging.** The debugger attaches to `iisexpress.exe` for in-process hosting. It takes hold as the module starts the
+  runtime on the first request, so breakpoints in `Startup` are hit. For out-of-process hosting, it attaches to the
+  module's child process, once a request (with the Windows user's credentials) has started it.
+- **Stopping.** Stopping debugging ends IIS Express. The next start also stops an IIS Express still running the site,
+  since an in-process app holds the build's files.
+
+Without IIS Express (or with `CSHARPSHOOTER_NO_IISEXPRESS=1`), the profile runs on Kestrel at the IIS Express URLs.
+Kestrel does nothing with `iisSettings`, so Windows authentication then needs the app's own handler: the
+`Microsoft.AspNetCore.Authentication.Negotiate` package with
+`services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate()`.
 
 A notification at the bottom right says what is going on until the browser opens, as VS says it in its status bar:
 *Kompilacja rozpoczęta…*, *Przywracanie pakietów NuGet…*, a project's own targets (*Contoso.Core: PreBuild…*, a gulp target),
