@@ -1,5 +1,5 @@
 diff --git a/Directory.Build.props b/Directory.Build.props
-index 8ae45d5..d58cdb1 100644
+index e5b92cb..f858954 100644
 --- a/Directory.Build.props
 +++ b/Directory.Build.props
 @@ -1,7 +1,7 @@
@@ -9,13 +9,13 @@ index 8ae45d5..d58cdb1 100644
 -    <TargetFramework>net11.0</TargetFramework>
 +    <TargetFramework>net10.0</TargetFramework>
      <!-- The version, until a vX.Y.Z tag on the commit names it. -->
-     <Version>0.2.0</Version>
+     <Version>0.2.2</Version>
      <Nullable>enable</Nullable>
 diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
-index 455ba4a..519b338 100644
+index 3a4ce77..7e8127b 100644
 --- a/src/Passenger.Core/ChildProcesses.cs
 +++ b/src/Passenger.Core/ChildProcesses.cs
-@@ -397,10 +397,7 @@ public static class ChildProcesses
+@@ -552,10 +552,7 @@ public static class ChildProcesses
          start.RedirectStandardInput = true;
          start.RedirectStandardOutput = true;
          start.RedirectStandardError = true;
@@ -28,10 +28,10 @@ index 455ba4a..519b338 100644
          Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory) { Start = start });
          // What it writes is nobody's: its pipes closed here, its writes to them fail, which .NET's console passes over.
 diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
-index e192720..cc790de 100644
+index 536142d..dfd4f6f 100644
 --- a/src/Passenger.Core/Lifeline.cs
 +++ b/src/Passenger.Core/Lifeline.cs
-@@ -51,18 +51,26 @@ internal static partial class Lifeline
+@@ -61,18 +61,26 @@ internal static partial class Lifeline
      {
          if (OperatingSystem.IsWindows())
          {
@@ -62,7 +62,7 @@ index e192720..cc790de 100644
  
      /// <summary>Puts a process group that leads itself on the watchdog's list: a child's, or a program the terminal started
      /// in its pseudo-terminal.</summary>
-@@ -174,7 +182,6 @@ internal static partial class Lifeline
+@@ -216,7 +224,6 @@ internal static partial class Lifeline
                  UseShellExecute = false,
                  CreateNoWindow = true,
                  RedirectStandardInput = true,
@@ -70,10 +70,10 @@ index e192720..cc790de 100644
              };
              Process started = Process.Start(start) ?? throw new InvalidOperationException("The watchdog did not start");
              foreach (int group in Groups)
-@@ -197,4 +204,71 @@ internal static partial class Lifeline
- 
-     [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
-     private static partial int Signal(int process, int signal);
+@@ -275,4 +282,71 @@ internal static partial class Lifeline
+         public nuint PeakProcessMemoryUsed;
+         public nuint PeakJobMemoryUsed;
+     }
 +
 +    /// <summary>The Windows job every child joins: the system kills them all once our handle to it closes, as it does
 +    /// however our process ends. What .NET 11's KillOnParentExit does for a ProcessStartInfo.</summary>
@@ -143,10 +143,10 @@ index e192720..cc790de 100644
 +    }
  }
 diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
-index 4041a2f..2a9ae08 100644
+index 96e3452..ec47a91 100644
 --- a/src/Passenger.DebugAdapter/DebugAdapter.cs
 +++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
-@@ -256,11 +256,13 @@ public sealed partial class DebugAdapter
+@@ -260,11 +260,13 @@ public sealed partial class DebugAdapter
              return Leave(() => debugger.DisconnectAsync(arguments.TerminateDebuggee ?? false,
                  arguments.LetGoWithin is int within and > 0 ? TimeSpan.FromMilliseconds(within) : null));
          }, then: RequestShutdown);
