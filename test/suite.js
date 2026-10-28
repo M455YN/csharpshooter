@@ -1633,6 +1633,49 @@ async function upToDateChecks(api, projectPath) {
   return results;
 }
 
+// Many .cs files nobody has open deleted one by one, their folder kept (a checkout of another branch): the open file's
+// answers go on at once, and the deleted classes are gone from the server. 300 files of the test's own, removed after.
+async function deletionChecks() {
+  const results = [];
+  const expect = (name, ok, got) => results.push({ name, ok: !!ok, got: [String(got)] });
+  const dir = path.join(root(), 'Contoso.Excel', 'ShooterBulk');
+  const symbols = async (q) => ((await vscode.commands.executeCommand('vscode.executeWorkspaceSymbolProvider', q)) || []).filter((x) => x.name === q);
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    for (let i = 0; i < 300; i++) {
+      fs.writeFileSync(path.join(dir, `Bulk${i}.cs`), `namespace ShooterBulk\n{\n    public class Bulk${i}\n    {\n        public int Value${i} => ${i};\n    }\n}\n`);
+    }
+    for (let i = 0; i < 120 && !(await symbols('Bulk299')).length; i++) await sleep(500);
+    const database = path.join(root(), 'Contoso.Excel', 'Database');
+    const doc = await vscode.workspace.openTextDocument(path.join(database, fs.readdirSync(database).find((f) => f.endsWith('.cs'))));
+    await vscode.window.showTextDocument(doc);
+    const line = doc.getText().split(/\r?\n/).findIndex((l) => /\bclass\b/.test(l));
+    const timed = async () => {
+      const t0 = Date.now();
+      await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, new vscode.Position(line + 1, 0));
+      await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, new vscode.Position(line, doc.lineAt(line).text.indexOf('class') + 7));
+      return Date.now() - t0;
+    };
+    await timed();
+    for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f));
+    const after = [];
+    for (let i = 0; i < 20; i++) {
+      after.push(await timed());
+      await sleep(250);
+    }
+    let gone = false;
+    for (let i = 0; i < 60 && !gone; i++) {
+      gone = !(await symbols('Bulk0')).length;
+      if (!gone) await sleep(500);
+    }
+    expect('300 .cs files deleted one by one: the open file answers at once, and they are gone from the server', Math.max(...after) < 5000 && gone,
+      `slowest answer ${Math.max(...after)} ms (of ${after.length}), Bulk0 gone: ${gone}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  return results;
+}
+
 // An .http file as VS 2026's HTTP editor has it: HTTP, "Wyślij żądanie" above each request, a request sent with the file's
 // variables and the chosen HTTP environment, its response in the "Odpowiedź" panel. A file and server of the test's own.
 async function httpFileChecks(api) {
@@ -1897,6 +1940,12 @@ async function run() {
     for (const r of await launchChecks(api, checks.launchProfile || 'WebApp Development')) {
       failed += r.ok ? 0 : 1;
       lines.push(`${r.ok ? 'PASS' : 'FAIL'}  F5: ${r.name}: ${r.got.join('; ').slice(0, 200)}`);
+    }
+  }
+  if (checks.deletion || (!process.env.CHECKS_FILE && process.env.SKIP_DELETION !== '1')) {
+    for (const r of await deletionChecks()) {
+      failed += r.ok ? 0 : 1;
+      lines.push(`${r.ok ? 'PASS' : 'FAIL'}  deletion: ${r.name}: ${r.got.join('; ').slice(0, 300)}`);
     }
   }
   if (checks.http || (!process.env.CHECKS_FILE && process.env.SKIP_HTTP !== '1')) {

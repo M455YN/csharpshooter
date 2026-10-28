@@ -13,7 +13,7 @@ const { registerRazorEnter } = require('./razor-enter');
 const { registerPublishPage } = require('./publish-page');
 const { registerPropertiesPage } = require('./properties-page');
 const { registerConfigurationManager } = require('./config-manager');
-const { registerPropertiesWindow } = require('./properties-window');
+const { registerPropertiesWindow, projectOf } = require('./properties-window');
 const { registerNuGetPage } = require('./nuget-page');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
@@ -136,7 +136,22 @@ async function startServer(context) {
       uriConverters: { code2Protocol: toServerUri, protocol2Code: (value) => vscode.Uri.parse(value) },
       middleware: {
         // Roslyn asks for its options by section; null leaves each at the server's default.
-        workspace: { configuration: (params) => params.items.map(() => null) },
+        workspace: {
+          configuration: (params) => params.items.map(() => null),
+          // A source file deleted (a checkout of another branch, a folder cleaned) is told the server as its project file
+          // changed, never as the file's deletion: Roslyn's server takes a deletion for a change of the file's text, and every
+          // compilation then reads each missing file, a second's retries apiece, until the project loads again (300 files
+          // held the open file's answers 158 s); a project changed loads again without them first, as Passenger 0.2.3 does.
+          didChangeWatchedFile: (event, next) => {
+            if (event.type !== 3 || !/\.(cs|vb|fs|razor|cshtml)$/i.test(event.uri)) return next(event);
+            const project = projectOf(vscode.Uri.parse(event.uri).fsPath);
+            if (!project) return next(event);
+            if (deletedIn.has(project)) return Promise.resolve();
+            deletedIn.add(project);
+            setTimeout(() => deletedIn.delete(project), 1000);
+            return next({ uri: toServerUri(vscode.Uri.file(project)), type: 2 });
+          },
+        },
         // While the solution loads, Roslyn colours a file from what it has so far: the types of NuGet packages and other
         // projects are not resolved yet and stay plain names. VS Code asks C# by range, which the server's refresh does not
         // reach, so a file opened then kept those colours until Razor's views were ready (on a large web solution a minute) or it was
@@ -252,6 +267,7 @@ function recolour() {
 }
 
 let recolourTimer;
+const deletedIn = new Set(); // projects told changed for a deletion in the last second (one notice for a burst)
 const loadingColours = new Map(); // a .cs file's last colours by range while the projects load
 function recolourSoon() {
   recolourTimer ??= setTimeout(() => {
