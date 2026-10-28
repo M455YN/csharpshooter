@@ -1,0 +1,99 @@
+# CSharpShooter SQL released from a tag (sql-v0.1.0): SQL Tools Service and Monaco fetched into sql/, its bundle and
+# .vsix made there, published to Open VSX and the Visual Studio Marketplace, then attached to a GitHub Release with the
+# latest entry of sql/CHANGELOG.md as its notes. CSharpShooter itself is released from v* tags (release.yml).
+name: Release SQL
+
+on:
+  push:
+    tags:
+      - "sql-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: sql
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Read version
+        id: meta
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "vsix=csharpshooter-sql-win32-x64-${VERSION}.vsix" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "push" ] && [ "${GITHUB_REF_NAME}" != "sql-v${VERSION}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match sql/package.json version sql-v${VERSION}"
+            exit 1
+          fi
+
+      # The bundle takes vscode-languageclient and the shared texts (l10n.js) from the repository's root.
+      - name: Install
+        working-directory: .
+        run: npm ci
+
+      - name: Texts (each English one with its Polish)
+        working-directory: .
+        run: npm run check-l10n
+
+      - name: SQL Tools Service (.sql IntelliSense and connections, win-x64)
+        run: node scripts/fetch-sqltools.js 6.0.20261023.1 win-x64
+
+      - name: Monaco editor (the SQL editor page)
+        run: node scripts/fetch-monaco.js 0.55.1
+
+      - name: Package VSIX
+        run: npm run package
+
+      - name: Release notes
+        run: node ../.github/scripts/latest-changelog.js CHANGELOG.md
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN || secrets.OVSX_PAT }}
+        shell: bash
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "Missing OPEN_VSX_TOKEN."
+            exit 1
+          fi
+          npx --yes ovsx publish "${{ steps.meta.outputs.vsix }}" --skip-duplicate
+
+      - name: Publish to Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "Missing VS_MARKETPLACE_TOKEN."
+            exit 1
+          fi
+          npx --yes @vscode/vsce publish --packagePath "${{ steps.meta.outputs.vsix }}" --skip-duplicate
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          VSIX: ${{ steps.meta.outputs.vsix }}
+        shell: bash
+        run: |
+          TAG="sql-v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes
+          fi
+          gh release create "$TAG" \
+            --title "CSharpShooter SQL ${VERSION}" \
+            --notes-file release-notes.md \
+            --target "${GITHUB_SHA}" \
+            "$VSIX"

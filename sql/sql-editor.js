@@ -7,7 +7,7 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
-const { table, tn } = require('./l10n');
+const { table, tn } = require('../l10n');
 
 const VIEW_TYPE = 'csharpShooter.sqlEditor';
 const MAX_ITEMS = 3000; // completion items one request gives the page

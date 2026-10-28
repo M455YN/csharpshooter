@@ -3,7 +3,7 @@
 // line opens in the query), and the status line (Query executed successfully, server, login, database, elapsed time,
 // rows). It shows the results of the query window in front.
 const vscode = require('vscode');
-const { table, tn } = require('./l10n');
+const { table, tn } = require('../l10n');
 
 // SSMS's words (its SqlEditors resources).
 const T = table({

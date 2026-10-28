@@ -1,6 +1,7 @@
 const fs = require("fs");
 
-const md = fs.readFileSync("CHANGELOG.md", "utf8").replace(/\r\n/g, "\n");
+// node latest-changelog.js [CHANGELOG.md]: the newest entry of that changelog (sql/CHANGELOG.md for CSharpShooter SQL).
+const md = fs.readFileSync(process.argv[2] || "CHANGELOG.md", "utf8").replace(/\r\n/g, "\n");
 const headings = [...md.matchAll(/^## \[([^\]]+)\]/gm)].filter(
   (match) => match[1].toLowerCase() !== "unreleased"
 );

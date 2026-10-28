@@ -1,0 +1,23 @@
+{
+  "description": "Pliki .sql jak w SSMS 22 i Visual Studio 2026: edytor z wynikami pod zapytaniem, połączenia, IntelliSense SQL Tools Service i Eksplorator obiektów.",
+  "command.sql.connect": "Połącz",
+  "category.Sql": "SQL",
+  "command.sql.disconnect": "Rozłącz",
+  "command.sql.changeDatabase": "Dostępne bazy danych",
+  "command.sql.newQuery": "Nowe zapytanie",
+  "command.sql.execute": "Wykonaj",
+  "command.sql.cancelQuery": "Anuluj wykonywanie zapytania",
+  "command.sqlExplorer.addServer": "Dodaj SQL Server...",
+  "command.sqlExplorer.refresh": "Odśwież",
+  "command.sqlExplorer.selectTop": "Wybierz pierwszych 1000 wierszy",
+  "command.sqlExplorer.remove": "Usuń",
+  "command.sql.parse": "Analizuj",
+  "command.sql.changeConnection": "Zmień połączenie...",
+  "command.sqlExplorer.filter": "Ustawienia filtru...",
+  "command.sqlExplorer.clearFilter": "Usuń filtr",
+  "container.sqlObjectExplorer": "Eksplorator obiektów SQL Server",
+  "view.sqlResults": "Wyniki zapytania",
+  "view.sqlObjectExplorer": "Eksplorator obiektów SQL Server",
+  "editor.sql": "Edytor SQL",
+  "config.sqlToolsPath": "Ścieżka do MicrosoftSqlToolsServiceLayer.dll (SQL Tools Service), dla funkcji IntelliSense i połączeń w plikach .sql. Puste: ten z folderu sqltools/ rozszerzenia."
+}

@@ -5,7 +5,7 @@
 // (Microsoft.SqlServer.ConnectionDlg.UI's resources). A password never reaches the page: an entry's remembered one stays
 // with the extension, which uses it when the field is left as it is.
 const vscode = require('vscode');
-const { table } = require('./l10n');
+const { table } = require('../l10n');
 
 const T = table({
   title: 'Connect',

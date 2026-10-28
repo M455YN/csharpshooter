@@ -5,7 +5,7 @@
 // database's or an object's New Query opens a query window connected to its database; a table's or a view's Select Top
 // 1000 Rows writes SSMS's query and runs it.
 const vscode = require('vscode');
-const { table } = require('./l10n');
+const { table } = require('../l10n');
 const { showFilterDialog } = require('./sql-filter-dialog');
 
 const T = table({

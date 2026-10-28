@@ -1,7 +1,6 @@
 node_modules/
 # Fetched and built, not sources: npm run fetch-server, scripts/build-debugger.ps1, scripts/build-testbridge.ps1
 server/
-sqltools/
 debugger/
 testbridge/bin/
 testbridge/obj/
@@ -12,4 +11,7 @@ testbridge/out/
 test/names.local.json
 # npm run bundle
 dist/
-media/monaco/
+# CSharpShooter SQL's fetched parts and bundle: cd sql && npm run fetch-sqltools && npm run fetch-monaco
+sql/sqltools/
+sql/media/monaco/
+sql/dist/

@@ -24,7 +24,7 @@ async function labels(doc, position) {
 }
 
 async function run() {
-  const api = await vscode.extensions.getExtension('M455YN.csharpshooter').activate();
+  const api = await vscode.extensions.getExtension('M455YN.csharpshooter-sql').activate();
   const { sql } = api;
   const check = (name, fn) => Promise.resolve().then(fn).then(() => console.log(`ok   ${name}`), (e) => { console.log(`FAIL ${name}: ${e.message}`); process.exitCode = 1; });
   const root = vscode.workspace.workspaceFolders[0].uri.fsPath;

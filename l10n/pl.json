@@ -658,5 +658,6 @@
   "env: {0}": "env: {0}",
   "<none>": "<none>",
   "=== REQUEST ===": "=== ŻĄDANIE ===",
-  "=== RESPONSE ===": "=== ODPOWIEDŹ ==="
+  "=== RESPONSE ===": "=== ODPOWIEDŹ ===",
+  "Open .sql files in an editor like SSMS 22 and Visual Studio 2026 (connections, results below the query, Object Explorer)? It is CSharpShooter SQL, an extension of its own.": "Otwierać pliki .sql w edytorze jak w SSMS 22 i Visual Studio 2026 (połączenia, wyniki pod zapytaniem, Eksplorator obiektów)? To CSharpShooter SQL, osobne rozszerzenie."
 }

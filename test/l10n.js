@@ -10,7 +10,9 @@ const literal = String.raw`'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"`;
 const unquote = (m) => JSON.parse(`"${(m[1] ?? m[2]).replace(/\\'/g, "'").replace(/(?<!\\)"/g, '\\"')}"`);
 const used = new Map(); // text -> where
 const plurals = new Set();
-for (const file of fs.readdirSync(root).filter((f) => f.endsWith('.js') && f !== 'l10n.js')) {
+// CSharpShooter's sources and CSharpShooter SQL's (sql/), which shares these texts.
+const sources = [...fs.readdirSync(root).filter((f) => f.endsWith('.js') && f !== 'l10n.js'), ...fs.readdirSync(path.join(root, 'sql')).filter((f) => f.endsWith('.js')).map((f) => `sql/${f}`)];
+for (const file of sources) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   for (const m of source.matchAll(new RegExp(String.raw`\b(?:t|n_)\(\s*(?:${literal})`, 'g'))) used.set(unquote(m), file);
   for (const m of source.matchAll(new RegExp(String.raw`\btn\([^,]+,\s*(?:${literal})\s*,\s*(?:${literal})`, 'g'))) {
@@ -32,13 +34,19 @@ for (const [text, polish] of Object.entries(pl)) {
   const holes = (s) => [...s.matchAll(/\{\d\}/g)].map((m) => m[0]).sort().join();
   for (const p of [].concat(polish)) if (holes(p) !== holes(text)) problems.push(`l10n/pl.json: ${JSON.stringify(p)} has other {n} than ${JSON.stringify(text)}`);
 }
-// package.json's texts: each %key% in package.nls.json (English) and package.nls.pl.json (Polish), and nothing more.
-const manifest = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
-const refs = new Set([...manifest.matchAll(/"%([^%"]+)%"/g)].map((m) => m[1]));
-for (const name of ['package.nls.json', 'package.nls.pl.json']) {
-  const nls = JSON.parse(fs.readFileSync(path.join(root, name), 'utf8'));
-  for (const key of refs) if (!(key in nls)) problems.push(`${name}: no "${key}"`);
-  for (const key of Object.keys(nls)) if (!refs.has(key)) problems.push(`${name}: "${key}" is not in package.json`);
+// package.json's texts: each %key% in package.nls.json (English) and package.nls.pl.json (Polish), and nothing more; the same
+// for CSharpShooter SQL's (sql/).
+let manifests = 0;
+for (const dir of [root, path.join(root, 'sql')]) {
+  const manifest = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');
+  const refs = new Set([...manifest.matchAll(/"%([^%"]+)%"/g)].map((m) => m[1]));
+  manifests += refs.size;
+  for (const name of ['package.nls.json', 'package.nls.pl.json']) {
+    const nls = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+    const where = path.relative(root, path.join(dir, name)).split(path.sep).join('/');
+    for (const key of refs) if (!(key in nls)) problems.push(`${where}: no "${key}"`);
+    for (const key of Object.keys(nls)) if (!refs.has(key)) problems.push(`${where}: "${key}" is not in its package.json`);
+  }
 }
-console.log(problems.length ? problems.join('\n') : `${used.size} texts and ${refs.size} of package.json's, each with its Polish`);
+console.log(problems.length ? problems.join('\n') : `${used.size} texts and ${manifests} of the package.json files', each with its Polish`);
 process.exitCode = problems.length ? 1 : 0;

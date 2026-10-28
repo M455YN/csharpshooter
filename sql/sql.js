@@ -5,12 +5,17 @@
 // passwords (ssms-connections.js), this extension's, the solution's connection strings (appsettings*.json and the
 // projects' user secrets) and this machine's servers; a new query window takes the last connection.
 const vscode = require('vscode');
-const { table, tn, language } = require('./l10n');
+const { table, tn, language } = require('../l10n');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { LanguageClient, State } = require('vscode-languageclient/node');
-const { parseJsonc } = require('./launch');
+// JSON with comments and trailing commas, as appsettings.json and launch.json may be written.
+function parseJsonc(text) {
+  return JSON.parse(text.replace(/^\uFEFF/, '')
+    .replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str || '')
+    .replace(/,(\s*[}\]])/g, '$1'));
+}
 const sqlConnection = require('./sql-connection');
 const ssms = require('./ssms-connections');
 const { showConnectDialog } = require('./sql-connect-dialog');

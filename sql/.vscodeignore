@@ -1,0 +1,6 @@
+# What CSharpShooter SQL's .vsix leaves out; sqltools/ and media/monaco/ go in, the code as dist/extension.js (npm run bundle).
+*.js
+scripts/**
+test/**
+**/*.pdb
+*.vsix

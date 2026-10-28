@@ -3,7 +3,7 @@
 // Create Date...) with its operator and value, the property's description below, Clear Filter, OK and Cancel; SSMS's
 // texts (its ObjectExplorer resources), the properties' own from the service in the UI's language.
 const vscode = require('vscode');
-const { table } = require('./l10n');
+const { table } = require('../l10n');
 
 const T = table({
   title: 'Filter Settings',

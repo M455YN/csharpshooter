@@ -35,11 +35,13 @@ const { runTests } = require('@vscode/test-electron');
   }
   // The extension runs from dist/extension.js (package.json's main): bundled from the sources first, as the .vsix is.
   if (!process.env.EXTENSION_PATH) require('child_process').execSync('npm run bundle', { cwd: path.resolve(__dirname, '..'), stdio: 'inherit' });
+  require('child_process').execSync('npm run bundle', { cwd: path.resolve(__dirname, '..', 'sql'), stdio: 'inherit' }); // CSharpShooter SQL's too
   try {
     await runTests({
       vscodeExecutablePath: exe,
       // EXTENSION_PATH: an installed copy (a .vsix unpacked), to test what the package holds.
-      extensionDevelopmentPath: process.env.EXTENSION_PATH || path.resolve(__dirname, '..'),
+      // CSharpShooter and CSharpShooter SQL (sql/), both as developed (or EXTENSION_PATH: an installed copy of the first).
+      extensionDevelopmentPath: [process.env.EXTENSION_PATH || path.resolve(__dirname, '..'), path.resolve(__dirname, '..', 'sql')],
       extensionTestsPath: suite,
       // A profile and extensions folder of its own: only this extension runs.
       launchArgs: [workspace, '--user-data-dir', path.join(profile, 'data'), '--extensions-dir', path.join(profile, 'ext'), '--disable-workspace-trust'],

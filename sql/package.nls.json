@@ -1,0 +1,23 @@
+{
+  "description": ".sql files as in SSMS 22 and Visual Studio 2026: an editor with the results below the query, connections, SQL Tools Service IntelliSense and an Object Explorer.",
+  "command.sql.connect": "Connect",
+  "category.Sql": "SQL",
+  "command.sql.disconnect": "Disconnect",
+  "command.sql.changeDatabase": "Available Databases",
+  "command.sql.newQuery": "New Query",
+  "command.sql.execute": "Execute",
+  "command.sql.cancelQuery": "Cancel Executing Query",
+  "command.sqlExplorer.addServer": "Add SQL Server...",
+  "command.sqlExplorer.refresh": "Refresh",
+  "command.sqlExplorer.selectTop": "Select Top 1000 Rows",
+  "command.sqlExplorer.remove": "Remove",
+  "command.sql.parse": "Parse",
+  "command.sql.changeConnection": "Change Connection...",
+  "command.sqlExplorer.filter": "Filter Settings...",
+  "command.sqlExplorer.clearFilter": "Remove Filter",
+  "container.sqlObjectExplorer": "SQL Server Object Explorer",
+  "view.sqlResults": "Query Results",
+  "view.sqlObjectExplorer": "SQL Server Object Explorer",
+  "editor.sql": "SQL Editor",
+  "config.sqlToolsPath": "Path to MicrosoftSqlToolsServiceLayer.dll (SQL Tools Service), for IntelliSense and connections in .sql files. Empty: the one under the extension's sqltools/ folder."
+}

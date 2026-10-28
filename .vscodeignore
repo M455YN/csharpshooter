@@ -3,6 +3,8 @@
 *.js
 node_modules/**
 .github/**
+# CSharpShooter SQL, an extension of its own (sql/, its own .vsix).
+sql/**
 testbridge/*.cs
 testbridge/*.csproj
 testbridge/bin/**
