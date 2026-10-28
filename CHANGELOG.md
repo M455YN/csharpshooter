@@ -4,17 +4,18 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-10-28
 
 ### Added
 
 - `.http` and `.rest` files as Visual Studio 2026's HTTP editor: *Wyślij żądanie* above each request (Ctrl+Alt+S), file variables, `{{$guid}}` and the other dynamic ones, `http-client.env.json` environments chosen from the status bar (F6), the response in an *Odpowiedź* panel (status code, time, size; body, headers, raw). REST Client's grammar colours them.
+- `.sql` files as in SQL Server Management Studio 22 and Visual Studio 2026 come in [CSharpShooter SQL](https://github.com/M455YN/csharpshooter/blob/main/sql/CHANGELOG.md), an extension of its own (SQL Tools Service and Monaco would double this one's size); the first `.sql` file opened offers to install it (*Zainstaluj*, *Nie teraz*, *Nigdy*).
 
 ### Changed
 
-- `.sql` files are no longer CSharpShooter's: they are [CSharpShooter SQL](sql/CHANGELOG.md)'s, an extension of its own, which the first `.sql` file opened offers to install (*Zainstaluj*, *Nie teraz*, *Nigdy*).
 - F5 right after a Build or Rebuild in the Solution Explorer builds nothing.
 - The debugger is Passenger's main on its way to 0.2.3: pointers as their address and type, C# 15 unions as the value they hold, steps over an `await` in .NET 11's runtime-async methods, clearer word on an evaluation that does not end (`PASSENGER_WAIT_SCALE` gives a slow machine longer).
+- GitHub Actions builds and publishes only for a pushed `v*` tag (CSharpShooter) or `sql-v*` tag (CSharpShooter SQL); the build without publishing runs on demand.
 
 ### Fixed
 
