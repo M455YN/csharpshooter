@@ -57,8 +57,8 @@ since the server and the debugger in it are built for Windows x64; for another s
 `node scripts/fetch-server.js 5.11.0 <rid>` and `scripts/build-debugger.ps1 -Runtime <rid>`, and change `--target` in
 `package.json`'s `package` script.
 
-GitHub Actions does the same on every push to `main`, every pull request and on demand (*Actions → Build → Run
-workflow*, with another server version if wanted): `.github/workflows/build.yml` on `windows-latest` installs Node 22
+GitHub Actions runs only for a pushed `v*` tag (`.github/workflows/release.yml`, below), and the same build without
+publishing on demand (*Actions → Build → Run workflow*, with another server version if wanted): `.github/workflows/build.yml` on `windows-latest` installs Node 22
 and the .NET 10 SDK, checks the texts (`npm run check-l10n`), downloads the server, builds the debugger from Passenger's
 source with the port's patch, packages the `.vsix` and keeps it as the run's artifact (`csharpshooter-win32-x64`).
 

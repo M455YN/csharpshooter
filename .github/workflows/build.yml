@@ -1,12 +1,10 @@
 # Builds the extension as it ships: the C# language server (Microsoft's roslyn-language-server package from nuget.org),
 # the debugger (Passenger built from source with debugger-port/net10.patch for .NET 10), then the .vsix with both inside,
-# kept as the run's artifact.
+# kept as the run's artifact. Only on demand (Actions > Build > Run workflow): what runs by itself is the release, on a
+# pushed v* tag (release.yml).
 name: Build
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
     inputs:
       server-version:
