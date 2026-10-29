@@ -285,8 +285,12 @@ server (`roslyn-extension/`): Ctrl+. offers those that apply at the caret, the e
 - *Ściągnij składowe aż do typu bazowego...* and, as Passenger has it, *Wypchnij składowe w dół do typów
   pochodnych...*: the members chosen into the base type, or into each derived class chosen.
 
-VS Code's input boxes and lists stand for VS's dialogs; there is no preview of the changes, nor *Ustaw jako abstrakcyjny*
-when members move. A file just made (by *Przenieś typ*) joins the refactorings once the server has loaded it into its project.
+VS Code's input boxes and lists stand for VS's dialogs. Moving members asks VS's *Ustaw jako abstrakcyjny* for each: pulled
+up into a class, abstract there and an `override` here; pushed down, left abstract here. As in VS, a file the change
+reaches that is open in no tab is saved, and one open is left with its changes to save. `csharpShooter.previewRefactorings`
+shows each change first in VS Code's Refactor Preview, ticked, as VS's *Podgląd zmian* (its one unticked line, *Podgląd
+zmian*, is empty: it only opens the panel). A file just made (by *Przenieś typ*) joins the refactorings once the server has
+loaded it into its project.
 
 ## Solution Explorer
 

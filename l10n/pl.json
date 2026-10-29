@@ -721,5 +721,6 @@
   "'{0}' has no members to move": "„{0}” nie ma składowych do przeniesienia",
   "Pulled {0} members of {1} up": "Ściągnięto w górę składowe {1}: {0}",
   "Pushed {0} members of {1} down": "Wypchnięto w dół składowe {1}: {0}",
-  "The file is in no project the C# language server has loaded yet.": "Plik nie należy jeszcze do żadnego projektu wczytanego przez serwer języka C#."
+  "The file is in no project the C# language server has loaded yet.": "Plik nie należy jeszcze do żadnego projektu wczytanego przez serwer języka C#.",
+  "Make abstract": "Ustaw jako abstrakcyjny"
 }

@@ -116,5 +116,6 @@
   "command.refactor.moveToNamespace": "Przenieś do przestrzeni nazw...",
   "command.refactor.pullMembersUp": "Ściągnij składowe aż do typu bazowego...",
   "command.refactor.pushMembersDown": "Wypchnij składowe w dół do typów pochodnych...",
-  "submenu.refactor": "Refaktoryzuj"
+  "submenu.refactor": "Refaktoryzuj",
+  "config.previewRefactorings": "Pokazuj zmiany refaktoryzacji w podglądzie refaktoryzacji VS Code przed ich zastosowaniem, każdą do zaznaczenia, jak pole Wyświetl podgląd zmian w Visual Studio (Zmień sygnaturę, Wyodrębnij interfejs, Przenieś, Ściągnij i Wypchnij składowe)."
 }

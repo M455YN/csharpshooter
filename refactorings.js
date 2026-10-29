@@ -19,18 +19,33 @@ function registerRefactorings(context, ask) {
       vscode.window.showWarningMessage(made.problem);
       return false;
     }
+    // Preview Changes, as VS's dialogs have it: VS Code's own Refactor Preview. It opens for a change that needs
+    // confirmation, which it shows unticked; the refactoring's own go in ticked, as VS's preview has them, and one
+    // empty change, the one that needs confirmation, only opens it.
+    const preview = vscode.workspace.getConfiguration('csharpShooter').get('previewRefactorings', false);
+    const metadata = preview ? { needsConfirmation: false, label: done } : undefined;
     const edit = new vscode.WorkspaceEdit();
+    if (preview && made.changes[0]) {
+      edit.insert(vscode.Uri.file(made.changes[0].path), new vscode.Position(0, 0), '', { needsConfirmation: true, label: t('Preview Changes') });
+    }
     for (const file of made.changes) {
       const uri = vscode.Uri.file(file.path);
       // A file it makes has its whole text as the one edit: written as the file is made (an edit to a file the same
       // workspace edit makes was left out of what was saved).
-      if (file.created) edit.createFile(uri, { ignoreIfExists: false, contents: Buffer.from(file.edits.map((e) => e.text).join(''), 'utf8') });
-      else for (const e of file.edits) edit.replace(uri, new vscode.Range(e.start.line, e.start.character, e.end.line, e.end.character), e.text);
+      if (file.created) edit.createFile(uri, { ignoreIfExists: false, contents: Buffer.from(file.edits.map((e) => e.text).join(''), 'utf8') }, metadata);
+      else for (const e of file.edits) edit.replace(uri, new vscode.Range(e.start.line, e.start.character, e.end.line, e.end.character), e.text, metadata);
     }
+    // As VS: a file not open in a tab is saved once changed; one open, or with unsaved edits of yours, is left to save.
+    const inTabs = new Set(vscode.window.tabGroups.all.flatMap((g) => g.tabs).map((tab) => tab.input?.uri?.toString()).filter(Boolean));
+    const dirty = new Set(vscode.workspace.textDocuments.filter((d) => d.isDirty).map((d) => d.uri.toString()));
     if (!(await vscode.workspace.applyEdit(edit))) {
-      vscode.window.showWarningMessage(t('The change could not be applied: a file changed meanwhile.'));
+      // A preview discarded is no failure.
+      if (!preview) vscode.window.showWarningMessage(t('The change could not be applied: a file changed meanwhile.'));
       return false;
     }
+    await Promise.all(vscode.workspace.textDocuments
+      .filter((d) => d.isDirty && !inTabs.has(d.uri.toString()) && !dirty.has(d.uri.toString()) && made.changes.some((f) => vscode.Uri.file(f.path).toString() === d.uri.toString()))
+      .map((d) => d.save()));
     vscode.window.setStatusBarMessage(done, 5000);
     // A use the change could not reach (a method group whose delegate no longer fits) is left as it was, and said.
     if (made.left?.length) {
@@ -129,11 +144,13 @@ function registerRefactorings(context, ask) {
     if (problem) return void vscode.window.showWarningMessage(problem);
     const title = up ? t('Pull Members Up') : t('Push Members Down');
     let target;
+    let targetKind;
     if (up) {
       const base = hierarchy.bases.length === 1 ? hierarchy.bases[0]
         : await vscode.window.showQuickPick(hierarchy.bases.map((b) => ({ label: b.text, description: b.kind, ...b })), { title, placeHolder: t('Select destination:') });
       if (!base) return false;
       target = base.id;
+      targetKind = base.kind;
     } else {
       const derived = await vscode.window.showQuickPick(hierarchy.derived.map((d) => ({ label: d.text, description: d.kind, id: d.id, picked: true })),
         { title, placeHolder: t('Select destination:'), canPickMany: true });
@@ -143,8 +160,15 @@ function registerRefactorings(context, ask) {
     const members = await vscode.window.showQuickPick(hierarchy.members.map((m) => ({ label: m.text, description: m.kind, id: m.id })),
       { title, placeHolder: t('Select members:'), canPickMany: true });
     if (!members?.length) return false;
-    // shortcut: no Make abstract choice (VS's checkbox per member); the members move whole. Upgrade with a second list.
-    const made = await ask(editor.document)(up ? 'PullMembersUp' : 'PushMembersDown', { at: at(editor), target, members: members.map((m) => m.id), abstract: [] });
+    // VS's Make abstract, per member: pulled up into a class, abstract there and overridden here; pushed down, left
+    // abstract here. An interface takes its members abstract anyway. None ticked moves them whole.
+    let madeAbstract = [];
+    if (!up || targetKind === 'class') {
+      const ticked = await vscode.window.showQuickPick(members.map((m) => ({ ...m, picked: false })), { title, placeHolder: t('Make abstract'), canPickMany: true });
+      if (!ticked) return false;
+      madeAbstract = ticked.map((m) => m.id);
+    }
+    const made = await ask(editor.document)(up ? 'PullMembersUp' : 'PushMembersDown', { at: at(editor), target, members: members.map((m) => m.id), abstract: madeAbstract });
     return apply(made, up ? t('Pulled {0} members of {1} up', members.length, hierarchy.type) : t('Pushed {0} members of {1} down', members.length, hierarchy.type));
   });
 

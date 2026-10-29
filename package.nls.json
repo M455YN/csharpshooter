@@ -116,5 +116,6 @@
   "command.refactor.moveToNamespace": "Move to Namespace...",
   "command.refactor.pullMembersUp": "Pull Members Up to Base Type...",
   "command.refactor.pushMembersDown": "Push Members Down to Derived Types...",
-  "submenu.refactor": "Refactor"
+  "submenu.refactor": "Refactor",
+  "config.previewRefactorings": "Show a refactoring's changes in VS Code's Refactor Preview before they are applied, each one to tick, as Visual Studio's Preview changes box (Change Signature, Extract Interface, Move, Pull Members Up, Push Members Down)."
 }

@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Refactorings as in Visual Studio 2026, made by Passenger's handlers in the C# server: *Zmień sygnaturę...* (Ctrl+R, Ctrl+O / Ctrl+R, Ctrl+V), *Wyodrębnij interfejs...* (Ctrl+R, Ctrl+I), *Przenieś typ do pliku* and *Przenieś do przestrzeni nazw...*, *Ściągnij składowe aż do typu bazowego...* and Passenger's *Wypchnij składowe w dół...*, offered by Ctrl+. where they apply and in the editor's *Refaktoryzuj* menu.
+- Refactorings as in Visual Studio 2026, made by Passenger's handlers in the C# server: *Zmień sygnaturę...* (Ctrl+R, Ctrl+O / Ctrl+R, Ctrl+V), *Wyodrębnij interfejs...* (Ctrl+R, Ctrl+I), *Przenieś typ do pliku* and *Przenieś do przestrzeni nazw...*, *Ściągnij składowe aż do typu bazowego...* and Passenger's *Wypchnij składowe w dół...*, offered by Ctrl+. where they apply and in the editor's *Refaktoryzuj* menu; members moved can be made abstract (*Ustaw jako abstrakcyjny*), files open in no tab are saved as VS saves them, and `csharpShooter.previewRefactorings` shows the changes first in VS Code's Refactor Preview.
 - Hot Reload: `.cs`, `.razor` and `.cshtml` edits saved while the program runs under the debugger go into it without a restart, as Visual Studio's Hot Reload on save (Roslyn's Edit and Continue through Passenger's handlers in the C# server, applied by the debugger). On for a Debug build; `"hotReload": false` turns it off. Edits the runtime cannot take are listed in Problems with *Uruchom ponownie*.
 - F5 of a profile with an `https` URL asks to trust ASP.NET Core's HTTPS development certificate when it is not trusted, as Visual Studio 2026 asks (its words, *Tak* or *Nie pytaj mnie ponownie*), and installs it when there is none.
 

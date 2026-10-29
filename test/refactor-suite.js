@@ -99,11 +99,11 @@ async function run() {
     let value;
     answers.push((o) => ((value = o.value), 'double Area(double scale, int times)'), '2');
     await vscode.commands.executeCommand('csharpShooter.refactor.changeSignature');
-    const program = vscode.workspace.textDocuments.find((d) => d.uri.fsPath.toLowerCase() === file('Program.cs').toLowerCase());
-    lines.push(`  Program.cs open ${!!program}, dirty ${program?.isDirty}, saved ${await program?.save()}, on disk: ${/circle\.Area\([^)]*\)/.exec(read('Program.cs'))?.[0]}`);
-    expect('Change Signature: the declaration and the call', /Area\(double scale, int times\)/.test(editor.document.getText())
-      && /circle\.Area\(1, 2\)/.test((await vscode.workspace.openTextDocument(file('Program.cs'))).getText()),
-    `box had "${value}"; call ${/circle\.Area\([^)]*\)/.exec((await vscode.workspace.openTextDocument(file('Program.cs'))).getText())?.[0]}`);
+    expect('Change Signature: the declaration and the call', /Area\(double scale, int times\)/.test(editor.document.getText()) && /circle\.Area\(1, 2\)/.test(read('Program.cs')),
+      `box had "${value}"; call on disk ${/circle\.Area\([^)]*\)/.exec(read('Program.cs'))?.[0]}`);
+    // As VS: Program.cs, in no tab, saved; Shapes.cs, open, left with its changes to save.
+    expect('a file in no tab is saved, the open one left to save', !vscode.workspace.textDocuments.find((d) => /Program\.cs$/.test(d.fileName))?.isDirty && editor.document.isDirty,
+      `Program.cs on disk changed, Shapes.cs dirty ${editor.document.isDirty}`);
 
     // Extract Interface: ICircle with every member, in ICircle.cs, which Circle then implements.
     editor = await caretAt('Shapes.cs', 'class Circle', 6);
@@ -115,18 +115,19 @@ async function run() {
 
     // Pull Members Up: Describe into Shape.
     editor = await caretAt('Shapes.cs', 'class Circle', 6);
-    answers.push((list) => list.filter((m) => /Describe/.test(m.label)));
+    answers.push((list) => list.filter((m) => /Describe/.test(m.label)), () => []);
     await vscode.commands.executeCommand('csharpShooter.refactor.pullMembersUp');
     let text = editor.document.getText();
     expect('Pull Members Up: Describe is Shape\'s', /class Shape\s*\{[^}]*Describe\(\)/.test(text), /class Shape[\s\S]*?\n\}/.exec(text)?.[0].replace(/\s+/g, ' '));
 
-    // Push Members Down: Describe from Shape into Circle and Square.
+    // Push Members Down: Describe from Shape into Circle and Square, left abstract in Shape (Make abstract).
     editor = await caretAt('Shapes.cs', 'class Shape', 6);
-    answers.push((list) => list, (list) => list.filter((m) => /Describe/.test(m.label)));
+    answers.push((list) => list, (list) => list.filter((m) => /Describe/.test(m.label)), (list) => list.filter((m) => /Describe/.test(m.label)));
     await vscode.commands.executeCommand('csharpShooter.refactor.pushMembersDown');
     text = editor.document.getText();
-    expect('Push Members Down: Describe in each derived class, none in Shape', (text.match(/Describe\(\)/g) || []).length === 2 && !/class Shape\s*\{[^}]*Describe/.test(text),
-      `${(text.match(/Describe\(\)/g) || []).length} Describe()`);
+    expect('Push Members Down, Make abstract: an override in each derived class, abstract in Shape',
+      (text.match(/override string Describe\(\)/g) || []).length === 2 && /abstract class Shape/.test(text) && /abstract string Describe\(\);/.test(text),
+      `${(text.match(/override string Describe\(\)/g) || []).length} overrides; Shape abstract ${/abstract class Shape/.test(text)}`);
 
     // Move Type to File: Square into Square.cs.
     editor = await caretAt('Shapes.cs', 'class Square', 6);
@@ -143,11 +144,25 @@ async function run() {
       if (actions.some((a) => a.command?.command === 'csharpShooter.refactor.moveToNamespace')) break;
       await sleep(500);
     }
+    // With Preview Changes on: nothing changes until the Refactor Preview's Apply.
+    const settings = vscode.workspace.getConfiguration('csharpShooter');
+    await settings.update('previewRefactorings', true, vscode.ConfigurationTarget.Global);
     answers.push('Contoso.Shapes.Squares');
-    await vscode.commands.executeCommand('csharpShooter.refactor.moveToNamespace');
+    const moving = vscode.commands.executeCommand('csharpShooter.refactor.moveToNamespace');
+    await sleep(3000);
+    const waited = !/namespace Contoso\.Shapes\.Squares/.test(editor.document.getText());
+    // The panel's Apply, once the panel has the changes.
+    let applied = false;
+    moving.then(() => (applied = true));
+    for (let i = 0; i < 30 && !applied; i++) {
+      await vscode.commands.executeCommand('refactorPreview.apply').then(() => {}, () => {});
+      await sleep(500);
+    }
+    await moving;
+    await settings.update('previewRefactorings', undefined, vscode.ConfigurationTarget.Global);
     await vscode.workspace.saveAll();
-    expect('Move to Namespace: Square is in Contoso.Shapes.Squares', /namespace Contoso\.Shapes\.Squares/.test(read('Square.cs')),
-      `${/namespace [^;\n{]*/.exec(read('Square.cs'))?.[0]}; said: ${said.join(' | ') || 'nothing'}`);
+    expect('Move to Namespace, previewed: unchanged until Apply, then Square is in Contoso.Shapes.Squares', waited && /namespace Contoso\.Shapes\.Squares/.test(read('Square.cs')),
+      `before Apply unchanged ${waited}; ${/namespace [^;\n{]*/.exec(read('Square.cs'))?.[0]}; said: ${said.join(' | ') || 'nothing'}`);
 
     // What the refactorings made builds.
     const built = await new Promise((resolve) => require('child_process').execFile('dotnet', ['build', root, '-nologo', '-v', 'q'], { cwd: root },
