@@ -1,10 +1,13 @@
 node_modules/
-# Fetched and built, not sources: npm run fetch-server, scripts/build-debugger.ps1, scripts/build-testbridge.ps1
+# Fetched and built, not sources: npm run fetch-server, scripts/build-debugger.ps1, scripts/build-testbridge.ps1, scripts/build-roslyn-extension.ps1
 server/
 debugger/
 testbridge/bin/
 testbridge/obj/
 testbridge/out/
+roslyn-extension/bin/
+roslyn-extension/obj/
+roslyn-extension/out/
 *.vsix
 .vscode-test/
 # Local name map for the tests (NAMES_FILE)

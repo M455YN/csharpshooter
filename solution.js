@@ -371,7 +371,8 @@ async function terminalTask(name, cmd, cwd, started = () => {}) {
 
 function registerSolutionView(context, findSolution) {
   const provider = new SolutionProvider(findSolution);
-  const view = vscode.window.createTreeView('csharpShooter.solution', { treeDataProvider: provider, showCollapseAll: true });
+  const editing = require('./solution-edit').registerItemEditing(context, () => view, (p) => revealPath(p));
+  const view = vscode.window.createTreeView('csharpShooter.solution', { treeDataProvider: provider, showCollapseAll: true, canSelectMany: true, dragAndDropController: editing.dragAndDrop });
   context.subscriptions.push(view);
 
   let timer;
@@ -501,7 +502,7 @@ function registerSolutionView(context, findSolution) {
     const item = await findItem(provider, uri.fsPath);
     if (item) await view.reveal(item, { select: true, focus: true, expand: true });
   });
-  return { provider, view, findItem: (p) => findItem(provider, p) };
+  return { provider, view, editing, findItem: (p) => findItem(provider, p) };
 }
 
 module.exports = { registerSolutionView, readSolution, readProject, nestingParents, newPublishProfile, terminalTask };

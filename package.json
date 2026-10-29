@@ -2,7 +2,7 @@
   "name": "csharpshooter",
   "displayName": "CSharpShooter",
   "description": "%description%",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "M455YN",
   "author": {
     "name": "Mateusz Afelt"
@@ -88,6 +88,11 @@
           "default": false,
           "description": "%config.taskRunner.buildBindings%"
         },
+        "csharpShooter.askToTrustDevCertificate": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.askToTrustDevCertificate%"
+        },
         "csharpShooter.launchProfilesInLaunchJson": {
           "type": "string",
           "enum": [
@@ -127,6 +132,11 @@
           "type": "boolean",
           "default": true,
           "description": "%config.visualStudioKeybindings%"
+        },
+        "csharpShooter.previewRefactorings": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.previewRefactorings%"
         }
       }
     },
@@ -215,6 +225,10 @@
       {
         "id": "csharpShooter.taskRunner.bindings",
         "label": "%submenu.taskRunner.bindings%"
+      },
+      {
+        "id": "csharpShooter.refactor",
+        "label": "%submenu.refactor%"
       }
     ],
     "commands": [
@@ -559,6 +573,67 @@
         "command": "csharpShooter.tests.goToTest",
         "title": "%command.tests.goToTest%",
         "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.refactor.changeSignature",
+        "title": "%command.refactor.changeSignature%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.extractInterface",
+        "title": "%command.refactor.extractInterface%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.moveTypeToFile",
+        "title": "%command.refactor.moveTypeToFile%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.moveToNamespace",
+        "title": "%command.refactor.moveToNamespace%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.pullMembersUp",
+        "title": "%command.refactor.pullMembersUp%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.pushMembersDown",
+        "title": "%command.refactor.pushMembersDown%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.solution.cut",
+        "title": "%command.solution.cut%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.copy",
+        "title": "%command.solution.copy%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.paste",
+        "title": "%command.solution.paste%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.delete",
+        "title": "%command.solution.delete%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.rename",
+        "title": "%command.solution.rename%",
+        "category": "%category.Solution%"
       }
     ],
     "menus": {
@@ -789,6 +864,31 @@
           "command": "csharpShooter.tests.goToTest",
           "when": "view == csharpShooter.testExplorer && viewItem == test",
           "group": "2_navigate@1"
+        },
+        {
+          "command": "csharpShooter.solution.cut",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "5_cutcopypaste@1"
+        },
+        {
+          "command": "csharpShooter.solution.copy",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "5_cutcopypaste@2"
+        },
+        {
+          "command": "csharpShooter.solution.paste",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(project|folder|file)( |$)/",
+          "group": "5_cutcopypaste@3"
+        },
+        {
+          "command": "csharpShooter.solution.delete",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "6_modify@1"
+        },
+        {
+          "command": "csharpShooter.solution.rename",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "6_modify@2"
         }
       ],
       "csharpShooter.solution.add": [
@@ -905,6 +1005,26 @@
         {
           "command": "csharpShooter.solution.manageNuGet",
           "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.cut",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.copy",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.paste",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.delete",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.rename",
+          "when": "false"
         }
       ],
       "csharpShooter.taskRunner.bindings": [
@@ -959,6 +1079,39 @@
           "command": "csharpShooter.visualizeData",
           "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "csharpShooter.refactor",
+          "when": "editorLangId == csharp",
+          "group": "1_modification@9"
+        }
+      ],
+      "csharpShooter.refactor": [
+        {
+          "command": "csharpShooter.refactor.changeSignature",
+          "group": "refactor@0"
+        },
+        {
+          "command": "csharpShooter.refactor.extractInterface",
+          "group": "refactor@1"
+        },
+        {
+          "command": "csharpShooter.refactor.moveTypeToFile",
+          "group": "refactor@2"
+        },
+        {
+          "command": "csharpShooter.refactor.moveToNamespace",
+          "group": "refactor@3"
+        },
+        {
+          "command": "csharpShooter.refactor.pullMembersUp",
+          "group": "refactor@4"
+        },
+        {
+          "command": "csharpShooter.refactor.pushMembersDown",
+          "group": "refactor@5"
         }
       ]
     },
@@ -1026,7 +1179,8 @@
               },
               "hotReload": {
                 "type": "boolean",
-                "default": false
+                "default": true,
+                "description": "%debugger.hotReload%"
               },
               "project": {
                 "type": "string",
@@ -1460,6 +1614,46 @@
         "key": "ctrl+r f",
         "command": "csharpShooter.tests.runFailed",
         "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+r ctrl+o",
+        "command": "csharpShooter.refactor.changeSignature",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && editorLangId == csharp && !editorReadonly"
+      },
+      {
+        "key": "ctrl+r ctrl+v",
+        "command": "csharpShooter.refactor.changeSignature",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && editorLangId == csharp && !editorReadonly"
+      },
+      {
+        "key": "ctrl+r ctrl+i",
+        "command": "csharpShooter.refactor.extractInterface",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && editorLangId == csharp && !editorReadonly"
+      },
+      {
+        "key": "ctrl+x",
+        "command": "csharpShooter.solution.cut",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "ctrl+c",
+        "command": "csharpShooter.solution.copy",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "ctrl+v",
+        "command": "csharpShooter.solution.paste",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "delete",
+        "command": "csharpShooter.solution.delete",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "f2",
+        "command": "csharpShooter.solution.rename",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
       }
     ],
     "languages": [
@@ -1597,6 +1791,7 @@
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",
     "build-testbridge": "powershell -NoProfile -File scripts/build-testbridge.ps1",
+    "build-roslyn-extension": "powershell -NoProfile -File scripts/build-roslyn-extension.ps1",
     "test": "node test/runTest.js",
     "check-l10n": "node test/l10n.js",
     "bundle": "npx -y esbuild@0.25.12 extension.js --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js --log-level=warning",

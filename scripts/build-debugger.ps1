@@ -1,9 +1,9 @@
-# Builds Passenger's debug adapter for .NET 10 into debugger/: fetches the commit the port was made on, applies
+﻿# Builds Passenger's debug adapter for .NET 10 into debugger/: fetches the commit the port was made on, applies
 # debugger-port/net10.patch, publishes.
 #   powershell -File scripts/build-debugger.ps1 [-Commit <sha>] [-Runtime win-x64]
 param(
-    # Passenger's main on its way to 0.2.3 (2026-10-28): the patch is made against it.
-    [string]$Commit = 'b9aee837f4e66a484dcabc24feee1ee7160bf16a',
+    # Passenger's main on its way to 0.2.3 (2026-10-29): the patch is made against it.
+    [string]$Commit = '7358d41110cbeb07b513d48dab17eb9102b710c1',
     [string]$Runtime = 'win-x64'
 )
 $ErrorActionPreference = 'Stop'

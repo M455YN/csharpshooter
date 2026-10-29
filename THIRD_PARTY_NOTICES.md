@@ -1,12 +1,16 @@
-# Third-party notices
+﻿# Third-party notices
 
-CSharpShooter bundles two programs it did not write, and one file; some of its code follows code of others.
+CSharpShooter bundles two programs it did not write, and one file, and part of a third; some of its code follows code of others.
 
 ## The .NET debugger (`debugger/`)
 
 The debug adapter of [Passenger](https://github.com/Zaneris/passenger), its main on the way to 0.2.3, ported to .NET 10 by
-`debugger-port/net10.patch` (commit `b9aee83`). Its licence and the notices for what it carries in turn are copied beside it by
+`debugger-port/net10.patch` (commit `7358d41`). Its licence and the notices for what it carries in turn are copied beside it by
 `scripts/build-debugger.ps1` (`debugger/LICENSE.Passenger.txt`, `debugger/THIRD_PARTY_NOTICES.Passenger.md`).
+The handlers in the C# server (`roslyn-extension/`: Hot Reload's `HotReload.cs`, `HotReloadMessages.cs` and
+`StaleCallers.cs`; the refactorings' `Signatures.cs`, `Interfaces.cs`, `TypeMoves.cs`, `MemberMoves.cs` and `Changes.cs`,
+with `RefactoringMessages.cs` and `RefactoringHandlers.cs` cut from its `Messages.cs` and `Handlers.cs`) are
+Passenger.Roslyn.Extension's at the same commit, under the same licence.
 
 ```
 MIT License

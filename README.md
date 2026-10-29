@@ -1,4 +1,4 @@
-# CSharpShooter for VSCodium
+﻿# CSharpShooter for VSCodium
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
@@ -22,7 +22,7 @@ npm run fetch-monaco
 without its TypeScript, CSS, HTML and JSON workers (6.6 MB). `fetch-sqltools` downloads Microsoft's SQL Tools Service (below under *SQL*) into `sqltools/`, without its own copy of
 .NET, the migration tool and the texts of languages other than English and Polish (139 MB instead of 337 MB).
 
-The debugger is Passenger's, its main on the way to 0.2.3 (commit `b9aee83` of 2026-10-28, which the script fetches:
+The debugger is Passenger's, its main on the way to 0.2.3 (commit `7358d41` of 2026-10-29, which the script fetches:
 0.2.2 and the fixes since, among them pointers shown as their address and type, C# 15 unions as the value they hold,
 steps over an `await` in .NET 11's runtime-async methods, clearer word on an evaluation that does not end, with
 `PASSENGER_WAIT_SCALE` to give a slow machine longer, and Hot Reload moving running frames to the new code), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
@@ -36,6 +36,13 @@ The Test Explorer's bridge to vstest.console (`testbridge/`, below under *Test E
 
 ```bash
 npm run build-testbridge
+```
+
+CSharpShooter's extension to the C# server (`roslyn-extension/`: Passenger's handlers for *Hot Reload* and the
+*Refactorings* below), compiled against `server/`'s own assemblies, so after `npm run fetch-server`:
+
+```bash
+npm run build-roslyn-extension
 ```
 
 The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspended` and `SafeProcessHandle.Resume`
@@ -226,6 +233,11 @@ are. A profile of any project can still be an entry of its own, written by hand:
 
 (`configuration`, `build: false`, `launchBrowser: false`, `env` and `args` override the profile.)
 
+A profile with an `https` URL first has ASP.NET Core's HTTPS development certificate checked, once a window session,
+as Visual Studio 2026 does (`dotnet dev-certs https --trust --check`): installed when there is none, and when it is not
+trusted VS's own question, *Ustawianie certyfikatu SSL programu ASP.NET Core jako zaufanego*, with *Tak* (`dotnet dev-certs
+https --trust`, after Windows' own prompt) and *Nie pytaj mnie ponownie* (`csharpShooter.askToTrustDevCertificate`: false).
+
 ### launch.json written for Microsoft's debuggers
 
 F5 on a configuration of type `coreclr` (Microsoft's C# extension) or `dotnet` (C# Dev Kit) runs it on CSharpShooter's
@@ -241,6 +253,45 @@ debugger when the extension that owns the type is not installed or is disabled (
 - Left out, and named in the CSharpShooter output: `sourceFileMap`, `symbolOptions`, `requireExactSource`,
   `sourceLinkOptions`, `logging` and the like. `pipeTransport` (a remote machine or container) is refused.
 
+## Hot Reload
+
+Edits to `.cs`, `.razor` and `.cshtml` files saved while the program runs under the debugger (F5) go into it without a
+restart, paused or running, as Visual Studio's Hot Reload on save. On by default for a Debug build; `"hotReload": false`
+in a `launch.json` configuration turns it off. It is Passenger's way: Roslyn's own Edit and Continue service, in the C#
+server through Passenger's handlers (`roslyn-extension/`, loaded with the server's `--extension`), compares the
+solution as the editors have it with what was built and emits the deltas; the debugger applies them (`applyChanges`).
+The status bar says what came of each save.
+
+- An edit the runtime cannot take while the program runs (Roslyn's rude edits: a signature changed under callers, a
+  field added to a struct, and the like) is listed in Problems (source *Hot Reload*) with *Uruchom ponownie* to restart;
+  code that does not compile is applied once it does.
+- An IIS Express profile gets it too, for the modules the app loads after the debugger attaches.
+- The open page does not reload itself yet: refresh it in the browser.
+
+## Refactorings
+
+The refactorings Visual Studio 2026 asks options for, with its names and keys, made by Passenger's handlers in the C#
+server (`roslyn-extension/`): Ctrl+. offers those that apply at the caret, the editor's menu has them under
+*Refaktoryzuj*, and each is one edit Ctrl+Z takes back.
+
+- *Zmień sygnaturę...* (Ctrl+R, Ctrl+O or Ctrl+R, Ctrl+V): the signature as one line to edit (`double Area(double
+  scale, int times)`): parameters reordered, removed, renamed or added, the method renamed, its return type changed;
+  a new parameter asks the value every call passes (*Wartość miejsca wywołania*). The declaration, its overrides and
+  implementations, and every call change; a use the new signature no longer fits is named, not changed.
+- *Wyodrębnij interfejs...* (Ctrl+R, Ctrl+I): the interface's name and members; a file of its own beside the type's,
+  which then implements it.
+- *Przenieś typ do {plik}.cs* and *Przenieś do przestrzeni nazw...*: the type into a new file, or into another
+  namespace with its users following.
+- *Ściągnij składowe aż do typu bazowego...* and, as Passenger has it, *Wypchnij składowe w dół do typów
+  pochodnych...*: the members chosen into the base type, or into each derived class chosen.
+
+VS Code's input boxes and lists stand for VS's dialogs. Moving members asks VS's *Ustaw jako abstrakcyjny* for each: pulled
+up into a class, abstract there and an `override` here; pushed down, left abstract here. As in VS, a file the change
+reaches that is open in no tab is saved, and one open is left with its changes to save. `csharpShooter.previewRefactorings`
+shows each change first in VS Code's Refactor Preview, ticked, as VS's *Podgląd zmian* (its one unticked line, *Podgląd
+zmian*, is empty: it only opens the panel). A file just made (by *Przenieś typ*) joins the refactorings once the server has
+loaded it into its project.
+
 ## Solution Explorer
 
 With a solution in the workspace the side bar opens on it, as VS opens on its Solution Explorer. Its icon comes after
@@ -255,6 +306,14 @@ and `*.user` hidden, related files nested (`Foo.cshtml.cs` under `Foo.cshtml`, `
 the title bar has **Sync with Active Document** and **Refresh**; a project's or the solution's context menu has
 Build, Rebuild, Clean (`dotnet build/clean` in a task), Edit Project File, Open in Terminal, Open Folder in File
 Explorer and Copy Full Path. It follows files created and deleted on disk.
+
+Files and folders are edited as in VS 2026, a file's nested files (`Foo.cshtml.cs` under `Foo.cshtml`) going with it:
+*Zmień nazwę* (F2; a `.cs` file's class renamed with every use when VS's question, *Zmieniasz nazwę pliku. Czy chcesz także
+zmienić nazwy…*, gets *Tak*), *Usuń* (Del, after VS's *Element „…” zostanie usunięty.*, into the Recycle Bin where VS deletes
+for good), *Wytnij*, *Kopiuj* and *Wklej* (Ctrl+X, Ctrl+C, Ctrl+V; a copy beside its original is named as VS names it,
+`Foo - kopiować.cs` in Polish), and drag and drop (a move; files dragged in from VS Code's Explorer or the system are
+copied). Several items can be selected. Moves and renames are VS Code's own file edits, so open editors follow them;
+what a rename changes in files open in no tab is saved, as VS saves it.
 
 **Opublikuj...** (a project's menu) opens VS 2026's Publish page in an editor tab: the profile to publish with, *Nowy
 profil*, *Opublikuj*, *Więcej akcji* (*Zmień nazwę*, *Usuń*), how the last publish ended (*Otwórz folder*), and *Ustawienia
@@ -372,7 +431,7 @@ the projects' folders without `bin`, `obj`, `node_modules` and binary files (abo
 10 000 files). VS adds classes and methods there, from its language services; this adds text.
 
 Not like VS (yet): files a project includes from outside its folder or removes with `<Compile Remove>` show as on disk;
-no drag and drop, rename or other item templates; the search has no *Wyszukuj wśród elementów
+no rename, delete or move of projects and solution folders, no other item templates; the search has no *Wyszukuj wśród elementów
 zewnętrznych* (VS's External Dependencies) and no index saved between sessions. VS Code gives a view above the tree at
 least 120 px, so the box has room below it (the result count goes there).
 
@@ -512,7 +571,7 @@ EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/folder SUITE=test/sql-suite.
 
 - HTML help inside `.cshtml` (HTML element/attribute completion, HTML formatting): Razor asks the client for it, and this
   extension answers empty. Tag helpers, components and C# come from Razor itself and work.
-- Hot Reload (Passenger's `applyChanges` request), solution view: none.
+- A page in the browser reloaded after Hot Reload applies an edit (`dotnet watch` does it with its BrowserRefresh).
 - *Add to Watch* and *Copy as Expression* on a member deeper than the frame's own (a field of a field) give the member's
   name alone, Passenger's `evaluateName` there, which the frame does not know. The magnifier builds the whole expression
   itself (`variable-paths.js`); the fix is to rewrite `evaluateName` in `variables` responses with it, in the inline

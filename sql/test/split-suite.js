@@ -31,6 +31,11 @@ async function run() {
     const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
     expect('a .sql file opens in CSharpShooter SQL\'s editor page, the extension active', sql.isActive && tab?.input instanceof vscode.TabInputCustom && tab.input.viewType === 'csharpShooter.sqlEditor',
       `active ${sql.isActive}, tab ${tab?.label} (${tab?.input?.viewType})`);
+    // Monaco in the page, with only its SQL language left of the ones it ships (scripts/fetch-monaco.js).
+    const editors = sql.exports.sql.editors();
+    let page;
+    for (let i = 0; i < 80 && !(page = editors.page({ uri: vscode.Uri.file(file) }))?.monacoReady; i++) await sleep(250);
+    expect('the page\'s Monaco editor is ready', !!page?.monacoReady, `monacoReady ${page?.monacoReady}`);
     const commands = await vscode.commands.getCommands(true);
     expect('its commands are there (Wykonaj, Połącz, Eksplorator obiektów)', ['csharpShooter.sql.execute', 'csharpShooter.sql.connect'].every((c) => commands.includes(c)),
       commands.filter((c) => c.startsWith('csharpShooter.sql.')).length + ' csharpShooter.sql.* commands');

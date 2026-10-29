@@ -11,8 +11,10 @@ const { launchProgress, buildLog, followBuildLog } = require('./build-progress')
 const { buildArgs } = require('./startup');
 const upToDate = require('./up-to-date');
 const iisExpress = require('./iis-express');
+const devCerts = require('./dev-certs');
 
 const TYPE = 'csharpshooter';
+let log = () => {}; // the CSharpShooter output
 
 /** JSON with comments and trailing commas, as VS writes and reads launchSettings.json and appsettings.json. */
 function parseJsonc(text) {
@@ -261,12 +263,13 @@ class LaunchProfiles {
       vscode.window.showErrorMessage(t('No launch profile "{0}" in {1} that runs here.', config.launchProfile, path.basename(project)));
       return undefined;
     }
-    if (entry?.profile.commandName === 'IISExpress' && iisExpress.available()) return this.launchIisExpress(config, project, entry, props, progress, handOver);
+    if (entry?.profile.commandName === 'IISExpress' && iisExpress.available()) return this.launchIisExpress(config, project, entry, props, progress, handOver, settings);
     const profile = entry?.profile || {};
     const urls = entry ? urlsOf(entry) : [];
     const env = { ...(profile.environmentVariables || {}), ...(config.env || {}) };
     if (urls.length && !env.ASPNETCORE_URLS) env.ASPNETCORE_URLS = urls.join(';');
     const args = config.args ?? (profile.commandLineArgs ? profile.commandLineArgs.split(' ').filter(Boolean) : []);
+    if (urls.some((u) => /^https:/i.test(u))) await trustDevCertificate();
     // Another process on the profile's port (an earlier run left going) keeps the app from listening there, and would
     // pass for it to the browser's wait below.
     const portBusy = urls[0] && (await accepts(urls[0]));
@@ -277,6 +280,8 @@ class LaunchProfiles {
       cwd: config.cwd || (profile.workingDirectory ? path.resolve(path.dirname(project), profile.workingDirectory) : path.dirname(project)),
       args,
       env,
+      // Hot Reload, as VS has it on for a Debug build (Edit and Continue needs its unoptimized code); hotReload: false turns it off.
+      hotReload: config.hotReload ?? /^debug$/i.test(settings.configuration),
       // The browser, as VS opens it: once the app says it listens, at the profile's launchUrl.
       __browser: profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: profile.launchUrl || '', portBusy } : undefined,
     };
@@ -303,12 +308,15 @@ class LaunchProfiles {
    *  (its console the task's terminal, as VS's tray icon shows it), and the debugger attached to the app: in-process to
    *  iisexpress.exe itself, which Passenger takes hold of as the module starts its runtime (the browser's first request),
    *  so breakpoints in Startup are hit; out of process to the module's child, once a request has started it. */
-  async launchIisExpress(config, project, entry, props, progress, handOver) {
+  async launchIisExpress(config, project, entry, props, progress, handOver, settings) {
     const state = this.state;
     const { file, site, pool } = iisExpress.writeConfig(project, readLaunchSettings(project).iisSettings);
     const model = iisExpress.webConfig(project, props);
     const program = config.program || props.TargetPath;
     const env = { ...(entry.profile.environmentVariables || {}), ...(config.env || {}), ...iisExpress.launcher(program) };
+    const hotReload = config.hotReload ?? /^debug$/i.test(settings.configuration);
+    // The runtime takes edits only when started so; the debugger, attached, gives each module loading after Edit and Continue.
+    if (hotReload) env.DOTNET_MODIFIABLE_ASSEMBLIES = 'debug';
     const urls = urlsOf(entry);
     const portBusy = urls[0] && (await accepts(urls[0]));
     if (portBusy) vscode.window.showWarningMessage(t('{0} is already in use by another process; {1} may not start there.', urls[0], path.basename(project, '.csproj')));
@@ -369,7 +377,7 @@ class LaunchProfiles {
       return undefined;
     }
     progress.report(t('Starting with the debugger…'));
-    const resolved = { ...config, request: 'attach', processId, __iisExpress: id, __browser: browser };
+    const resolved = { ...config, request: 'attach', processId, hotReload, __iisExpress: id, __browser: browser };
     if (browser?.base && !portBusy) {
       handOver();
       const progressId = String((state.progressIds = (state.progressIds || 0) + 1));
@@ -378,6 +386,41 @@ class LaunchProfiles {
     }
     return resolved;
   }
+}
+
+/** Visual Studio 2026's question before F5 of a profile with an https URL, in its words: trust ASP.NET Core's development
+ *  certificate, so the browser does not warn of it (dev-certs.js). csharpShooter.askToTrustDevCertificate: false stops it. */
+async function trustDevCertificate() {
+  const settings = vscode.workspace.getConfiguration('csharpShooter');
+  if (!settings.get('askToTrustDevCertificate', true)) return;
+  const errors = {
+    1: t('Failed to create the certificate.'),
+    2: t('Failed saving the certificate.'),
+    3: t('Failed exporting the certificate.'),
+    4: t('Failed trusting the certificate.'),
+    [devCerts.NO_CERTIFICATE]: t('The ASP.NET developer certificate is not installed.'),
+    [devCerts.NOT_TRUSTED]: t('The certificate is not trusted.'),
+    [-1]: t('Failed with a critical error.'),
+  };
+  await devCerts.ensureTrusted({
+    dotnet: async (args) => {
+      const code = await devCerts.devCerts(args);
+      log(`dotnet dev-certs https ${args.join(' ')}: exit ${code}`);
+      return code;
+    },
+    ask: async () => {
+      const yes = t('Yes');
+      const never = t("Don't ask me again");
+      const chosen = await Promise.resolve(vscode.window.showWarningMessage(t('Trust ASP.NET Core SSL Certificate'), {
+        modal: true,
+        detail: t('This project is configured to use SSL. To avoid SSL warnings in the browser you can choose to trust the self-signed certificate that ASP.NET Core has generated.\n\nWould you like to trust the ASP.NET Core SSL certificate?'),
+      }, yes, never)).catch((e) => log(`The certificate question was not shown: ${e.message}`));
+      log(`The certificate question answered: ${chosen ?? 'no'}`);
+      if (chosen === never) await settings.update('askToTrustDevCertificate', false, vscode.ConfigurationTarget.Global);
+      return chosen === yes ? 'yes' : chosen === never ? 'never' : 'no';
+    },
+    fail: (code) => vscode.window.showWarningMessage(t('The following error occurred running the dev-certs tool to trust the ASP.NET Core development certificate. {0}', errors[code] || t('Failed with an error.'))),
+  });
 }
 
 /** Runs a resolved launch without a debugger: a task running the program (dotnet <dll>, or its apphost), then the
@@ -550,7 +593,8 @@ async function offerProfileEntries(context) {
   await addProfileEntries(missing);
 }
 
-function registerLaunch(context) {
+function registerLaunch(context, output) {
+  log = (line) => output?.appendLine(line);
   const state = { changed: new vscode.EventEmitter(), sessions: new Set() };
   const provider = new LaunchProfiles(state);
   // Something to restart: an app under the debugger, a start still building, or a run without the debugger.
