@@ -1,4 +1,4 @@
-# CSharpShooter for VSCodium
+﻿# CSharpShooter for VSCodium
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
@@ -22,7 +22,7 @@ npm run fetch-monaco
 without its TypeScript, CSS, HTML and JSON workers (6.6 MB). `fetch-sqltools` downloads Microsoft's SQL Tools Service (below under *SQL*) into `sqltools/`, without its own copy of
 .NET, the migration tool and the texts of languages other than English and Polish (139 MB instead of 337 MB).
 
-The debugger is Passenger's, its main on the way to 0.2.3 (commit `b9aee83` of 2026-10-28, which the script fetches:
+The debugger is Passenger's, its main on the way to 0.2.3 (commit `7358d41` of 2026-10-29, which the script fetches:
 0.2.2 and the fixes since, among them pointers shown as their address and type, C# 15 unions as the value they hold,
 steps over an `await` in .NET 11's runtime-async methods, clearer word on an evaluation that does not end, with
 `PASSENGER_WAIT_SCALE` to give a slow machine longer, and Hot Reload moving running frames to the new code), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
