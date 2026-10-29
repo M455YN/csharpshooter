@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Hot Reload's half in the C# language server: Passenger's Edit and Continue handlers (HotReload.cs,
+       HotReloadMessages.cs, StaleCallers.cs from Passenger.Roslyn.Extension at 7358d41, MIT), loaded with the server's
+       extension option. Compiled against the server's own assemblies in server/ (npm run fetch-server), carrying none of them;
+       published into hotreload-extension/out by scripts/build-hotreload.ps1. -->
+  <PropertyGroup>
+    <!-- The server's: the extension runs in its process. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- Roslyn marks its extension message handlers experimental. -->
+    <NoWarn>$(NoWarn);RSEXPERIMENTAL008</NoWarn>
+    <ServerFolder>$(MSBuildThisFileDirectory)../server/</ServerFolder>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="out/**;bin/**;obj/**" />
+    <Reference Include="$(ServerFolder)Microsoft.CodeAnalysis.dll;$(ServerFolder)Microsoft.CodeAnalysis.CSharp.dll;$(ServerFolder)Microsoft.CodeAnalysis.Workspaces.dll;$(ServerFolder)Microsoft.CodeAnalysis.CSharp.Workspaces.dll;$(ServerFolder)Microsoft.CodeAnalysis.ExternalAccess.Extensions.dll;$(ServerFolder)Microsoft.CodeAnalysis.Features.dll" Private="false" />
+    <!-- The server's Edit and Continue service is internal: made public to compile against. -->
+    <Publicize Include="Microsoft.CodeAnalysis.Features;Microsoft.CodeAnalysis.Workspaces" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.3.2" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

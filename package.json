@@ -1026,7 +1026,8 @@
               },
               "hotReload": {
                 "type": "boolean",
-                "default": false
+                "default": true,
+                "description": "%debugger.hotReload%"
               },
               "project": {
                 "type": "string",
@@ -1597,6 +1598,7 @@
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",
     "build-testbridge": "powershell -NoProfile -File scripts/build-testbridge.ps1",
+    "build-hotreload": "powershell -NoProfile -File scripts/build-hotreload.ps1",
     "test": "node test/runTest.js",
     "check-l10n": "node test/l10n.js",
     "bundle": "npx -y esbuild@0.25.12 extension.js --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js --log-level=warning",

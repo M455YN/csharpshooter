@@ -659,5 +659,17 @@
   "<none>": "<none>",
   "=== REQUEST ===": "=== ŻĄDANIE ===",
   "=== RESPONSE ===": "=== ODPOWIEDŹ ===",
-  "Open .sql files in an editor like SSMS 22 and Visual Studio 2026 (connections, results below the query, Object Explorer)? It is CSharpShooter SQL, an extension of its own.": "Otwierać pliki .sql w edytorze jak w SSMS 22 i Visual Studio 2026 (połączenia, wyniki pod zapytaniem, Eksplorator obiektów)? To CSharpShooter SQL, osobne rozszerzenie."
+  "Open .sql files in an editor like SSMS 22 and Visual Studio 2026 (connections, results below the query, Object Explorer)? It is CSharpShooter SQL, an extension of its own.": "Otwierać pliki .sql w edytorze jak w SSMS 22 i Visual Studio 2026 (połączenia, wyniki pod zapytaniem, Eksplorator obiektów)? To CSharpShooter SQL, osobne rozszerzenie.",
+  "the C# language server has not started": "serwer języka C# nie został uruchomiony",
+  "the C# language server gave no answer": "serwer języka C# nie odpowiedział",
+  "The program's runtime did not say which edits it can take": "Środowisko uruchomieniowe programu nie podało, jakie zmiany może przyjąć",
+  "{0} cannot be edited": "{0} nie może być edytowany",
+  "Hot Reload failed: {0}": "Ponowne ładowanie na gorąco nie powiodło się: {0}",
+  "No managed code changes to apply.": "Brak zmian kodu zarządzanego do zastosowania.",
+  "Restart is needed to apply the changes: {0}": "Aby zastosować zmiany, wymagane jest ponowne uruchomienie: {0}",
+  "Unable to apply changes due to compilation errors: {0}": "Nie można zastosować zmian z powodu błędów kompilacji: {0}",
+  "The debugger could not apply the changes: {0}": "Debuger nie mógł zastosować zmian: {0}",
+  "The runtime refused the update to {0}: restart to apply changes": "Środowisko uruchomieniowe odrzuciło aktualizację {0}: uruchom ponownie, aby zastosować zmiany",
+  "Hot Reload could not start: {0}": "Nie można uruchomić ponownego ładowania na gorąco: {0}",
+  "Changes applied: {0}": "Zastosowano zmiany: {0}"
 }

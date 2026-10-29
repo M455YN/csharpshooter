@@ -4,6 +4,12 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Hot Reload: `.cs`, `.razor` and `.cshtml` edits saved while the program runs under the debugger go into it without a restart, as Visual Studio's Hot Reload on save (Roslyn's Edit and Continue through Passenger's handlers in the C# server, applied by the debugger). On for a Debug build; `"hotReload": false` turns it off. Edits the runtime cannot take are listed in Problems with *Uruchom ponownie*.
+
 ## [0.6.0] - 2026-10-28
 
 ### Added

@@ -76,6 +76,7 @@
   "debugger.launchProfile": "Profil z Properties/launchSettings.json projektu: jego środowisko, adresy URL (ASPNETCORE_URLS), argumenty i przeglądarka. Profile IISExpress działają na Kestrelu pod adresami IIS Express.",
   "debugger.configuration": "Konfiguracja kompilacji.",
   "debugger.build": "Skompiluj projekt przed uruchomieniem.",
+  "debugger.hotReload": "Ponowne ładowanie na gorąco: zmiany w plikach C#, .razor i .cshtml zapisane podczas debugowania trafiają do działającego programu bez ponownego uruchamiania. Domyślnie włączone dla kompilacji Debug.",
   "debugger.launchBrowser": "Otwórz przeglądarkę, gdy profil o to prosi, kiedy aplikacja zacznie nasłuchiwać.",
   "debugger.startupProject": "Uruchom projekt startowy (pasek stanu, Solution Explorer: Ustaw jako projekt startowy) z jego aktywnym profilem uruchamiania (ActiveDebugProfile w jego .csproj.user, jak trzyma go Visual Studio), jak F5 w VS.",
   "debugger.framework": "Platforma docelowa projektu z wieloma platformami (ActiveDebugFramework z jego .csproj.user dla projektu startowego).",

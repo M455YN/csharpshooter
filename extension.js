@@ -25,12 +25,14 @@ const { registerHttpFiles } = require('./http-file');
 const { launchProgress } = require('./build-progress');
 const { readSolution } = require('./solution');
 const { TranslatingAdapter } = require('./debug-l10n');
+const { registerHotReload } = require('./hot-reload');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
 const toServerUri = (uri) => (uri.scheme === 'file' ? pathToFileURL(uri.fsPath).href : uri.toString());
 
 let client;
+let hotReloadIn; // the client whose server activated Hot Reload's extension
 let loading; // what the start is doing, until the projects are loaded (for the tests: its lines)
 let output;
 // Resolved once the server has loaded the solution; the tests wait on it.
@@ -121,6 +123,9 @@ async function startServer(context) {
   if (setting('razorViewsInDesignTime')) {
     args.push('--csharpDesignTimePath', context.asAbsolutePath(path.join('designtime', 'CSharpShooter.Razor.DesignTime.targets')));
   }
+  // Hot Reload's half in the server (hotreload-extension/, scripts/build-hotreload.ps1), activated once it has started.
+  const hotReloadDll = context.asAbsolutePath(path.join('hotreload-extension', 'out', 'CSharpShooter.HotReload.dll'));
+  if (fs.existsSync(hotReloadDll)) args.push('--extension', hotReloadDll);
 
   client = new LanguageClient('csharpShooter', 'C# (Roslyn)',
     // Without tiered PGO's instrumented code the server's JIT spends less while Razor generates a project's views: on a
@@ -212,6 +217,13 @@ async function startServer(context) {
   } catch (e) {
     loading.finish();
     throw e;
+  }
+  if (args.includes(hotReloadDll)) {
+    const started = client;
+    started.sendRequest('server/_vs_activateExtension', { assemblyFilePath: hotReloadDll }).then((answer) => {
+      if (answer?.workspaceMessageHandlers?.length) hotReloadIn = started;
+      else output.appendLine(`Hot Reload's extension was not activated: ${JSON.stringify(answer?.extensionException ?? answer)}`);
+    }, (e) => output.appendLine(`Hot Reload's extension was not activated: ${e.message}`));
   }
   const solution = await findSolution();
   if (solution) {
@@ -398,11 +410,12 @@ async function activate(context) {
   const configurationManager = registerConfigurationManager(context, findSolution, startup.startup);
   registerSqlOffer(context);
   const httpFiles = registerHttpFiles(context);
+  const hotReload = registerHotReload(context, () => (client && client === hotReloadIn ? client : undefined));
   const markStartup = async () => solutionView.provider.setStartup(await startup.startup.project());
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, httpFiles, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, httpFiles, hotReload, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {

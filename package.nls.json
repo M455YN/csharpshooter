@@ -76,6 +76,7 @@
   "debugger.launchProfile": "A profile of the project's Properties/launchSettings.json: its environment, URLs (ASPNETCORE_URLS), arguments and browser. IISExpress profiles run on Kestrel at the IIS Express URLs.",
   "debugger.configuration": "Build configuration.",
   "debugger.build": "Build the project before it starts.",
+  "debugger.hotReload": "Hot Reload: C#, .razor and .cshtml edits saved while the program runs under the debugger go into it without a restart. On by default for a Debug build.",
   "debugger.launchBrowser": "Open the browser when a profile asks for it, once the app listens.",
   "debugger.startupProject": "Run the startup project (status bar, Solution Explorer: Set as Startup Project) with its active launch profile (its .csproj.user's ActiveDebugProfile, as Visual Studio keeps it), as VS's F5.",
   "debugger.framework": "Target framework of a multi-targeted project (its .csproj.user's ActiveDebugFramework for the startup project).",

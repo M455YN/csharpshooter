@@ -38,6 +38,13 @@ The Test Explorer's bridge to vstest.console (`testbridge/`, below under *Test E
 npm run build-testbridge
 ```
 
+Hot Reload's half in the C# server (`hotreload-extension/`, below under *Hot Reload*), compiled against `server/`'s own
+assemblies, so after `npm run fetch-server`:
+
+```bash
+npm run build-hotreload
+```
+
 The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspended` and `SafeProcessHandle.Resume`
 (a suspended `CreateProcessW` with piped standard streams, then `ResumeThread`), `KillOnParentExit` (a kill-on-close
 Windows job), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator. Off Windows, `StartDetached` is dropped,
@@ -240,6 +247,21 @@ debugger when the extension that owns the type is not installed or is disabled (
   project and profile.
 - Left out, and named in the CSharpShooter output: `sourceFileMap`, `symbolOptions`, `requireExactSource`,
   `sourceLinkOptions`, `logging` and the like. `pipeTransport` (a remote machine or container) is refused.
+
+## Hot Reload
+
+Edits to `.cs`, `.razor` and `.cshtml` files saved while the program runs under the debugger (F5) go into it without a
+restart, paused or running, as Visual Studio's Hot Reload on save. On by default for a Debug build; `"hotReload": false`
+in a `launch.json` configuration turns it off. It is Passenger's way: Roslyn's own Edit and Continue service, in the C#
+server through Passenger's handlers (`hotreload-extension/`, loaded with the server's `--extension`), compares the
+solution as the editors have it with what was built and emits the deltas; the debugger applies them (`applyChanges`).
+The status bar says what came of each save.
+
+- An edit the runtime cannot take while the program runs (Roslyn's rude edits: a signature changed under callers, a
+  field added to a struct, and the like) is listed in Problems (source *Hot Reload*) with *Uruchom ponownie* to restart;
+  code that does not compile is applied once it does.
+- An IIS Express profile gets it too, for the modules the app loads after the debugger attaches.
+- The open page does not reload itself yet: refresh it in the browser.
 
 ## Solution Explorer
 
@@ -512,7 +534,7 @@ EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/folder SUITE=test/sql-suite.
 
 - HTML help inside `.cshtml` (HTML element/attribute completion, HTML formatting): Razor asks the client for it, and this
   extension answers empty. Tag helpers, components and C# come from Razor itself and work.
-- Hot Reload (Passenger's `applyChanges` request), solution view: none.
+- A page in the browser reloaded after Hot Reload applies an edit (`dotnet watch` does it with its BrowserRefresh).
 - *Add to Watch* and *Copy as Expression* on a member deeper than the frame's own (a field of a field) give the member's
   name alone, Passenger's `evaluateName` there, which the frame does not know. The magnifier builds the whole expression
   itself (`variable-paths.js`); the fix is to rewrite `evaluateName` in `variables` responses with it, in the inline

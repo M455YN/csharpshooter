@@ -261,7 +261,7 @@ class LaunchProfiles {
       vscode.window.showErrorMessage(t('No launch profile "{0}" in {1} that runs here.', config.launchProfile, path.basename(project)));
       return undefined;
     }
-    if (entry?.profile.commandName === 'IISExpress' && iisExpress.available()) return this.launchIisExpress(config, project, entry, props, progress, handOver);
+    if (entry?.profile.commandName === 'IISExpress' && iisExpress.available()) return this.launchIisExpress(config, project, entry, props, progress, handOver, settings);
     const profile = entry?.profile || {};
     const urls = entry ? urlsOf(entry) : [];
     const env = { ...(profile.environmentVariables || {}), ...(config.env || {}) };
@@ -277,6 +277,8 @@ class LaunchProfiles {
       cwd: config.cwd || (profile.workingDirectory ? path.resolve(path.dirname(project), profile.workingDirectory) : path.dirname(project)),
       args,
       env,
+      // Hot Reload, as VS has it on for a Debug build (Edit and Continue needs its unoptimized code); hotReload: false turns it off.
+      hotReload: config.hotReload ?? /^debug$/i.test(settings.configuration),
       // The browser, as VS opens it: once the app says it listens, at the profile's launchUrl.
       __browser: profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: profile.launchUrl || '', portBusy } : undefined,
     };
@@ -303,12 +305,15 @@ class LaunchProfiles {
    *  (its console the task's terminal, as VS's tray icon shows it), and the debugger attached to the app: in-process to
    *  iisexpress.exe itself, which Passenger takes hold of as the module starts its runtime (the browser's first request),
    *  so breakpoints in Startup are hit; out of process to the module's child, once a request has started it. */
-  async launchIisExpress(config, project, entry, props, progress, handOver) {
+  async launchIisExpress(config, project, entry, props, progress, handOver, settings) {
     const state = this.state;
     const { file, site, pool } = iisExpress.writeConfig(project, readLaunchSettings(project).iisSettings);
     const model = iisExpress.webConfig(project, props);
     const program = config.program || props.TargetPath;
     const env = { ...(entry.profile.environmentVariables || {}), ...(config.env || {}), ...iisExpress.launcher(program) };
+    const hotReload = config.hotReload ?? /^debug$/i.test(settings.configuration);
+    // The runtime takes edits only when started so; the debugger, attached, gives each module loading after Edit and Continue.
+    if (hotReload) env.DOTNET_MODIFIABLE_ASSEMBLIES = 'debug';
     const urls = urlsOf(entry);
     const portBusy = urls[0] && (await accepts(urls[0]));
     if (portBusy) vscode.window.showWarningMessage(t('{0} is already in use by another process; {1} may not start there.', urls[0], path.basename(project, '.csproj')));
@@ -369,7 +374,7 @@ class LaunchProfiles {
       return undefined;
     }
     progress.report(t('Starting with the debugger…'));
-    const resolved = { ...config, request: 'attach', processId, __iisExpress: id, __browser: browser };
+    const resolved = { ...config, request: 'attach', processId, hotReload, __iisExpress: id, __browser: browser };
     if (browser?.base && !portBusy) {
       handOver();
       const progressId = String((state.progressIds = (state.progressIds || 0) + 1));
