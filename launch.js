@@ -11,6 +11,7 @@ const { launchProgress, buildLog, followBuildLog } = require('./build-progress')
 const { buildArgs } = require('./startup');
 const upToDate = require('./up-to-date');
 const iisExpress = require('./iis-express');
+const devCerts = require('./dev-certs');
 
 const TYPE = 'csharpshooter';
 
@@ -267,6 +268,7 @@ class LaunchProfiles {
     const env = { ...(profile.environmentVariables || {}), ...(config.env || {}) };
     if (urls.length && !env.ASPNETCORE_URLS) env.ASPNETCORE_URLS = urls.join(';');
     const args = config.args ?? (profile.commandLineArgs ? profile.commandLineArgs.split(' ').filter(Boolean) : []);
+    if (urls.some((u) => /^https:/i.test(u))) await trustDevCertificate();
     // Another process on the profile's port (an earlier run left going) keeps the app from listening there, and would
     // pass for it to the browser's wait below.
     const portBusy = urls[0] && (await accepts(urls[0]));
@@ -383,6 +385,35 @@ class LaunchProfiles {
     }
     return resolved;
   }
+}
+
+/** Visual Studio 2026's question before F5 of a profile with an https URL, in its words: trust ASP.NET Core's development
+ *  certificate, so the browser does not warn of it (dev-certs.js). csharpShooter.askToTrustDevCertificate: false stops it. */
+async function trustDevCertificate() {
+  const settings = vscode.workspace.getConfiguration('csharpShooter');
+  if (!settings.get('askToTrustDevCertificate', true)) return;
+  const errors = {
+    1: t('Failed to create the certificate.'),
+    2: t('Failed saving the certificate.'),
+    3: t('Failed exporting the certificate.'),
+    4: t('Failed trusting the certificate.'),
+    [devCerts.NO_CERTIFICATE]: t('The ASP.NET developer certificate is not installed.'),
+    [devCerts.NOT_TRUSTED]: t('The certificate is not trusted.'),
+    [-1]: t('Failed with a critical error.'),
+  };
+  await devCerts.ensureTrusted({
+    ask: async () => {
+      const yes = t('Yes');
+      const never = t("Don't ask me again");
+      const chosen = await vscode.window.showWarningMessage(t('Trust ASP.NET Core SSL Certificate'), {
+        modal: true,
+        detail: t('This project is configured to use SSL. To avoid SSL warnings in the browser you can choose to trust the self-signed certificate that ASP.NET Core has generated.\n\nWould you like to trust the ASP.NET Core SSL certificate?'),
+      }, yes, never);
+      if (chosen === never) await settings.update('askToTrustDevCertificate', false, vscode.ConfigurationTarget.Global);
+      return chosen === yes ? 'yes' : chosen === never ? 'never' : 'no';
+    },
+    fail: (code) => vscode.window.showWarningMessage(t('The following error occurred running the dev-certs tool to trust the ASP.NET Core development certificate. {0}', errors[code] || t('Failed with an error.'))),
+  });
 }
 
 /** Runs a resolved launch without a debugger: a task running the program (dotnet <dll>, or its apphost), then the

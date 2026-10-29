@@ -88,6 +88,11 @@
           "default": false,
           "description": "%config.taskRunner.buildBindings%"
         },
+        "csharpShooter.askToTrustDevCertificate": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.askToTrustDevCertificate%"
+        },
         "csharpShooter.launchProfilesInLaunchJson": {
           "type": "string",
           "enum": [

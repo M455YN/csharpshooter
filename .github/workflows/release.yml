@@ -58,6 +58,9 @@ jobs:
       - name: .http files (requests, variables, environments)
         run: node test/http-requests.js
 
+      - name: HTTPS development certificate (the check before F5)
+        run: node test/dev-certs.js
+
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js 5.11.0 win-x64
 

@@ -233,6 +233,11 @@ are. A profile of any project can still be an entry of its own, written by hand:
 
 (`configuration`, `build: false`, `launchBrowser: false`, `env` and `args` override the profile.)
 
+A profile with an `https` URL first has ASP.NET Core's HTTPS development certificate checked, once a window session,
+as Visual Studio 2026 does (`dotnet dev-certs https --trust --check`): installed when there is none, and when it is not
+trusted VS's own question, *Ustawianie certyfikatu SSL programu ASP.NET Core jako zaufanego*, with *Tak* (`dotnet dev-certs
+https --trust`, after Windows' own prompt) and *Nie pytaj mnie ponownie* (`csharpShooter.askToTrustDevCertificate`: false).
+
 ### launch.json written for Microsoft's debuggers
 
 F5 on a configuration of type `coreclr` (Microsoft's C# extension) or `dotnet` (C# Dev Kit) runs it on CSharpShooter's

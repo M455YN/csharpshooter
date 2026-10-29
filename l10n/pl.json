@@ -671,5 +671,18 @@
   "The debugger could not apply the changes: {0}": "Debuger nie mógł zastosować zmian: {0}",
   "The runtime refused the update to {0}: restart to apply changes": "Środowisko uruchomieniowe odrzuciło aktualizację {0}: uruchom ponownie, aby zastosować zmiany",
   "Hot Reload could not start: {0}": "Nie można uruchomić ponownego ładowania na gorąco: {0}",
-  "Changes applied: {0}": "Zastosowano zmiany: {0}"
+  "Changes applied: {0}": "Zastosowano zmiany: {0}",
+  "Failed to create the certificate.": "Nie można utworzyć certyfikatu.",
+  "Failed saving the certificate.": "Nie można zapisać certyfikatu.",
+  "Failed exporting the certificate.": "Nie można wyeksportować certyfikatu.",
+  "Failed trusting the certificate.": "Nie można ustawić certyfikatu jako zaufanego.",
+  "The ASP.NET developer certificate is not installed.": "Certyfikat dewelopera programu ASP.NET nie jest zainstalowany.",
+  "The certificate is not trusted.": "Certyfikat nie jest zaufany.",
+  "Failed with a critical error.": "Niepowodzenie: błąd krytyczny.",
+  "Failed with an error.": "Niepowodzenie: błąd.",
+  "Trust ASP.NET Core SSL Certificate": "Ustawianie certyfikatu SSL programu ASP.NET Core jako zaufanego",
+  "This project is configured to use SSL. To avoid SSL warnings in the browser you can choose to trust the self-signed certificate that ASP.NET Core has generated.\n\nWould you like to trust the ASP.NET Core SSL certificate?": "Ten projekt został skonfigurowany do korzystania z protokołu SSL. Aby uniknąć wyświetlania w przeglądarce ostrzeżeń dotyczących protokołu SSL, można ustawić certyfikat z podpisem własnym, wygenerowany przez program ASP.NET Core, jako zaufany.\n\nCzy chcesz ustawić certyfikat SSL programu ASP.NET Core jako zaufany?",
+  "The following error occurred running the dev-certs tool to trust the ASP.NET Core development certificate. {0}": "Wystąpił następujący błąd podczas uruchamiania narzędzia dev-certs w celu ustawienia certyfikatu programistycznego programu ASP.NET Core jako zaufanego. {0}",
+  "Yes": "Tak",
+  "Don't ask me again": "Nie pytaj mnie ponownie"
 }

@@ -63,7 +63,7 @@ async function run() {
   try {
     await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0], {
       type: 'csharpshooter', request: 'launch', name: 'WebApp', project: path.join(root, 'WebApp', 'WebApp.csproj'),
-      startupProject: false, launchBrowser: false, env: { ASPNETCORE_URLS: URL },
+      startupProject: false, launchProfile: 'https', launchBrowser: false, env: { ASPNETCORE_URLS: URL },
     });
     let body;
     for (let i = 0; i < 120 && !(body = await get(`${URL}/value`)); i++) await sleep(500);
