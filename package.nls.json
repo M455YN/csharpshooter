@@ -109,5 +109,12 @@
   "command.tests.clearResults": "Clear Results",
   "command.tests.goToTest": "Open Test",
   "command.http.send": "Send Request",
-  "command.http.environment": "Choose the HTTP Environment"
+  "command.http.environment": "Choose the HTTP Environment",
+  "command.refactor.changeSignature": "Change Signature...",
+  "command.refactor.extractInterface": "Extract Interface...",
+  "command.refactor.moveTypeToFile": "Move Type to Another File...",
+  "command.refactor.moveToNamespace": "Move to Namespace...",
+  "command.refactor.pullMembersUp": "Pull Members Up to Base Type...",
+  "command.refactor.pushMembersDown": "Push Members Down to Derived Types...",
+  "submenu.refactor": "Refactor"
 }

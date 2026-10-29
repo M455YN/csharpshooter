@@ -38,11 +38,11 @@ The Test Explorer's bridge to vstest.console (`testbridge/`, below under *Test E
 npm run build-testbridge
 ```
 
-Hot Reload's half in the C# server (`hotreload-extension/`, below under *Hot Reload*), compiled against `server/`'s own
-assemblies, so after `npm run fetch-server`:
+CSharpShooter's extension to the C# server (`roslyn-extension/`: Passenger's handlers for *Hot Reload* and the
+*Refactorings* below), compiled against `server/`'s own assemblies, so after `npm run fetch-server`:
 
 ```bash
-npm run build-hotreload
+npm run build-roslyn-extension
 ```
 
 The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspended` and `SafeProcessHandle.Resume`
@@ -258,7 +258,7 @@ debugger when the extension that owns the type is not installed or is disabled (
 Edits to `.cs`, `.razor` and `.cshtml` files saved while the program runs under the debugger (F5) go into it without a
 restart, paused or running, as Visual Studio's Hot Reload on save. On by default for a Debug build; `"hotReload": false`
 in a `launch.json` configuration turns it off. It is Passenger's way: Roslyn's own Edit and Continue service, in the C#
-server through Passenger's handlers (`hotreload-extension/`, loaded with the server's `--extension`), compares the
+server through Passenger's handlers (`roslyn-extension/`, loaded with the server's `--extension`), compares the
 solution as the editors have it with what was built and emits the deltas; the debugger applies them (`applyChanges`).
 The status bar says what came of each save.
 
@@ -267,6 +267,26 @@ The status bar says what came of each save.
   code that does not compile is applied once it does.
 - An IIS Express profile gets it too, for the modules the app loads after the debugger attaches.
 - The open page does not reload itself yet: refresh it in the browser.
+
+## Refactorings
+
+The refactorings Visual Studio 2026 asks options for, with its names and keys, made by Passenger's handlers in the C#
+server (`roslyn-extension/`): Ctrl+. offers those that apply at the caret, the editor's menu has them under
+*Refaktoryzuj*, and each is one edit Ctrl+Z takes back.
+
+- *Zmień sygnaturę...* (Ctrl+R, Ctrl+O or Ctrl+R, Ctrl+V): the signature as one line to edit (`double Area(double
+  scale, int times)`): parameters reordered, removed, renamed or added, the method renamed, its return type changed;
+  a new parameter asks the value every call passes (*Wartość miejsca wywołania*). The declaration, its overrides and
+  implementations, and every call change; a use the new signature no longer fits is named, not changed.
+- *Wyodrębnij interfejs...* (Ctrl+R, Ctrl+I): the interface's name and members; a file of its own beside the type's,
+  which then implements it.
+- *Przenieś typ do {plik}.cs* and *Przenieś do przestrzeni nazw...*: the type into a new file, or into another
+  namespace with its users following.
+- *Ściągnij składowe aż do typu bazowego...* and, as Passenger has it, *Wypchnij składowe w dół do typów
+  pochodnych...*: the members chosen into the base type, or into each derived class chosen.
+
+VS Code's input boxes and lists stand for VS's dialogs; there is no preview of the changes, nor *Ustaw jako abstrakcyjny*
+when members move. A file just made (by *Przenieś typ*) joins the refactorings once the server has loaded it into its project.
 
 ## Solution Explorer
 

@@ -1,5 +1,5 @@
 // Hot Reload under the debugger (F5), as Passenger does it: Roslyn's own Edit and Continue service, in the C# server through
-// hotreload-extension/ (Passenger's handlers), compares the solution as the editors have it with what was built and emits
+// roslyn-extension/ (Passenger's handlers), compares the solution as the editors have it with what was built and emits
 // the deltas; the debugger (Passenger's) applies them with its applyChanges, the program paused or running. On each save
 // of a .cs, .razor or .cshtml file while a session with hotReload runs.
 const vscode = require('vscode');

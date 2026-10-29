@@ -220,6 +220,10 @@
       {
         "id": "csharpShooter.taskRunner.bindings",
         "label": "%submenu.taskRunner.bindings%"
+      },
+      {
+        "id": "csharpShooter.refactor",
+        "label": "%submenu.refactor%"
       }
     ],
     "commands": [
@@ -564,6 +568,42 @@
         "command": "csharpShooter.tests.goToTest",
         "title": "%command.tests.goToTest%",
         "category": "%category.Test%"
+      },
+      {
+        "command": "csharpShooter.refactor.changeSignature",
+        "title": "%command.refactor.changeSignature%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.extractInterface",
+        "title": "%command.refactor.extractInterface%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.moveTypeToFile",
+        "title": "%command.refactor.moveTypeToFile%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.moveToNamespace",
+        "title": "%command.refactor.moveToNamespace%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.pullMembersUp",
+        "title": "%command.refactor.pullMembersUp%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.refactor.pushMembersDown",
+        "title": "%command.refactor.pushMembersDown%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
       }
     ],
     "menus": {
@@ -964,6 +1004,39 @@
           "command": "csharpShooter.visualizeData",
           "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "csharpShooter.refactor",
+          "when": "editorLangId == csharp",
+          "group": "1_modification@9"
+        }
+      ],
+      "csharpShooter.refactor": [
+        {
+          "command": "csharpShooter.refactor.changeSignature",
+          "group": "refactor@0"
+        },
+        {
+          "command": "csharpShooter.refactor.extractInterface",
+          "group": "refactor@1"
+        },
+        {
+          "command": "csharpShooter.refactor.moveTypeToFile",
+          "group": "refactor@2"
+        },
+        {
+          "command": "csharpShooter.refactor.moveToNamespace",
+          "group": "refactor@3"
+        },
+        {
+          "command": "csharpShooter.refactor.pullMembersUp",
+          "group": "refactor@4"
+        },
+        {
+          "command": "csharpShooter.refactor.pushMembersDown",
+          "group": "refactor@5"
         }
       ]
     },
@@ -1466,6 +1539,21 @@
         "key": "ctrl+r f",
         "command": "csharpShooter.tests.runFailed",
         "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "key": "ctrl+r ctrl+o",
+        "command": "csharpShooter.refactor.changeSignature",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && editorLangId == csharp && !editorReadonly"
+      },
+      {
+        "key": "ctrl+r ctrl+v",
+        "command": "csharpShooter.refactor.changeSignature",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && editorLangId == csharp && !editorReadonly"
+      },
+      {
+        "key": "ctrl+r ctrl+i",
+        "command": "csharpShooter.refactor.extractInterface",
+        "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && editorLangId == csharp && !editorReadonly"
       }
     ],
     "languages": [
@@ -1603,7 +1691,7 @@
   "scripts": {
     "fetch-server": "node scripts/fetch-server.js",
     "build-testbridge": "powershell -NoProfile -File scripts/build-testbridge.ps1",
-    "build-hotreload": "powershell -NoProfile -File scripts/build-hotreload.ps1",
+    "build-roslyn-extension": "powershell -NoProfile -File scripts/build-roslyn-extension.ps1",
     "test": "node test/runTest.js",
     "check-l10n": "node test/l10n.js",
     "bundle": "npx -y esbuild@0.25.12 extension.js --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js --log-level=warning",

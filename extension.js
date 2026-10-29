@@ -26,13 +26,14 @@ const { launchProgress } = require('./build-progress');
 const { readSolution } = require('./solution');
 const { TranslatingAdapter } = require('./debug-l10n');
 const { registerHotReload } = require('./hot-reload');
+const { registerRefactorings } = require('./refactorings');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
 const toServerUri = (uri) => (uri.scheme === 'file' ? pathToFileURL(uri.fsPath).href : uri.toString());
 
 let client;
-let hotReloadIn; // the client whose server activated Hot Reload's extension
+let extensionIn; // the client whose server activated CSharpShooter's extension
 let loading; // what the start is doing, until the projects are loaded (for the tests: its lines)
 let output;
 // Resolved once the server has loaded the solution; the tests wait on it.
@@ -123,9 +124,10 @@ async function startServer(context) {
   if (setting('razorViewsInDesignTime')) {
     args.push('--csharpDesignTimePath', context.asAbsolutePath(path.join('designtime', 'CSharpShooter.Razor.DesignTime.targets')));
   }
-  // Hot Reload's half in the server (hotreload-extension/, scripts/build-hotreload.ps1), activated once it has started.
-  const hotReloadDll = context.asAbsolutePath(path.join('hotreload-extension', 'out', 'CSharpShooter.HotReload.dll'));
-  if (fs.existsSync(hotReloadDll)) args.push('--extension', hotReloadDll);
+  // CSharpShooter's extension to the server, Hot Reload and the refactorings (roslyn-extension/, scripts/build-roslyn-extension.ps1),
+  // activated once it has started.
+  const extensionDll = context.asAbsolutePath(path.join('roslyn-extension', 'out', 'CSharpShooter.Roslyn.Extension.dll'));
+  if (fs.existsSync(extensionDll)) args.push('--extension', extensionDll);
 
   client = new LanguageClient('csharpShooter', 'C# (Roslyn)',
     // Without tiered PGO's instrumented code the server's JIT spends less while Razor generates a project's views: on a
@@ -218,12 +220,12 @@ async function startServer(context) {
     loading.finish();
     throw e;
   }
-  if (args.includes(hotReloadDll)) {
+  if (args.includes(extensionDll)) {
     const started = client;
-    started.sendRequest('server/_vs_activateExtension', { assemblyFilePath: hotReloadDll }).then((answer) => {
-      if (answer?.workspaceMessageHandlers?.length) hotReloadIn = started;
-      else output.appendLine(`Hot Reload's extension was not activated: ${JSON.stringify(answer?.extensionException ?? answer)}`);
-    }, (e) => output.appendLine(`Hot Reload's extension was not activated: ${e.message}`));
+    started.sendRequest('server/_vs_activateExtension', { assemblyFilePath: extensionDll }).then((answer) => {
+      if (answer?.workspaceMessageHandlers?.length) extensionIn = started;
+      else output.appendLine(`CSharpShooter's server extension was not activated: ${JSON.stringify(answer?.extensionException ?? answer)}`);
+    }, (e) => output.appendLine(`CSharpShooter's server extension was not activated: ${e.message}`));
   }
   const solution = await findSolution();
   if (solution) {
@@ -410,12 +412,25 @@ async function activate(context) {
   const configurationManager = registerConfigurationManager(context, findSolution, startup.startup);
   registerSqlOffer(context);
   const httpFiles = registerHttpFiles(context);
-  const hotReload = registerHotReload(context, () => (client && client === hotReloadIn ? client : undefined));
+  const hotReload = registerHotReload(context, () => (client && client === extensionIn ? client : undefined));
+  // A message about a document to the server extension's handlers (Roslyn's method name has its own typo).
+  const refactorings = registerRefactorings(context, (document) => async (name, message) => {
+    if (!client || client !== extensionIn) throw new Error(t('the C# language server has not started'));
+    const answer = await client.sendRequest('textDocument/_vs_dipatchExtensionMessage', {
+      messageName: `Passenger.Roslyn.Extension.${name}`, message: JSON.stringify(message), textDocument: { uri: toServerUri(document.uri) },
+    }).catch((e) => {
+      // The handlers are the solution's: a file in no project the server has loaded (one just made) is in a workspace of its own.
+      throw /No handler found/.test(e.message) ? new Error(t('The file is in no project the C# language server has loaded yet.')) : e;
+    });
+    if (answer?.extensionException) throw new Error(answer.extensionException.message || answer.extensionException.Message || JSON.stringify(answer.extensionException));
+    if (!answer?.response) throw new Error(t('the C# language server gave no answer'));
+    return JSON.parse(answer.response);
+  });
   const markStartup = async () => solutionView.provider.setStartup(await startup.startup.project());
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, httpFiles, hotReload, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, httpFiles, hotReload, refactorings, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {

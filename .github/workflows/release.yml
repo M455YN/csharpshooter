@@ -61,12 +61,15 @@ jobs:
       - name: HTTPS development certificate (the check before F5)
         run: node test/dev-certs.js
 
+      - name: Change Signature's text (a signature read back)
+        run: node test/signature-text.js
+
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js 5.11.0 win-x64
 
       - name: Hot Reload (Passenger's Edit and Continue handlers, built against the server)
         shell: pwsh
-        run: ./scripts/build-hotreload.ps1
+        run: ./scripts/build-roslyn-extension.ps1
 
       - name: Debugger (Passenger for .NET 10, win-x64)
         shell: pwsh

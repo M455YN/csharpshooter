@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Hot Reload's half in the C# language server: Passenger's Edit and Continue handlers (HotReload.cs,
-       HotReloadMessages.cs, StaleCallers.cs from Passenger.Roslyn.Extension at 7358d41, MIT), loaded with the server's
-       extension option. Compiled against the server's own assemblies in server/ (npm run fetch-server), carrying none of them;
-       published into hotreload-extension/out by scripts/build-hotreload.ps1. -->
+  <!-- CSharpShooter's extension to the C# language server, loaded with the server's extension option: Passenger's
+       handlers from Passenger.Roslyn.Extension at 7358d41 (MIT), Edit and Continue for Hot Reload (HotReload.cs,
+       HotReloadMessages.cs, StaleCallers.cs) and the refactorings that ask their options (Signatures.cs, Interfaces.cs,
+       TypeMoves.cs, MemberMoves.cs, Changes.cs; their messages and handlers cut from Messages.cs and Handlers.cs).
+       Compiled against the server's own assemblies in server/ (npm run fetch-server), carrying none of them; built into
+       roslyn-extension/out by scripts/build-roslyn-extension.ps1. -->
   <PropertyGroup>
     <!-- The server's: the extension runs in its process. -->
     <TargetFramework>net10.0</TargetFramework>

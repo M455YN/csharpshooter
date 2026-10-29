@@ -109,5 +109,12 @@
   "command.tests.clearResults": "Wyczyść wyniki",
   "command.tests.goToTest": "Otwórz test",
   "command.http.send": "Wyślij żądanie",
-  "command.http.environment": "Wybierz środowisko HTTP"
+  "command.http.environment": "Wybierz środowisko HTTP",
+  "command.refactor.changeSignature": "Zmień sygnaturę...",
+  "command.refactor.extractInterface": "Wyodrębnij interfejs...",
+  "command.refactor.moveTypeToFile": "Przenieś typ do innego pliku...",
+  "command.refactor.moveToNamespace": "Przenieś do przestrzeni nazw...",
+  "command.refactor.pullMembersUp": "Ściągnij składowe aż do typu bazowego...",
+  "command.refactor.pushMembersDown": "Wypchnij składowe w dół do typów pochodnych...",
+  "submenu.refactor": "Refaktoryzuj"
 }
