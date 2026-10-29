@@ -29,7 +29,8 @@ async function ensureTrusted({ ask, fail, dotnet = devCerts }) {
   } else if (code !== NOT_TRUSTED) {
     return fail(code), 'failed';
   }
-  const answer = await ask();
+  // A question that cannot be shown (VS Code's test host refuses modal dialogs) is a no: the start goes on.
+  const answer = await Promise.resolve().then(ask).catch(() => 'no');
   if (answer !== 'yes') return answer;
   // Windows asks itself before a certificate goes into the user's trusted roots.
   code = await dotnet(['--trust']);
@@ -37,4 +38,4 @@ async function ensureTrusted({ ask, fail, dotnet = devCerts }) {
   return code === 0 ? 'trusted' : 'failed';
 }
 
-module.exports = { ensureTrusted, reset: () => (checked = false), NO_CERTIFICATE, NOT_TRUSTED };
+module.exports = { ensureTrusted, devCerts, reset: () => (checked = false), NO_CERTIFICATE, NOT_TRUSTED };

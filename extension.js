@@ -398,7 +398,7 @@ async function activate(context) {
   const propertiesPage = registerPropertiesPage(context, solutionView);
   const propertiesWindow = registerPropertiesWindow(context, solutionView);
   const nugetPage = registerNuGetPage(context, findSolution);
-  const launch = registerLaunch(context);
+  const launch = registerLaunch(context, output);
   registerCompat(context, output, launch.provider);
   const taskRunner = registerTaskRunner(context, findSolution);
   const startup = registerStartup(context, findSolution, launch);

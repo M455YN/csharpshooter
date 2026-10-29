@@ -14,6 +14,7 @@ const iisExpress = require('./iis-express');
 const devCerts = require('./dev-certs');
 
 const TYPE = 'csharpshooter';
+let log = () => {}; // the CSharpShooter output
 
 /** JSON with comments and trailing commas, as VS writes and reads launchSettings.json and appsettings.json. */
 function parseJsonc(text) {
@@ -402,13 +403,19 @@ async function trustDevCertificate() {
     [-1]: t('Failed with a critical error.'),
   };
   await devCerts.ensureTrusted({
+    dotnet: async (args) => {
+      const code = await devCerts.devCerts(args);
+      log(`dotnet dev-certs https ${args.join(' ')}: exit ${code}`);
+      return code;
+    },
     ask: async () => {
       const yes = t('Yes');
       const never = t("Don't ask me again");
-      const chosen = await vscode.window.showWarningMessage(t('Trust ASP.NET Core SSL Certificate'), {
+      const chosen = await Promise.resolve(vscode.window.showWarningMessage(t('Trust ASP.NET Core SSL Certificate'), {
         modal: true,
         detail: t('This project is configured to use SSL. To avoid SSL warnings in the browser you can choose to trust the self-signed certificate that ASP.NET Core has generated.\n\nWould you like to trust the ASP.NET Core SSL certificate?'),
-      }, yes, never);
+      }, yes, never)).catch((e) => log(`The certificate question was not shown: ${e.message}`));
+      log(`The certificate question answered: ${chosen ?? 'no'}`);
       if (chosen === never) await settings.update('askToTrustDevCertificate', false, vscode.ConfigurationTarget.Global);
       return chosen === yes ? 'yes' : chosen === never ? 'never' : 'no';
     },
@@ -586,7 +593,8 @@ async function offerProfileEntries(context) {
   await addProfileEntries(missing);
 }
 
-function registerLaunch(context) {
+function registerLaunch(context, output) {
+  log = (line) => output?.appendLine(line);
   const state = { changed: new vscode.EventEmitter(), sessions: new Set() };
   const provider = new LaunchProfiles(state);
   // Something to restart: an app under the debugger, a start still building, or a run without the debugger.

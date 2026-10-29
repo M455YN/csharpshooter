@@ -43,13 +43,14 @@ async function scenario(name, codes, answer) {
   r = await scenario('dotnet missing', [-1], 'yes');
   assert.deepStrictEqual([r.result, r.asked, r.failed], ['failed', 0, [-1]]);
 
+  d.reset();
+  const refused = await d.ensureTrusted({ dotnet: async () => d.NOT_TRUSTED, ask: async () => { throw new Error('refused to show dialog'); }, fail: () => {} });
+  assert.strictEqual(refused, 'no');
+
   // Once a window session: a second F5 runs nothing.
   const ran = [];
   const again = await d.ensureTrusted({ dotnet: async (a) => (ran.push(a), 0), ask: async () => 'yes', fail: () => {} });
   assert.deepStrictEqual([again, ran.length], ['checked', 0]);
 
-  // This machine's own certificate, read only (--check).
-  d.reset();
-  console.log('this machine:', await d.ensureTrusted({ ask: async () => 'no', fail: (c) => console.log('failed', c) }));
   console.log('all passed');
 })().catch((e) => { console.error(e); process.exit(1); });
