@@ -609,6 +609,31 @@
         "title": "%command.refactor.pushMembersDown%",
         "category": "%category.CSharpShooter%",
         "enablement": "editorLangId == csharp"
+      },
+      {
+        "command": "csharpShooter.solution.cut",
+        "title": "%command.solution.cut%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.copy",
+        "title": "%command.solution.copy%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.paste",
+        "title": "%command.solution.paste%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.delete",
+        "title": "%command.solution.delete%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.rename",
+        "title": "%command.solution.rename%",
+        "category": "%category.Solution%"
       }
     ],
     "menus": {
@@ -839,6 +864,31 @@
           "command": "csharpShooter.tests.goToTest",
           "when": "view == csharpShooter.testExplorer && viewItem == test",
           "group": "2_navigate@1"
+        },
+        {
+          "command": "csharpShooter.solution.cut",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "5_cutcopypaste@1"
+        },
+        {
+          "command": "csharpShooter.solution.copy",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "5_cutcopypaste@2"
+        },
+        {
+          "command": "csharpShooter.solution.paste",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(project|folder|file)( |$)/",
+          "group": "5_cutcopypaste@3"
+        },
+        {
+          "command": "csharpShooter.solution.delete",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "6_modify@1"
+        },
+        {
+          "command": "csharpShooter.solution.rename",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
+          "group": "6_modify@2"
         }
       ],
       "csharpShooter.solution.add": [
@@ -954,6 +1004,26 @@
         },
         {
           "command": "csharpShooter.solution.manageNuGet",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.cut",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.copy",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.paste",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.delete",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.rename",
           "when": "false"
         }
       ],
@@ -1559,6 +1629,31 @@
         "key": "ctrl+r ctrl+i",
         "command": "csharpShooter.refactor.extractInterface",
         "when": "config.csharpShooter.visualStudioKeybindings && editorTextFocus && editorLangId == csharp && !editorReadonly"
+      },
+      {
+        "key": "ctrl+x",
+        "command": "csharpShooter.solution.cut",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "ctrl+c",
+        "command": "csharpShooter.solution.copy",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "ctrl+v",
+        "command": "csharpShooter.solution.paste",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "delete",
+        "command": "csharpShooter.solution.delete",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "f2",
+        "command": "csharpShooter.solution.rename",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
       }
     ],
     "languages": [

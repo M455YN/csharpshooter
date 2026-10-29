@@ -307,6 +307,14 @@ the title bar has **Sync with Active Document** and **Refresh**; a project's or 
 Build, Rebuild, Clean (`dotnet build/clean` in a task), Edit Project File, Open in Terminal, Open Folder in File
 Explorer and Copy Full Path. It follows files created and deleted on disk.
 
+Files and folders are edited as in VS 2026, a file's nested files (`Foo.cshtml.cs` under `Foo.cshtml`) going with it:
+*Zmień nazwę* (F2; a `.cs` file's class renamed with every use when VS's question, *Zmieniasz nazwę pliku. Czy chcesz także
+zmienić nazwy…*, gets *Tak*), *Usuń* (Del, after VS's *Element „…” zostanie usunięty.*, into the Recycle Bin where VS deletes
+for good), *Wytnij*, *Kopiuj* and *Wklej* (Ctrl+X, Ctrl+C, Ctrl+V; a copy beside its original is named as VS names it,
+`Foo - kopiować.cs` in Polish), and drag and drop (a move; files dragged in from VS Code's Explorer or the system are
+copied). Several items can be selected. Moves and renames are VS Code's own file edits, so open editors follow them;
+what a rename changes in files open in no tab is saved, as VS saves it.
+
 **Opublikuj...** (a project's menu) opens VS 2026's Publish page in an editor tab: the profile to publish with, *Nowy
 profil*, *Opublikuj*, *Więcej akcji* (*Zmień nazwę*, *Usuń*), how the last publish ended (*Otwórz folder*), and *Ustawienia
 profilu* as VS's settings dialog has them (*Konfiguracja*, *Struktura docelowa*, *Tryb wdrożenia*, *Docelowe środowisko
@@ -423,7 +431,7 @@ the projects' folders without `bin`, `obj`, `node_modules` and binary files (abo
 10 000 files). VS adds classes and methods there, from its language services; this adds text.
 
 Not like VS (yet): files a project includes from outside its folder or removes with `<Compile Remove>` show as on disk;
-no drag and drop, rename or other item templates; the search has no *Wyszukuj wśród elementów
+no rename, delete or move of projects and solution folders, no other item templates; the search has no *Wyszukuj wśród elementów
 zewnętrznych* (VS's External Dependencies) and no index saved between sessions. VS Code gives a view above the tree at
 least 120 px, so the box has room below it (the result count goes there).
 

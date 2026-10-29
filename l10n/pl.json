@@ -722,5 +722,18 @@
   "Pulled {0} members of {1} up": "Ściągnięto w górę składowe {1}: {0}",
   "Pushed {0} members of {1} down": "Wypchnięto w dół składowe {1}: {0}",
   "The file is in no project the C# language server has loaded yet.": "Plik nie należy jeszcze do żadnego projektu wczytanego przez serwer języka C#.",
-  "Make abstract": "Ustaw jako abstrakcyjny"
+  "Make abstract": "Ustaw jako abstrakcyjny",
+  "Not a valid file name.": "To nie jest prawidłowa nazwa pliku.",
+  "A file or folder with the name \"{0}\" already exists at this location on disk. Choose a different name.": "Plik lub folder o nazwie \"{0}\" już istnieje w tej lokalizacji na dysku. Wybierz inną nazwę.",
+  "Changing a file name extension can make the file unusable. Change it?": "Zmiana rozszerzenia pliku może spowodować, że plik ten stanie się bezużyteczny. Zmienić?",
+  "You are renaming a file. Would you also like to perform a rename in this project of all references to the code element '{0}'?": "Zmieniasz nazwę pliku. Czy chcesz także zmienić nazwy w tym projekcie dla wszystkich odwołań do elementu kodu „{0}”?",
+  "No": "Nie",
+  "\"{0}\" will be deleted.": "Element „{0}” zostanie usunięty.",
+  "The selected items will be deleted.": "Wybrane elementy zostaną usunięte.",
+  "You can restore it from the Recycle Bin.": "Można go przywrócić z Kosza.",
+  "Cannot move '{0}'. The destination folder is the same as the source folder.": "Nie można przenieść elementu „{0}”. Folder docelowy jest taki sam jak folder źródłowy.",
+  "Cannot move '{0}'. The destination folder is a subfolder of the source folder.": "Nie można przenieść elementu „{0}”. Folder docelowy jest podfolderem folderu źródłowego.",
+  "Cannot move the folder '{0}'. A folder with the same name already exists in the destination directory.": "Nie można przenieść folderu \"{0}\". Folder o tej samej nazwie istnieje już w katalogu docelowym.",
+  " - Copy": " - kopiować",
+  " - Copy ({0})": " - kopiować ({0})"
 }
