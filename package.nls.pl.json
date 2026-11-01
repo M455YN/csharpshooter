@@ -122,5 +122,7 @@
   "command.solution.copy": "Kopiuj",
   "command.solution.paste": "Wklej",
   "command.solution.delete": "Usuń",
-  "command.solution.rename": "Zmień nazwę"
+  "command.solution.rename": "Zmień nazwę",
+  "command.solution.addNewItem": "Nowy element...",
+  "command.solution.addClass": "Klasa..."
 }

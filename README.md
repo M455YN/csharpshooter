@@ -407,6 +407,12 @@ Not like VS (yet): no *Zachowanie zależności* or uninstall options, licences a
 dependencies it brings; no credential providers for private feeds beyond what dotnet itself uses.
 
 Right-click a project or folder → **Add**:
+- **Nowy element...** (Ctrl+Shift+A in the tree): VS 2026's *Dodaj nowy element* for an ASP.NET Core or C# project, as a list to
+  search: its 38 templates' names, descriptions, default names and order, read from VS's `ItemTemplates/AspNetCore` and the
+  packages that name them (*Klasa*, *Interfejs*, *Składnik Razor*, *Kontroler MVC — pusty*, *Strona Razor — pusta*…), then
+  the name (`Class.cs`, or `Class1.cs` when that is taken). The files are made here or by the .NET SDK's item templates
+  (`dotnet new page`, `mvccontroller`…), not copied from VS. A project that is not a web one lists only the general items.
+- **Klasa...** (Shift+Alt+C in the tree): the same with *Klasa* chosen.
 - **New Folder...**
 - **View (.cshtml)...**: `Name.cshtml` with `ViewData["Title"]`, in the folder (a project's `Views` when the project
   itself was clicked).
@@ -431,7 +437,8 @@ the projects' folders without `bin`, `obj`, `node_modules` and binary files (abo
 10 000 files). VS adds classes and methods there, from its language services; this adds text.
 
 Not like VS (yet): files a project includes from outside its folder or removes with `<Compile Remove>` show as on disk;
-no rename, delete or move of projects and solution folders, no other item templates; the search has no *Wyszukuj wśród elementów
+no rename, delete or move of projects and solution folders; *Nowy element* is a list, not VS's dialog (no sort, no
+Online), without its AngularJS items, *.editorconfig*, *Szablon tekstowy*, ML.NET or WPF and Windows Forms items; the search has no *Wyszukuj wśród elementów
 zewnętrznych* (VS's External Dependencies) and no index saved between sessions. VS Code gives a view above the tree at
 least 120 px, so the box has room below it (the result count goes there).
 

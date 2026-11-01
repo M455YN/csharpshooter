@@ -122,5 +122,7 @@
   "command.solution.copy": "Copy",
   "command.solution.paste": "Paste",
   "command.solution.delete": "Delete",
-  "command.solution.rename": "Rename"
+  "command.solution.rename": "Rename",
+  "command.solution.addNewItem": "New Item...",
+  "command.solution.addClass": "Class..."
 }

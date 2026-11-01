@@ -494,6 +494,9 @@ function registerSolutionView(context, findSolution) {
   };
   const add = require('./add-items'); // late: add-items reads projects through this module
   register('csharpShooter.solution.addFolder', (item, name) => add.addFolder(item, name, revealPath));
+  const newItem = require('./new-item'); // late, as add-items
+  register('csharpShooter.solution.addNewItem', (item, choice) => newItem.addNewItem(item || view.selection[0], revealPath, choice));
+  register('csharpShooter.solution.addClass', (item, name) => newItem.addClass(item || view.selection[0], revealPath, typeof name === 'string' ? name : undefined));
   register('csharpShooter.solution.addView', (item, name) => add.addView(item, name, revealPath));
   register('csharpShooter.solution.addController', (item, name, options) => add.addController(item, name, revealPath, options));
   register('csharpShooter.solution.syncWithActive', async () => {

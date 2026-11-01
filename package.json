@@ -634,6 +634,16 @@
         "command": "csharpShooter.solution.rename",
         "title": "%command.solution.rename%",
         "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.addNewItem",
+        "title": "%command.solution.addNewItem%",
+        "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.solution.addClass",
+        "title": "%command.solution.addClass%",
+        "category": "%category.Solution%"
       }
     ],
     "menus": {
@@ -893,6 +903,14 @@
       ],
       "csharpShooter.solution.add": [
         {
+          "command": "csharpShooter.solution.addNewItem",
+          "group": "0_new@1"
+        },
+        {
+          "command": "csharpShooter.solution.addClass",
+          "group": "0_new@2"
+        },
+        {
           "command": "csharpShooter.solution.addFolder",
           "group": "1_folder@1"
         },
@@ -1024,6 +1042,14 @@
         },
         {
           "command": "csharpShooter.solution.rename",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.addNewItem",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.solution.addClass",
           "when": "false"
         }
       ],
@@ -1653,6 +1679,16 @@
       {
         "key": "f2",
         "command": "csharpShooter.solution.rename",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "ctrl+shift+a",
+        "command": "csharpShooter.solution.addNewItem",
+        "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
+      },
+      {
+        "key": "shift+alt+c",
+        "command": "csharpShooter.solution.addClass",
         "when": "focusedView == 'csharpShooter.solution' && !inputFocus"
       }
     ],

@@ -145,4 +145,4 @@ async function addController(item, name, reveal, options = {}) {
   return create(path.join(dir, `${name}.cs`), lines.join(style.eol) + style.eol, reveal);
 }
 
-module.exports = { addFolder, addView, addController, namespaceFor, projectStyle };
+module.exports = { addFolder, addView, addController, namespaceFor, projectStyle, targetOf };

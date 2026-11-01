@@ -4,6 +4,12 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Solution Explorer: *Dodaj → Nowy element...* (Ctrl+Shift+A) with Visual Studio 2026's 38 ASP.NET Core and C# items, their names, descriptions and order, and *Dodaj → Klasa...* (Shift+Alt+C).
+
 ## [0.7.0] - 2026-10-29
 
 ### Added
