@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CSharpShooter's startup hook (DOTNET_STARTUP_HOOKS) in a program debugged with Hot Reload, never in the program as
+       built: after the debugger applies an update, hot-reload.js tells it over a socket, and it calls the program's
+       MetadataUpdateHandlers as the runtime's own Hot Reload agent does, so a Blazor component shows the edit at once.
+       Passenger's Passenger.UpdateHandlers at 9954e4b (MIT), its socket a loopback TCP one (Node has no Unix sockets on
+       Windows). Built into update-handlers/out by scripts/build-update-handlers.ps1, its own assembly alone. -->
+  <PropertyGroup>
+    <!-- The oldest .NET the hook is given to, so it loads into any of them. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="out/**;bin/**;obj/**" />
+  </ItemGroup>
+</Project>

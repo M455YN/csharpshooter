@@ -1,4 +1,4 @@
-# What the .vsix leaves out; server/, debugger/, testbridge/out/ and roslyn-extension/out/ go in. The code is dist/extension.js, one bundle of the
+# What the .vsix leaves out; server/, debugger/, testbridge/out/, roslyn-extension/out/ and update-handlers/out/ go in. The code is dist/extension.js, one bundle of the
 # sources and node_modules (npm run bundle, before vsce packages), so neither goes in as files.
 *.js
 node_modules/**
@@ -13,6 +13,10 @@ roslyn-extension/*.cs
 roslyn-extension/*.csproj
 roslyn-extension/bin/**
 roslyn-extension/obj/**
+update-handlers/*.cs
+update-handlers/*.csproj
+update-handlers/bin/**
+update-handlers/obj/**
 test/**
 scripts/**
 debugger-port/**

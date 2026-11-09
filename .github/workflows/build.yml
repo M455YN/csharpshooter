@@ -54,6 +54,10 @@ jobs:
         shell: pwsh
         run: ./scripts/build-debugger.ps1 -Runtime win-x64
 
+      - name: Hot Reload's update handlers (the startup hook that runs the program's MetadataUpdateHandlers)
+        shell: pwsh
+        run: ./scripts/build-update-handlers.ps1
+
       - name: Test bridge (vstest.console through its translation layer, for the Test Explorer)
         shell: pwsh
         run: ./scripts/build-testbridge.ps1
