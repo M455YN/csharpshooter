@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The syntax check behind csharpShooter.sql.checkQuery: SQL Tools Service's own parser (Microsoft.SqlServer.Management.
+       SqlParser, from sqltools/) called as the service calls it, with no 750 ms wait and no check cancelling another.
+       Built next to the service's assemblies by scripts/build-sqlcheck.ps1, its own assembly alone. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.SqlServer.Management.SqlParser">
+      <HintPath>../sqltools/Microsoft.SqlServer.Management.SqlParser.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

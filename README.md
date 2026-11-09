@@ -14,13 +14,10 @@ Needs Node.js and the .NET 10 runtime (the server runs on the installed `dotnet`
 ```bash
 npm install
 npm run fetch-server
-npm run fetch-sqltools
-npm run fetch-monaco
 ```
 
-`fetch-monaco` puts Microsoft's Monaco editor (MIT) into `media/monaco` for the SQL editor page (below under *SQL*),
-without its TypeScript, CSS, HTML and JSON workers (6.6 MB). `fetch-sqltools` downloads Microsoft's SQL Tools Service (below under *SQL*) into `sqltools/`, without its own copy of
-.NET, the migration tool and the texts of languages other than English and Polish (139 MB instead of 337 MB).
+The SQL Tools Service of `.sql` files is CSharpShooter SQL's (`sql/`, below under *SQL*), fetched there by its own
+`npm run fetch-sqltools`.
 
 The debugger is Passenger's, its main after 0.3.0 (commit `9954e4b` of 2026-11-09, which the script fetches: 0.3.0's
 debugger and the fixes since, among them the value a Step Out returns, of an `async` method too, a stop on an exception
@@ -63,7 +60,7 @@ so children stay in the adapter's session; only Windows is tested.
 
 ## Package and install
 
-With `server/`, `sqltools/`, `media/monaco/` and `debugger/` in place (above):
+With `server/` and `debugger/` in place (above):
 
 ```bash
 npm run package
@@ -621,9 +618,10 @@ as deep as the body goes.
 
 ## SQL
 
-`.sql` files are [CSharpShooter SQL](sql/README.md)'s, an extension of its own built from `sql/` (SQL Tools Service and
-Monaco would double this one's size): query windows as in SQL Server Management Studio 22 and Visual Studio 2026. The
-first `.sql` file opened offers to install it (*Zainstaluj*, *Nie teraz*, *Nigdy*).
+`.sql` files are [CSharpShooter SQL](sql/README.md)'s, an extension of its own built from `sql/` (SQL Tools Service would
+double this one's size): T-SQL IntelliSense and syntax errors, with no connection to a server, and the syntax of a Razor
+Tag Helper's SQL checked for C# Razor Tag Helper Support. The first `.sql` file opened offers to install it
+(*Zainstaluj*, *Nie teraz*, *Nigdy*).
 
 ## Test
 
@@ -646,11 +644,10 @@ node test/markup-suite.js /path/to/empty/folder
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/markup-suite.js node test/runTest.js
 ```
 
-The `.sql` checks (`test/sql-suite.js`) need a SQL Server with a small database; the suite's header says which, e.g. on
-LocalDB:
+The `.sql` checks (`sql/test/split-suite.js`) need no SQL Server, only CSharpShooter SQL's `sqltools/`:
 
 ```bash
-EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/folder SUITE=test/sql-suite.js node test/runTest.js
+EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=sql/test/split-suite.js node test/runTest.js
 ```
 
 ## Not done

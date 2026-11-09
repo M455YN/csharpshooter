@@ -8,7 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- `csharpShooter.sql.openQuery` opens a query from code in a query window, on a connection string of the file's project (the nearest `appsettings*.json` above it, its user secrets too; a choice when several): C# Razor Tag Helper Support's *Open … in SQL editor* above a Tag Helper's SQL.
+- `csharpShooter.sql.checkQuery` gives the syntax errors of SQL in code (line, column, message), with no connection and without showing it, in a few milliseconds: CSharpShooter.SqlCheck (`sqlcheck/`, built by `npm run build-sqlcheck`) calls the SQL Tools Service's own parser with its options, in a process of its own, where the service waits 750 ms before each check and lets a newer one cancel it. Where the parser stops after a statement's first error (as SSMS 22 does), a mistyped clause word starting a later line (`wherse …` then `ordser by …`) is found too, by parsing again with the erring line blanked; nothing else that parse says is taken, so it adds no error of its own. C# Razor Tag Helper Support underlines a Tag Helper's SQL with it.
+
+### Changed
+
+- CSharpShooter SQL is the SQL Tools Service alone: `.sql` files open in VS Code's own editor with T-SQL IntelliSense and their syntax errors underlined, with no connection to a server.
+
+### Removed
+
+- The SQL editor page (Monaco), connections and SSMS's Connect dialog, *Wykonaj*/*Anuluj*/*Analizuj* and the *Wyniki zapytania* panel, the toolbar row and query status bar, and the *Eksplorator obiektów SQL Server*. A Tag Helper's query runs in SQL Server Management Studio, from C# Razor Tag Helper Support's *Open in SQL Server Management Studio*.
 
 ## [0.1.0] - 2026-10-28
 

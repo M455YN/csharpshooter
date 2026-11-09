@@ -1,6 +1,6 @@
 # Third-party notices
 
-CSharpShooter SQL bundles two programs it did not write. The MIT licence text they come under:
+CSharpShooter SQL bundles a program it did not write. The MIT licence text it comes under:
 
 ```
 MIT License
@@ -30,14 +30,5 @@ Microsoft's [sqltoolsservice](https://github.com/microsoft/sqltoolsservice) rele
 (win-x64, net10.0), under MIT, Copyright (c) Microsoft Corporation, with its own `sqltools/Notice.txt` for what it
 carries (SqlClient, SMO and ScriptDom under MIT, DacFx under Microsoft's DacFx licence terms, which allow it to be
 distributed with an application). `scripts/fetch-sqltools.js` leaves out its own copy of .NET, the migration tool and
-the texts of languages other than English and Polish. The Connect dialog of `.sql` files (`sql-connect-dialog.js`) is laid out as SQL Server Management Studio 22's, with
-its words for the same things (`Microsoft.SqlServer.ConnectionDlg.UI` and `SqlEditors` resources) in Polish and English;
-no SSMS code or file ships with this extension, and SSMS's `RegSrvr17.xml` is only read where SSMS is installed.
-
-## The Monaco editor (`media/monaco/`)
-
-Microsoft's [monaco-editor](https://github.com/microsoft/monaco-editor) 0.55.1 from npm (its `min/vs`), under MIT,
-Copyright (c) 2016 - present Microsoft Corporation, with its licence in `media/monaco/LICENSE` (copied by
-`scripts/fetch-monaco.js`). The SQL editor page's layout follows [vsc-ms-sql-manager](https://github.com/jakubkozera/vsc-ms-sql-manager)
-(MIT, Copyright (c) Jakub Kozera); none of its code is copied.
+the texts of languages other than English and Polish.
 

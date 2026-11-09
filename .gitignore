@@ -18,7 +18,9 @@ update-handlers/out/
 test/names.local.json
 # npm run bundle
 dist/
-# CSharpShooter SQL's fetched parts and bundle: cd sql && npm run fetch-sqltools && npm run fetch-monaco
+# CSharpShooter SQL's fetched and built parts and bundle: cd sql && npm run fetch-sqltools && npm run build-sqlcheck
 sql/sqltools/
-sql/media/monaco/
+sql/sqlcheck/bin/
+sql/sqlcheck/obj/
+sql/sqlcheck/out/
 sql/dist/

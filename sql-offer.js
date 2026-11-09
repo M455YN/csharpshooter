@@ -1,11 +1,11 @@
-// The first .sql file opened offers CSharpShooter SQL (M455YN.csharpshooter-sql), its SSMS-like editor, when it is not
-// installed: once a window until Never is chosen, never forced (an extension pack would install it for everyone).
+// The first .sql file opened offers CSharpShooter SQL (M455YN.csharpshooter-sql), T-SQL IntelliSense and syntax errors,
+// when it is not installed: once a window until Never is chosen, never forced (an extension pack would install it for everyone).
 const vscode = require('vscode');
 const { table } = require('./l10n');
 
 const SQL_EXTENSION = 'M455YN.csharpshooter-sql';
 const T = table({
-  offer: 'Open .sql files in an editor like SSMS 22 and Visual Studio 2026 (connections, results below the query, Object Explorer)? It is CSharpShooter SQL, an extension of its own.',
+  offer: 'Add T-SQL IntelliSense and syntax errors to .sql files, and to the SQL of Razor Tag Helpers? It is CSharpShooter SQL, an extension of its own.',
   install: 'Install',
   notNow: 'Not now',
   never: 'Never',
