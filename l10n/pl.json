@@ -782,5 +782,9 @@
   "No running processes were found.": "Nie znaleziono uruchomionych procesów.",
   "Reattaching to {0}...": "Trwa ponowne dołączanie do {0}...",
   "Unable to find matching process. Select the process to attach to from the list.": "Nie można znaleźć pasującego procesu. Wybierz procesy do dołączenia z listy.",
-  "Add T-SQL IntelliSense and syntax errors to .sql files, and to the SQL of Razor Tag Helpers? It is CSharpShooter SQL, an extension of its own.": "Dodać IntelliSense T-SQL i błędy składni do plików .sql oraz do SQL w tag helperach Razor? To CSharpShooter SQL, osobne rozszerzenie."
+  "Add T-SQL IntelliSense and syntax errors to .sql files, and to the SQL of Razor Tag Helpers? It is CSharpShooter SQL, an extension of its own.": "Dodać IntelliSense T-SQL i błędy składni do plików .sql oraz do SQL w tag helperach Razor? To CSharpShooter SQL, osobne rozszerzenie.",
+  "Open {0} in SQL Server Management Studio": "Otwórz {0} w SQL Server Management Studio",
+  "Connection string to open the query on": "Parametry połączenia, na których otworzyć zapytanie",
+  "SQL Server Management Studio was not found in Program Files.": "Nie znaleziono programu SQL Server Management Studio w Program Files.",
+  "Values the app gives this query: set them before running it.": "Wartości przekazywane przez aplikację: uzupełnij je przed uruchomieniem."
 }

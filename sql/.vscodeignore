@@ -3,5 +3,6 @@
 scripts/**
 test/**
 sqlcheck/**
+razor/**
 **/*.pdb
 *.vsix

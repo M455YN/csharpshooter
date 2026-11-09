@@ -30,8 +30,13 @@
     "t-sql",
     "intellisense"
   ],
+  "extensionDependencies": [
+    "M455YN.csharpshooter"
+  ],
   "activationEvents": [
-    "onLanguage:sql"
+    "onLanguage:sql",
+    "onLanguage:razor",
+    "onLanguage:aspnetcorerazor"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -40,12 +45,21 @@
         "command": "csharpShooter.sql.checkQuery",
         "title": "%command.sql.checkQuery%",
         "category": "%category.Sql%"
+      },
+      {
+        "command": "csharpShooter.sql.openInSsms",
+        "title": "%command.sql.openInSsms%",
+        "category": "%category.Sql%"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "csharpShooter.sql.checkQuery",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.sql.openInSsms",
           "when": "false"
         }
       ]
@@ -57,6 +71,32 @@
           "type": "string",
           "default": "",
           "description": "%config.sqlToolsPath%"
+        },
+        "csharpShooter.sql.razorAttributes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "select",
+            "insert",
+            "update",
+            "delete",
+            "move",
+            "lookup-sql",
+            "sql"
+          ],
+          "description": "%config.sql.razorAttributes%"
+        },
+        "csharpShooter.sql.razorCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.sql.razorCodeLens%"
+        },
+        "csharpShooter.sql.razorDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.sql.razorDiagnostics%"
         }
       }
     }

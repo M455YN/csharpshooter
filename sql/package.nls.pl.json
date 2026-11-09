@@ -1,6 +1,10 @@
 {
-  "description": "IntelliSense T-SQL i błędy składni w plikach .sql z SQL Tools Service firmy Microsoft, bez połączenia z serwerem, oraz sprawdzanie składni SQL w kodzie (tag helperów Razor, dla C# Razor Tag Helper Support).",
+  "description": "Dodatek SQL do CSharpShooter: IntelliSense T-SQL i błędy składni w plikach .sql z SQL Tools Service firmy Microsoft, bez połączenia z serwerem, oraz SQL tag helperów Razor (select=@(@\"...\")) otwierany w SQL Server Management Studio i sprawdzany podczas pisania.",
   "category.Sql": "SQL",
   "command.sql.checkQuery": "Sprawdź SQL w kodzie",
-  "config.sqlToolsPath": "Ścieżka do MicrosoftSqlToolsServiceLayer.dll (SQL Tools Service) dla IntelliSense i błędów składni w plikach .sql. Puste: ta z folderu sqltools/ rozszerzenia."
+  "config.sqlToolsPath": "Ścieżka do MicrosoftSqlToolsServiceLayer.dll (SQL Tools Service) dla IntelliSense i błędów składni w plikach .sql. Puste: ta z folderu sqltools/ rozszerzenia.",
+  "command.sql.openInSsms": "Otwórz w SQL Server Management Studio",
+  "config.sql.razorAttributes": "Atrybuty tag helperów w stronach .cshtml i .razor, które zawierają SQL: nad każdym przycisk Otwórz w SQL Server Management Studio, a jego błędy składni podkreślone. Gdy jest zainstalowany C# Razor Tag Helper Support, robi to sam, według swoich sqlHighlighting.rules.",
+  "config.sql.razorCodeLens": "Pokazuj Otwórz w SQL Server Management Studio nad każdym atrybutem tag helpera z SQL.",
+  "config.sql.razorDiagnostics": "Podkreślaj błędy składni SQL w atrybutach tag helperów podczas pisania."
 }

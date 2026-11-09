@@ -618,10 +618,10 @@ as deep as the body goes.
 
 ## SQL
 
-`.sql` files are [CSharpShooter SQL](sql/README.md)'s, an extension of its own built from `sql/` (SQL Tools Service would
-double this one's size): T-SQL IntelliSense and syntax errors, with no connection to a server, and the syntax of a Razor
-Tag Helper's SQL checked for C# Razor Tag Helper Support. The first `.sql` file opened offers to install it
-(*Zainstaluj*, *Nie teraz*, *Nigdy*).
+SQL is [CSharpShooter SQL](sql/README.md)'s, CSharpShooter's add-on built from `sql/` (SQL Tools Service would double
+this one's size), which needs CSharpShooter: T-SQL IntelliSense and syntax errors in `.sql` files, with no connection to
+a server, and the SQL of a Razor page's Tag Helpers (`select=@(@"...")`) opened in SQL Server Management Studio and
+checked as you type. The first `.sql` file opened offers to install it (*Zainstaluj*, *Nie teraz*, *Nigdy*).
 
 ## Test
 

@@ -10,6 +10,7 @@ const readline = require('readline');
 const { spawn } = require('child_process');
 const { table, language } = require('../l10n');
 const { LanguageClient } = require('vscode-languageclient/node');
+const { registerRazorSql } = require('./razor-sql');
 
 const T = table({
   noServer: 'SQL Tools Service not found: {0}. Run "npm run fetch-sqltools" in the extension folder.',
@@ -105,7 +106,8 @@ function registerSql(context) {
   );
   if (vscode.workspace.textDocuments.some((d) => d.languageId === 'sql')) start().catch(() => {});
   startChecker();
-  return { checkQuery, client: () => client };
+  const razor = registerRazorSql(context, checkQuery);
+  return { checkQuery, razor, client: () => client };
 }
 
 module.exports = { registerSql };

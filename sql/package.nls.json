@@ -1,6 +1,10 @@
 {
-  "description": "T-SQL IntelliSense and syntax errors in .sql files from Microsoft's SQL Tools Service, with no connection to a server, and syntax checks of SQL in code (a Razor Tag Helper's, for C# Razor Tag Helper Support).",
+  "description": "CSharpShooter's SQL add-on: T-SQL IntelliSense and syntax errors in .sql files from Microsoft's SQL Tools Service, with no connection to a server, and the SQL of Razor Tag Helpers (select=@(@\"...\")) opened in SQL Server Management Studio and checked as you type.",
   "category.Sql": "SQL",
   "command.sql.checkQuery": "Check SQL in Code",
-  "config.sqlToolsPath": "Path to MicrosoftSqlToolsServiceLayer.dll (SQL Tools Service), for IntelliSense and syntax errors in .sql files. Empty: the one under the extension's sqltools/ folder."
+  "config.sqlToolsPath": "Path to MicrosoftSqlToolsServiceLayer.dll (SQL Tools Service), for IntelliSense and syntax errors in .sql files. Empty: the one under the extension's sqltools/ folder.",
+  "command.sql.openInSsms": "Open in SQL Server Management Studio",
+  "config.sql.razorAttributes": "Tag Helper attributes of .cshtml and .razor pages that hold SQL: an Open in SQL Server Management Studio lens above each, and its syntax errors underlined. C# Razor Tag Helper Support does this itself when installed, by its own sqlHighlighting.rules.",
+  "config.sql.razorCodeLens": "Show Open in SQL Server Management Studio above each Tag Helper attribute holding SQL.",
+  "config.sql.razorDiagnostics": "Underline the syntax errors of the SQL in Tag Helper attributes as you type."
 }

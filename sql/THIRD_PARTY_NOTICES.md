@@ -32,3 +32,8 @@ carries (SqlClient, SMO and ScriptDom under MIT, DacFx under Microsoft's DacFx l
 distributed with an application). `scripts/fetch-sqltools.js` leaves out its own copy of .NET, the migration tool and
 the texts of languages other than English and Polish.
 
+## C# Razor Tag Helper Support (`razor/`)
+
+`razor/tags.js` (its `folding.js` scanner), `razor/sql-query.js` and `razor/ssms.js` are copied from
+[csharp-razor-taghelpers](https://github.com/M455YN/csharp-razor-taghelpers), MIT, Copyright (c) 2026 Mateusz Afelt,
+the same author's.
