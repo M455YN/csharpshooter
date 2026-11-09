@@ -64,6 +64,9 @@ jobs:
       - name: Change Signature's text (a signature read back)
         run: node test/signature-text.js
 
+      - name: Attach to Process (names listed, Reattach's choice)
+        run: node test/attach.js
+
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js 5.11.0 win-x64
 

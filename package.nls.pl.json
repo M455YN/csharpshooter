@@ -36,6 +36,8 @@
   "command.startup.pickConfiguration": "Konfiguracje rozwiązania...",
   "command.startup.pickPlatform": "Platformy rozwiązania...",
   "command.restart": "Uruchom ponownie",
+  "command.attachToProcess": "Dołącz do procesu...",
+  "command.reattachToProcess": "Dołącz ponownie do procesu",
   "command.solution.search": "Przeszukaj Solution Explorer",
   "command.searchEverywhere": "Wyszukaj (kod, pliki, typy, elementy członkowskie, tekst, funkcje)",
   "command.findInFiles": "Znajdź w plikach",

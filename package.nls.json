@@ -36,6 +36,8 @@
   "command.startup.pickConfiguration": "Solution Configurations...",
   "command.startup.pickPlatform": "Solution Platforms...",
   "command.restart": "Restart",
+  "command.attachToProcess": "Attach to Process...",
+  "command.reattachToProcess": "Reattach to Process",
   "command.solution.search": "Search Solution Explorer",
   "command.searchEverywhere": "Search (code, files, types, members, text, features)",
   "command.findInFiles": "Find in Files",

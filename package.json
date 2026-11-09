@@ -411,6 +411,17 @@
         "icon": "$(debug-restart)"
       },
       {
+        "command": "csharpShooter.attachToProcess",
+        "title": "%command.attachToProcess%",
+        "category": "%category.CSharpShooter%",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "csharpShooter.reattachToProcess",
+        "title": "%command.reattachToProcess%",
+        "category": "%category.CSharpShooter%"
+      },
+      {
         "command": "csharpShooter.solution.search",
         "title": "%command.solution.search%",
         "icon": "$(search)",
@@ -1262,7 +1273,7 @@
                   "integer",
                   "string"
                 ],
-                "default": "${command:pickProcess}"
+                "default": "${command:csharpShooter.pickProcess}"
               },
               "justMyCode": {
                 "type": "boolean",
@@ -1585,6 +1596,16 @@
         "command": "csharpShooter.restart",
         "key": "ctrl+shift+f5",
         "when": "!inDebugMode || debugType == 'csharpshooter'"
+      },
+      {
+        "command": "csharpShooter.attachToProcess",
+        "key": "ctrl+alt+p",
+        "when": "config.csharpShooter.visualStudioKeybindings"
+      },
+      {
+        "command": "csharpShooter.reattachToProcess",
+        "key": "shift+alt+p",
+        "when": "config.csharpShooter.visualStudioKeybindings"
       },
       {
         "key": "f6",

@@ -409,6 +409,7 @@ async function activate(context) {
   const propertiesWindow = registerPropertiesWindow(context, solutionView);
   const nugetPage = registerNuGetPage(context, findSolution);
   const launch = registerLaunch(context, output);
+  require('./attach').registerAttach(context);
   registerCompat(context, output, launch.provider);
   const taskRunner = registerTaskRunner(context, findSolution);
   const startup = registerStartup(context, findSolution, launch);

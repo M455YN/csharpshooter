@@ -195,6 +195,8 @@ class LaunchProfiles {
       config = { ...config, project: now.project, launchProfile: now.profile ?? null, framework: config.framework ?? now.framework,
         name: `${path.basename(now.project, '.csproj')}: ${now.profile ?? path.basename(now.project, '.csproj')}` };
     }
+    // ${command:csharpShooter.pickProcess} gives the PID as text.
+    if (config.request === 'attach' && /^\d+$/.test(config.processId)) config = { ...config, processId: Number(config.processId) };
     if (config.request !== 'launch' || !config.project) return config;
     const project = path.resolve(folder?.uri.fsPath || '', config.project);
     const key = project.toLowerCase();

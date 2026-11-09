@@ -860,5 +860,15 @@
   "nothing is allowed here": "schemat nie dopuszcza tu niczego",
   "matches none of the {0} options of its schema's {1}": "nie pasuje do żadnej z {0} opcji {1} schematu",
   "matches both {0} and {1} of its schema's oneOf, which allows exactly one": "pasuje zarówno do {0}, jak i do {1} z oneOf schematu, który dopuszcza dokładnie jedną",
-  "option {0}": "opcji {0}"
+  "option {0}": "opcji {0}",
+  "Attach to Process": "Dołącz do procesu",
+  "Reattach to Process": "Dołącz ponownie do procesu",
+  "Filter processes": "Filtruj procesy",
+  "PID": "Identyfikator PID",
+  "Session": "Sesja",
+  "Recently attached": "Ostatnio dołączone",
+  "Other processes": "Inne procesy",
+  "No running processes were found.": "Nie znaleziono uruchomionych procesów.",
+  "Reattaching to {0}...": "Trwa ponowne dołączanie do {0}...",
+  "Unable to find matching process. Select the process to attach to from the list.": "Nie można znaleźć pasującego procesu. Wybierz procesy do dołączenia z listy."
 }
