@@ -391,6 +391,7 @@ function registerSearchEverywhere(context, solutionView) {
           await search(m.query, m.options, post);
           post({ type: 'recent', recent: recent() });
         }
+        if (m.type === 'copy') await vscode.env.clipboard.writeText(m.text);
         if (m.type === 'preview') post({ type: 'preview', key: m.key, path: m.path, line: m.line, ranges: m.ranges, rel: m.rel, ...preview(m.path, m.line) });
         if (m.type === 'open') await open(m.item);
         if (m.type === 'replace') {
@@ -680,7 +681,13 @@ function registerSearchEverywhere(context, solutionView) {
   });
   results.addEventListener('dblclick', (e) => { const row = e.target.closest('[data-row]'); if (row) vscode.postMessage({ type: 'open', item: rows[Number(row.dataset.row)] }); });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    // Ctrl+C on text selected outside the boxes (the preview, the results): VS Code takes the key from a webview and its
+    // copy does not always come back here, so the selection goes to the clipboard through the extension.
+    const copy = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'c' || e.key === 'C' || e.key === 'Insert');
+    if (copy && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') && String(window.getSelection())) {
+      e.preventDefault();
+      vscode.postMessage({ type: 'copy', text: String(window.getSelection()) });
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       if (!rows.length) return;
       sel = Math.max(0, Math.min(rows.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1)));
