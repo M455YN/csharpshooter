@@ -321,6 +321,28 @@ shows each change first in VS Code's Refactor Preview, ticked, as VS's *Podgląd
 zmian*, is empty: it only opens the panel). A file just made (by *Przenieś typ*) joins the refactorings once the server has
 loaded it into its project.
 
+## Razor and XML editing
+
+- Typing a start tag's `>` writes its end tag after the caret, as Visual Studio does: in `.razor` and `.cshtml` (Razor's
+  own answer, as VS asks it, so a void element such as `<br>`, a self-closing tag and a generic's `List<string>` in
+  `@code` get none) and in XML, `.csproj`, `.props` and `.targets` (a tag already closed by an end tag after it, or a
+  `>` in an attribute's value, gets none). However fast you type, what you type after the `>` before the end tag comes
+  stays before it; Ctrl+Z takes the end tag back alone. Plain `.html` files keep VS Code's own (`html.autoClosingTags`).
+  Renaming a tag's end tag with it (linked editing) is not done.
+- CSS classes complete in a `class="…"` of a `.razor` or `.cshtml` from every stylesheet the app's pages use, each named
+  beside the class: the `<link>`s of the pages of the component's project and of the projects that reference it
+  (`App.razor`, `_Layout.cshtml`, a `wwwroot` `index.html`; `@Assets["…"]` read as its address), followed as the app
+  serves them: the CSS isolation bundle (`{Project}.styles.css`: every `*.razor.css`), `wwwroot`, a referenced project's
+  or a NuGet package's static web assets (`_content/{Id}/…`, from the package folder its restore resolved), a CDN's
+  address (fetched once and kept in the extension's storage); their `@import`s, the pages' `<style>` blocks and the
+  component's own `.razor.css`.
+- Go to Definition and Go to Declaration (F12) on the identifier a JS interop call gives (`IJSRuntime`'s,
+  an `IJSObjectReference`'s or `IJSInProcessRuntime`'s `InvokeAsync`, `InvokeVoidAsync`, `Invoke`…; the server's hover
+  must say it is JS interop's) open the JavaScript function: in the module the reference was imported from
+  (`InvokeAsync<IJSObjectReference>("import", "./Pages/Counter.razor.js")`, with a cancellation token or a timeout too,
+  or a `Lazy`'s `.Value`), else a global among the app's scripts in `wwwroot` (`"myLib.greet"` finds `greet`). F12 on
+  an `import`'s path opens the module.
+
 ## Solution Explorer
 
 With a solution in the workspace the side bar opens on it, as VS opens on its Solution Explorer. Its icon comes after
@@ -615,6 +637,14 @@ EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
+
+The markup checks (`test/markup-suite.js`: end tags, CSS classes, JS interop's F12) make a Blazor app of their own, with a
+package of theirs and a local stand-in for a CDN:
+
+```bash
+node test/markup-suite.js /path/to/empty/folder
+EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/markup-suite.js node test/runTest.js
+```
 
 The `.sql` checks (`test/sql-suite.js`) need a SQL Server with a small database; the suite's header says which, e.g. on
 LocalDB:
