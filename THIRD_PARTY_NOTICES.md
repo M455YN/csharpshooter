@@ -10,7 +10,10 @@ The debug adapter of [Passenger](https://github.com/Zaneris/passenger), its main
 The handlers in the C# server (`roslyn-extension/`: Hot Reload's `HotReload.cs`, `HotReloadMessages.cs` and
 `StaleCallers.cs`; the refactorings' `Signatures.cs`, `Interfaces.cs`, `TypeMoves.cs`, `MemberMoves.cs` and `Changes.cs`,
 with `RefactoringMessages.cs` and `RefactoringHandlers.cs` cut from its `Messages.cs` and `Handlers.cs`) are
-Passenger.Roslyn.Extension's at the same commit, under the same licence.
+Passenger.Roslyn.Extension's at the same commit, under the same licence. Hot Reload's update handlers' hook
+(`update-handlers/`) is Passenger's `Passenger.UpdateHandlers` at `9954e4b`, and `browser-refresh.js` and
+`update-handlers.js` port Passenger.App's `BrowserRefresh.cs`, `DevelopmentAssets.cs` and `UpdateHandlerHook.cs` at the
+same commit, under the same licence.
 
 ```
 MIT License

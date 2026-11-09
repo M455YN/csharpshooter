@@ -1,11 +1,16 @@
 // Hot Reload under the debugger (F5), as Passenger does it: Roslyn's own Edit and Continue service, in the C# server through
 // roslyn-extension/ (Passenger's handlers), compares the solution as the editors have it with what was built and emits
 // the deltas; the debugger (Passenger's) applies them with its applyChanges, the program paused or running. On each save
-// of a .cs, .razor or .cshtml file while a session with hotReload runs.
+// of a .cs, .razor or .cshtml file while a session with hotReload runs. Then, as Passenger's IDE does: the program's
+// MetadataUpdateHandlers run (update-handlers.js, a startup hook in the program), so a Blazor component renders the edit,
+// and a web app's open pages refresh (browser-refresh.js, the SDK's own browser refresh), a stylesheet saved applied in
+// them without a reload.
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const { t } = require('./l10n');
+const { prepareBrowserRefresh } = require('./browser-refresh');
+const { prepareUpdateHandlers } = require('./update-handlers');
 
 const TYPE = 'csharpshooter';
 const CODE = /\.(cs|razor|cshtml)$/i;
@@ -16,7 +21,39 @@ function registerHotReload(context, server) {
   const diagnostics = vscode.languages.createDiagnosticCollection('Hot Reload');
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   const sessions = new Map(); // debug session id → its Hot Reload
-  const api = { sessions, last: undefined, applied: new vscode.EventEmitter() };
+  const api = { sessions, last: undefined, applied: new vscode.EventEmitter(), staticFiles: new vscode.EventEmitter() };
+  // What a launch made for its session before it started (the hook's socket, the browser refresh), by the id its
+  // configuration carries; what no session takes up within minutes (the launch failed) is let go.
+  const prepared = new Map();
+  let preparedIds = 0;
+  const toConsole = (line) => vscode.debug.activeDebugConsole.appendLine(line);
+
+  /** The update handlers' hook and, for a web app, the browser refresh for a program about to be debugged with Hot Reload:
+   *  the environment that loads them, the id its configuration carries (__hotReloadExtras), and why the browser is not
+   *  kept up where it is not. launch.js asks it. */
+  api.prepare = async ({ project, props, env, buildProperties }) => {
+    let browser;
+    try {
+      browser = await prepareBrowserRefresh(project, props, env, { properties: buildProperties || [] });
+    } catch (e) {
+      browser = { said: t('Hot Reload: the browser is not kept up: {0}', e.message) };
+    }
+    // The hook first among the startup hooks, as Passenger has it.
+    const handlers = await prepareUpdateHandlers(context.extensionPath, props, browser?.env || env).catch(() => undefined);
+    if (!handlers && !browser?.refresh) return { env, said: browser?.said };
+    const id = String(++preparedIds);
+    const extras = { handlers: handlers?.hook, browser: browser?.refresh };
+    extras.expiry = setTimeout(() => disposeExtras(extras), 5 * 60000);
+    extras.expiry.unref?.();
+    prepared.set(id, extras);
+    return { env: handlers?.env || browser.env, id, said: browser?.said };
+  };
+  const disposeExtras = (extras) => {
+    clearTimeout(extras.expiry);
+    extras.handlers?.dispose();
+    extras.browser?.dispose();
+    for (const [id, e] of prepared) if (e === extras) prepared.delete(id);
+  };
 
   const ask = async (name, message) => {
     const client = server();
@@ -105,6 +142,15 @@ function registerHotReload(context, server) {
     }
   }
 
+  /** An update applied and the program let go: its handlers run first (a framework's caches cleared, a Blazor component
+   *  rendered again), then its pages are refreshed. A program paused at a breakpoint runs its handlers as it goes on. */
+  async function applied(hr, outcome) {
+    if (outcome.result !== 'applied') return outcome;
+    const handlers = await hr.handlers?.updated(hr.paused ? 0 : 2000);
+    const pages = hr.browser?.updated();
+    return { ...outcome, handlers, pages };
+  }
+
   /** Roslyn's session, at the session's first edit: undefined once started, else why not. */
   async function start(hr) {
     try {
@@ -129,7 +175,7 @@ function registerHotReload(context, server) {
     clearTimeout(hr.timer);
     hr.timer = setTimeout(() => {
       hr.running = (hr.running || Promise.resolve()).then(async () => {
-        const outcome = await apply(hr).catch((e) => ({ result: 'failed', said: t('Hot Reload failed: {0}', e.message) }));
+        const outcome = await apply(hr).then((o) => applied(hr, o)).catch((e) => ({ result: 'failed', said: t('Hot Reload failed: {0}', e.message) }));
         api.last = outcome;
         problemsShown(outcome.problems || []);
         say(outcome.said, outcome.result !== 'applied' && outcome.result !== 'none');
@@ -144,10 +190,39 @@ function registerHotReload(context, server) {
     }, 300);
   };
 
-  context.subscriptions.push(diagnostics, status, api.applied,
+  // Files changed on disk while a web app's pages are kept up: each it serves told to them (a stylesheet applied in place,
+  // anything else reloading them), a component's scoped CSS bundled again first. Build output is passed over.
+  let changedFiles = new Set();
+  let changedTimer;
+  const fileChanged = (uri) => {
+    if (uri.scheme !== 'file' || /[\\/](bin|obj|node_modules|\.git|\.vs)[\\/]/i.test(uri.fsPath)) return;
+    if (!live().some((hr) => hr.browser)) return;
+    changedFiles.add(uri.fsPath);
+    clearTimeout(changedTimer);
+    changedTimer = setTimeout(() => {
+      const files = [...changedFiles];
+      changedFiles = new Set();
+      for (const hr of live().filter((h) => h.browser)) {
+        hr.browser.changed(files).then((told) => told.length && api.staticFiles.fire(told), () => {});
+      }
+    }, 200);
+  };
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+
+  context.subscriptions.push(diagnostics, status, api.applied, api.staticFiles, watcher,
+    watcher.onDidChange(fileChanged), watcher.onDidCreate(fileChanged), watcher.onDidDelete(fileChanged),
+    { dispose: () => [...prepared.values()].forEach(disposeExtras) },
     vscode.debug.onDidStartDebugSession((s) => {
       if (s.type === TYPE && s.configuration.hotReload) {
-        sessions.set(s.id, { debug: s, originals: new Map(), given: new Set(), saved: new Set(), paused: false });
+        const extras = prepared.get(s.configuration.__hotReloadExtras);
+        if (extras) {
+          clearTimeout(extras.expiry);
+          prepared.delete(s.configuration.__hotReloadExtras);
+        }
+        const hr = { debug: s, originals: new Map(), given: new Set(), saved: new Set(), paused: false, handlers: extras?.handlers, browser: extras?.browser };
+        if (hr.handlers) hr.handlers.says = (failure) => toConsole(t("Hot Reload: the program's update handler {0}", failure));
+        if (hr.browser) hr.browser.says = (line, error) => (error ? toConsole(line) : say(line));
+        sessions.set(s.id, hr);
       }
     }),
     vscode.debug.onDidTerminateDebugSession((s) => {
@@ -156,6 +231,7 @@ function registerHotReload(context, server) {
       sessions.delete(s.id);
       hr.ended = true;
       clearTimeout(hr.timer);
+      disposeExtras(hr);
       if (hr.id !== undefined) tell('End', hr.id);
       if (!sessions.size) diagnostics.clear();
     }),

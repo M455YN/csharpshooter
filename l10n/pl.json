@@ -822,5 +822,26 @@
   "An empty C# code file": "Pusty plik kodu C#",
   "Add New Item - {0}": "Dodaj nowy element - {0}",
   "Search (Ctrl+E)": "Wyszukaj (Ctrl+E)",
-  "dotnet new {0} failed: {1}": "Polecenie dotnet new {0} nie powiodło się: {1}"
+  "dotnet new {0} failed: {1}": "Polecenie dotnet new {0} nie powiodło się: {1}",
+  "Hot Reload: the browser is not kept up: {0}": "Ponowne ładowanie na gorąco: przeglądarka nie będzie odświeżana: {0}",
+  "Hot Reload: the browser is not kept up: {0} runs on .NET {1}, older than the SDK's browser refresh (.NET 6).": "Ponowne ładowanie na gorąco: przeglądarka nie będzie odświeżana: {0} działa na platformie .NET {1}, starszej niż odświeżanie przeglądarki zestawu SDK (.NET 6).",
+  "Hot Reload: the browser is not kept up: the SDK {0} that {1} builds with has a browser refresh CSharpShooter does not speak.": "Ponowne ładowanie na gorąco: przeglądarka nie będzie odświeżana: zestaw SDK {0}, którym jest kompilowany projekt {1}, ma odświeżanie przeglądarki, którego CSharpShooter nie obsługuje.",
+  "Hot Reload: the browser is not kept up: the SDK {0} that {1} builds with has no browser refresh.": "Ponowne ładowanie na gorąco: przeglądarka nie będzie odświeżana: zestaw SDK {0}, którym jest kompilowany projekt {1}, nie ma odświeżania przeglądarki.",
+  "Hot Reload: the browser is not kept up: {0}'s build made no browser tools for its pages (a build with EnableHotReloadInRuntimeConfigDevFile, as a Debug build has it).": "Ponowne ładowanie na gorąco: przeglądarka nie będzie odświeżana: kompilacja projektu {0} nie utworzyła narzędzi przeglądarki dla jego stron (tworzy je kompilacja z właściwością EnableHotReloadInRuntimeConfigDevFile, jak kompilacja Debug).",
+  "Hot Reload: the browser is not kept up: the key {0}'s build made for its browser tools is gone: build {0} again.": "Ponowne ładowanie na gorąco: przeglądarka nie będzie odświeżana: brak klucza utworzonego przez kompilację projektu {0} dla narzędzi przeglądarki: skompiluj ponownie projekt {0}.",
+  "Hot Reload: {0}'s scoped CSS is not in {1}'s pages, as {1}'s build took in none of it: build {1} again to have it.": "Ponowne ładowanie na gorąco: izolowanego kodu CSS projektu {0} nie ma na stronach projektu {1}, ponieważ kompilacja projektu {1} go nie uwzględniła: skompiluj ponownie projekt {1}.",
+  "Hot Reload: {0}'s scoped CSS could not be bundled again: {1}": "Ponowne ładowanie na gorąco: nie można ponownie utworzyć pakietu izolowanego kodu CSS projektu {0}: {1}",
+  "Hot Reload: {0} changed, with no page open to apply it in.": "Ponowne ładowanie na gorąco: zmieniono plik {0}, ale żadna strona, na której można go zastosować, nie jest otwarta.",
+  "Hot Reload: {0} changed, with no page open to reload.": "Ponowne ładowanie na gorąco: zmieniono plik {0}, ale żadna strona do ponownego załadowania nie jest otwarta.",
+  "Hot Reload: {1} applied in {0} pages.": [
+    "Ponowne ładowanie na gorąco: zastosowano plik {1} na {0} stronie.",
+    "Ponowne ładowanie na gorąco: zastosowano plik {1} na {0} stronach.",
+    "Ponowne ładowanie na gorąco: zastosowano plik {1} na {0} stronach."
+  ],
+  "Hot Reload: {1} changed: {0} pages reloaded.": [
+    "Ponowne ładowanie na gorąco: zmieniono plik {1}: ponownie załadowano {0} stronę.",
+    "Ponowne ładowanie na gorąco: zmieniono plik {1}: ponownie załadowano {0} strony.",
+    "Ponowne ładowanie na gorąco: zmieniono plik {1}: ponownie załadowano {0} stron."
+  ],
+  "Hot Reload: the program's update handler {0}": "Ponowne ładowanie na gorąco: procedura obsługi aktualizacji programu {0}"
 }

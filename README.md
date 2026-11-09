@@ -49,6 +49,13 @@ stays as of `7358d41`, since Passenger's newer one takes a newer server's API th
 npm run build-roslyn-extension
 ```
 
+Hot Reload's startup hook that runs the program's `MetadataUpdateHandler`s after an update (`update-handlers/`,
+Passenger's `Passenger.UpdateHandlers` at `9954e4b`, for .NET 8 and later):
+
+```bash
+npm run build-update-handlers
+```
+
 The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspended` and `SafeProcessHandle.Resume`
 (a suspended `CreateProcessW` with piped standard streams, then `ResumeThread`), `KillOnParentExit` (a kill-on-close
 Windows job; a program started on a desktop of its own goes through Passenger's `OwnDesktop` as before), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator. Off Windows, `StartDetached` is dropped,
@@ -269,8 +276,26 @@ The status bar says what came of each save.
 - An edit the runtime cannot take while the program runs (Roslyn's rude edits: a signature changed under callers, a
   field added to a struct, and the like) is listed in Problems (source *Hot Reload*) with *Uruchom ponownie* to restart;
   code that does not compile is applied once it does.
-- An IIS Express profile gets it too, for the modules the app loads after the debugger attaches.
-- The open page does not reload itself yet: refresh it in the browser.
+- An IIS Express profile gets it too, for the modules the app loads after the debugger attaches (without the update
+  handlers and the browser refresh below).
+
+After each update the program takes, as Passenger does it (and `dotnet watch`):
+
+- The program's `MetadataUpdateHandler`s run, every `ClearCache` then every `UpdateApplication`, as the runtime's own Hot
+  Reload agent calls them, so a Blazor component renders the edit at once and a framework's caches are cleared. A small
+  assembly of CSharpShooter's (`update-handlers/`, Passenger's `Passenger.UpdateHandlers`) is loaded into the program as
+  a startup hook (`DOTNET_STARTUP_HOOKS`, .NET 8 and later) and told over a loopback socket; a handler that throws is
+  named in the Debug Console.
+- A web app's open pages are kept up by the SDK's own browser refresh (`Microsoft.AspNetCore.Watch.BrowserRefresh.dll`
+  of the SDK the app builds with, under its `dotnet-watch` tool), loaded into the app as a startup hook and hosting
+  startup; its script in the page connects back to a WebSocket of CSharpShooter's. The page refreshes after an update
+  (a Blazor page renders again, any other reloads). A stylesheet saved in `wwwroot` (or a Razor class library's) is
+  applied in the page without a reload, a component's or page's scoped CSS (`.razor.css`, `.cshtml.css`) once its
+  project has bundled it again; any other static file the app serves reloads the page. With .NET 11's SDK the app
+  forwards the page's socket, and CSharpShooter proves itself with the key the app's build made. The status bar says
+  what each change came to.
+
+`"hotReload": false` turns these off with the rest.
 
 ## Refactorings
 
@@ -582,4 +607,3 @@ EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/folder SUITE=test/sql-suite.
 
 - HTML help inside `.cshtml` (HTML element/attribute completion, HTML formatting): Razor asks the client for it, and this
   extension answers empty. Tag helpers, components and C# come from Razor itself and work.
-- A page in the browser reloaded after Hot Reload applies an edit (`dotnet watch` does it with its BrowserRefresh).

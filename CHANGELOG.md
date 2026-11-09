@@ -4,6 +4,13 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Hot Reload runs the program's `MetadataUpdateHandler`s after each update (every `ClearCache`, then every `UpdateApplication`), so a Blazor component renders the edit at once: Passenger's update handlers' hook, loaded into the program as a startup hook (.NET 8 and later).
+- Hot Reload keeps a web app's open pages up, as `dotnet watch` does, with the SDK's own browser refresh loaded into the app: the page refreshes after an update, a stylesheet saved in `wwwroot` (or a Razor class library's, or a component's scoped CSS once bundled again) is applied without a reload, and any other static file saved reloads the page. Ported from Passenger's `BrowserRefresh` (`9954e4b`), .NET 11's forwarded socket included. `"hotReload": false` turns both off.
+
 ## [0.9.0] - 2026-11-09
 
 ### Changed

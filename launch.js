@@ -49,16 +49,23 @@ function urlsOf({ profile, iis }) {
 }
 
 /** Asks MSBuild what the build writes, so AssemblyName, OutputPath and target framework are the project's own. */
+/** The global properties a start's build is given, as -p: arguments. */
+const globalProperties = (settings, framework) => [`-p:Configuration=${settings.configuration}`,
+  ...buildArgs(settings).filter((a) => a.startsWith('-p:')), ...(framework ? [`-p:TargetFramework=${framework}`] : [])];
+
 function msbuildProperties(project, settings, framework) {
   return new Promise((resolve, reject) => {
     // IntermediateOutputPath and CleanFile: where the build lists what it wrote, which the up-to-date check keeps.
-    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', '-getProperty:IntermediateOutputPath', '-getProperty:CleanFile', '-getProperty:AspNetCoreHostingModel', `-p:Configuration=${settings.configuration}`,
-      ...buildArgs(settings).filter((a) => a.startsWith('-p:')),
-      ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
+    // MSBuildExtensionsPath (the SDK's folder), UsingMicrosoftNETSdkWeb, TargetFrameworkVersion and the project references:
+    // what Hot Reload's browser refresh and update handlers need (hot-reload.js).
+    execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', '-getProperty:IntermediateOutputPath', '-getProperty:CleanFile', '-getProperty:AspNetCoreHostingModel',
+      '-getProperty:MSBuildExtensionsPath', '-getProperty:UsingMicrosoftNETSdkWeb', '-getProperty:TargetFrameworkVersion', '-getItem:ProjectReference',
+      ...globalProperties(settings, framework)],
       { cwd: path.dirname(project), windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
         if (error) return reject(new Error(`dotnet msbuild ${path.basename(project)}: ${stderr || stdout || error.message}`));
         try {
-          resolve(JSON.parse(stdout).Properties);
+          const read = JSON.parse(stdout);
+          resolve({ ...read.Properties, ProjectReferences: (read.Items?.ProjectReference || []).map((i) => i.FullPath).filter(Boolean) });
         } catch {
           reject(new Error(`dotnet msbuild ${path.basename(project)} said: ${stdout}`));
         }
@@ -292,6 +299,14 @@ class LaunchProfiles {
       handOver();
       await runWithoutDebugging(resolved, this.state, progress);
       return undefined;
+    }
+    // Hot Reload's update handlers' hook and, for a web app, the SDK's browser refresh, loaded into the program
+    // (hot-reload.js); hotReload: false loads neither.
+    if (resolved.hotReload && this.hotReload) {
+      const extras = await this.hotReload.prepare({ project, props, env, buildProperties: globalProperties(settings, config.framework) });
+      resolved.env = extras.env;
+      resolved.__hotReloadExtras = extras.id;
+      if (extras.said) log(extras.said);
     }
     progress.report(t('Starting with the debugger…'));
     // The debug session's tracker says the rest (the wait for the port, the browser) and closes it.

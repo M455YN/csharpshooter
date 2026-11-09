@@ -413,6 +413,7 @@ async function activate(context) {
   registerSqlOffer(context);
   const httpFiles = registerHttpFiles(context);
   const hotReload = registerHotReload(context, () => (client && client === extensionIn ? client : undefined));
+  launch.provider.hotReload = hotReload;
   // A message about a document to the server extension's handlers (Roslyn's method name has its own typo).
   const refactorings = registerRefactorings(context, (document) => async (name, message) => {
     if (!client || client !== extensionIn) throw new Error(t('the C# language server has not started'));
