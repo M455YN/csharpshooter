@@ -54,6 +54,7 @@ const T = table({
   certificateFailed: 'The certificate of {0} is not trusted. Connect trusting it?',
   noServer: 'SQL Tools Service not found: {0}. Run "npm run fetch-sqltools" in the extension folder.',
   noSqlEditor: 'Open a .sql file first.',
+  pickConnection: 'Connection string to open the query on',
 });
 
 const CERTIFICATE = /certificate|certyfikat|SSL|TLS|pre-login|uzgadniania przed logowaniem/i;
@@ -74,7 +75,7 @@ async function solutionConnections() {
     for (const [name, value] of Object.entries(userSecrets(path.dirname(file.fsPath)))) strings[name] = value;
     for (const [name, connectionString] of Object.entries(strings)) {
       if (typeof connectionString === 'string' && connectionString.includes('=')) {
-        found.push({ key: `${vscode.workspace.asRelativePath(file)}#${name}`, name, file: vscode.workspace.asRelativePath(file), connectionString });
+        found.push({ key: `${vscode.workspace.asRelativePath(file)}#${name}`, name, file: vscode.workspace.asRelativePath(file), fsPath: file.fsPath, connectionString });
       }
     }
   }
@@ -457,6 +458,25 @@ function registerSql(context) {
     return doc;
   }
 
+  /** A query from code (a Razor Tag Helper's SQL, C# Razor Tag Helper Support's CodeLens): { text, file } in a query
+   *  window on a connection string of the file's project (the nearest appsettings*.json above it, else the solution's;
+   *  asked when several). */
+  async function openQuery({ text = '', file } = {}) {
+    const all = await solutionConnections();
+    const above = all.filter((c) => file && path.resolve(file).toLowerCase().startsWith(path.dirname(c.fsPath).toLowerCase() + path.sep));
+    const nearest = Math.max(-1, ...above.map((c) => path.dirname(c.fsPath).length));
+    const own = above.length ? above.filter((c) => path.dirname(c.fsPath).length === nearest) : all;
+    const choices = own.filter((c, i) => own.findIndex((o) => o.connectionString === c.connectionString) === i);
+    let chosen = choices[0];
+    if (choices.length > 1) {
+      const item = await vscode.window.showQuickPick(choices.map((c) => ({ label: c.name, description: c.file, detail: sqlConnection.masked(c.connectionString), c })),
+        { placeHolder: T.pickConnection });
+      if (!item) return undefined;
+      chosen = item.c;
+    }
+    return newQuery(chosen?.connectionString, text, false);
+  }
+
   /** Execute (Visual Studio's Ctrl+Shift+E, SSMS's F5): the selection, or the whole window, run on its connection; a
    *  window not connected yet asks for one first, as SSMS does. The SQL editor page sends its own selection. */
   async function execute() {
@@ -632,6 +652,7 @@ function registerSql(context) {
       return doc ? connectDialog(doc) : vscode.window.showInformationMessage(T.noSqlEditor);
     }),
     vscode.commands.registerCommand('csharpShooter.sql.newQuery', () => newQuery(undefined, '', false)),
+    vscode.commands.registerCommand('csharpShooter.sql.openQuery', openQuery),
     vscode.commands.registerCommand('csharpShooter.sql.execute', execute),
     vscode.commands.registerCommand('csharpShooter.sql.cancelQuery', cancelQuery),
     vscode.commands.registerCommand('csharpShooter.sql.parse', parse),

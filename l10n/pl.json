@@ -870,5 +870,6 @@
   "Other processes": "Inne procesy",
   "No running processes were found.": "Nie znaleziono uruchomionych procesów.",
   "Reattaching to {0}...": "Trwa ponowne dołączanie do {0}...",
-  "Unable to find matching process. Select the process to attach to from the list.": "Nie można znaleźć pasującego procesu. Wybierz procesy do dołączenia z listy."
+  "Unable to find matching process. Select the process to attach to from the list.": "Nie można znaleźć pasującego procesu. Wybierz procesy do dołączenia z listy.",
+  "Connection string to open the query on": "Parametry połączenia, na których otworzyć zapytanie"
 }

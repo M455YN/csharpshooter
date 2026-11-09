@@ -62,6 +62,11 @@
         "category": "%category.Sql%"
       },
       {
+        "command": "csharpShooter.sql.openQuery",
+        "title": "%command.sql.openQuery%",
+        "category": "%category.Sql%"
+      },
+      {
         "command": "csharpShooter.sql.execute",
         "title": "%command.sql.execute%",
         "icon": "$(play)",
@@ -207,6 +212,10 @@
         },
         {
           "command": "csharpShooter.sqlExplorer.newQuery",
+          "when": "false"
+        },
+        {
+          "command": "csharpShooter.sql.openQuery",
           "when": "false"
         },
         {

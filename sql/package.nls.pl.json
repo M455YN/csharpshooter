@@ -5,6 +5,7 @@
   "command.sql.disconnect": "Rozłącz",
   "command.sql.changeDatabase": "Dostępne bazy danych",
   "command.sql.newQuery": "Nowe zapytanie",
+  "command.sql.openQuery": "Otwórz zapytanie z kodu",
   "command.sql.execute": "Wykonaj",
   "command.sql.cancelQuery": "Anuluj wykonywanie zapytania",
   "command.sqlExplorer.addServer": "Dodaj SQL Server...",

@@ -4,6 +4,12 @@ All notable changes to **CSharpShooter SQL** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `csharpShooter.sql.openQuery` opens a query from code in a query window, on a connection string of the file's project (the nearest `appsettings*.json` above it, its user secrets too; a choice when several): C# Razor Tag Helper Support's *Open … in SQL editor* above a Tag Helper's SQL.
+
 ## [0.1.0] - 2026-10-28
 
 ### Added
