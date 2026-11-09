@@ -28,6 +28,7 @@ const { TranslatingAdapter } = require('./debug-l10n');
 const { registerHotReload } = require('./hot-reload');
 const { registerRefactorings } = require('./refactorings');
 const { registerEndTags } = require('./end-tags');
+const { registerCssClasses } = require('./css-classes');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
@@ -392,6 +393,7 @@ async function activate(context) {
   const dataVisualizer = registerDataVisualizer(context);
   registerRazorEnter(context);
   registerEndTags(context, () => (client && client.state === State.Running ? { client, toServerUri } : undefined));
+  registerCssClasses(context);
   // Texts already shown (trees, the status bar, open pages) keep their language until the window reloads.
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
     if (!e.affectsConfiguration('csharpShooter.uiLanguage')) return;

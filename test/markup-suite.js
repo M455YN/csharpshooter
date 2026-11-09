@@ -1,9 +1,15 @@
 // The editor's help in a Blazor app's markup, in a real editor on a small app of the test's own: a start tag's '>' writes
-// its end tag (in a .razor, a .cshtml, an .xml and a .csproj).
-//   node test/markup-suite.js <empty folder>          (makes the app: dotnet new blazor)
+// its end tag (in a .razor, a .cshtml, an .xml and a .csproj), and CSS classes complete in class="…" from the stylesheets
+// the app's pages link.
+//   node test/markup-suite.js <empty folder>          (makes the app: dotnet new blazor, a package of its own, a CDN's stand-in)
 //   EDITOR_EXE=<editor exe> WORKSPACE=<that folder> SUITE=test/markup-suite.js node test/runTest.js
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+
+// The CDN's stand-in: a stylesheet on a local server, which counts how often it was fetched.
+const CDN_PORT = 5281;
+const CDN_CSS = '.cdn-card { color: red; }\n@media (min-width: 1px) { .cdn-wide > .cdn-inner { margin: 0 } }\n';
 
 const INTEROP_PAGE = `@page "/interop"
 @inject IJSRuntime JS
@@ -39,11 +45,35 @@ if (require.main === module) {
   const { execFileSync } = require('child_process');
   const run = (...args) => execFileSync('dotnet', args, { stdio: 'inherit', cwd: folder });
   fs.mkdirSync(folder, { recursive: true });
+  // The package: a Razor class library with a stylesheet, packed into a feed of the folder's own.
+  run('new', 'razorclasslib', '-n', 'Kit', '-o', 'kit-src');
+  fs.writeFileSync(path.join(folder, 'kit-src', 'wwwroot', 'kit.css'), '/* the package\'s */\n.kit-card, .kit-card:hover { padding: 1px }\n');
+  run('pack', 'kit-src', '-o', 'feed', '-c', 'Release', '-p:PackageVersion=1.0.0');
+  fs.writeFileSync(path.join(folder, 'nuget.config'), `<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="local" value="feed" />
+  </packageSources>
+  <config>
+    <add key="globalPackagesFolder" value="packages" />
+  </config>
+</configuration>
+`);
+  fs.rmSync(path.join(folder, 'kit-src'), { recursive: true, force: true });
   run('new', 'blazor', '-n', 'Shop', '-o', 'Shop', '--interactivity', 'Server');
   run('new', 'sln', '-n', 'Shop');
   run('sln', fs.readdirSync(folder).find((f) => /\.slnx?$/.test(f)), 'add', path.join('Shop', 'Shop.csproj'));
+  run('add', path.join('Shop', 'Shop.csproj'), 'package', 'Kit', '--version', '1.0.0');
   const shop = path.join(folder, 'Shop');
+  const app = path.join(shop, 'Components', 'App.razor');
+  fs.writeFileSync(app, fs.readFileSync(app, 'utf8').replace('</head>', `    <link rel="stylesheet" href="http://127.0.0.1:${CDN_PORT}/cdn.css" />
+    <link rel="stylesheet" href="_content/Kit/kit.css" />
+    <style>
+        .inline-note { color: gray; }
+    </style>
+</head>`));
   fs.writeFileSync(path.join(shop, 'Components', 'Pages', 'Interop.razor'), INTEROP_PAGE);
+  fs.writeFileSync(path.join(shop, 'Components', 'Pages', 'Interop.razor.css'), '.scoped-title { font-weight: bold; }\n');
   fs.mkdirSync(path.join(shop, 'Pages'), { recursive: true });
   fs.writeFileSync(path.join(shop, 'Pages', 'Legacy.cshtml'), '@page\n<div>\n</div>\n');
   fs.writeFileSync(path.join(folder, 'notes.xml'), '<?xml version="1.0"?>\n<notes>\n</notes>\n');
@@ -61,6 +91,13 @@ async function run() {
     failed += ok ? 0 : 1;
     lines.push(`${ok ? 'PASS' : 'FAIL'}  ${name}: ${got}`);
   };
+  let fetched = 0;
+  const cdn = http.createServer((req, res) => {
+    fetched++;
+    res.writeHead(200, { 'content-type': 'text/css' });
+    res.end(CDN_CSS);
+  });
+  await new Promise((r) => cdn.listen(CDN_PORT, '127.0.0.1', r));
   // No completion list pops up while the keys are typed (a '>' would take its item).
   for (const languageId of ['aspnetcorerazor', 'xml']) {
     const editorSettings = vscode.workspace.getConfiguration('editor', { languageId });
@@ -174,7 +211,24 @@ async function run() {
     await sleep(1000);
     expect('.csproj: a condition\'s > and a self-closing tag are left alone', !/<\/Foo>/.test(editor.document.getText()), JSON.stringify(lineOf(editor, at)));
     await vscode.commands.executeCommand('workbench.action.files.revert');
+
+    // 2. CSS classes in class="…": the CDN's (fetched once), the package's, the isolation bundle's, wwwroot's and <style>'s.
+    editor = await open(file('Shop', 'Components', 'Pages', 'Interop.razor'));
+    at = caretAfter(editor, '<h1 class="');
+    let labels = [];
+    for (let i = 0; i < 30 && !labels.includes('cdn-card'); i++) {
+      const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', editor.document.uri, at);
+      labels = list.items.map((c) => (typeof c.label === 'string' ? c.label : c.label.label));
+      if (!labels.includes('cdn-card')) await sleep(500);
+    }
+    const want = ['cdn-card', 'cdn-wide', 'cdn-inner', 'kit-card', 'scoped-title', 'inline-note', 'btn-primary', 'valid'];
+    expect('class="": every stylesheet\'s classes', want.every((c) => labels.includes(c)), `missing ${want.filter((c) => !labels.includes(c)).join(', ') || 'none'} among ${labels.length}`);
+    await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', editor.document.uri, at);
+    expect('the CDN\'s stylesheet is fetched once', fetched === 1, `${fetched} times`);
+    const outside = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', editor.document.uri, caretAfter(editor, '<h1 '));
+    expect('no classes outside class=""', !outside.items.some((c) => (c.label.label ?? c.label) === 'kit-card'), `${outside.items.length} items`);
   } finally {
+    cdn.close();
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     for (const [name, text] of backups) fs.writeFileSync(name, text);
   }

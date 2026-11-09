@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Typing a start tag's `>` writes its end tag, as Visual Studio does, in `.razor`, `.cshtml`, XML, `.csproj`, `.props` and `.targets`, however fast you type; void elements, self-closing tags and a generic's `<…>` in C# are left alone, and Ctrl+Z takes the end tag back.
+- CSS classes complete in `class="…"` of a `.razor`/`.cshtml` from every stylesheet the app's pages use: CDN links (fetched once and cached), NuGet packages' and referenced projects' static web assets, the CSS isolation bundle, `wwwroot` and `<style>` blocks.
 
 ## [0.9.0] - 2026-11-09
 

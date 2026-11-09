@@ -304,6 +304,13 @@ loaded it into its project.
   `>` in an attribute's value, gets none). However fast you type, what you type after the `>` before the end tag comes
   stays before it; Ctrl+Z takes the end tag back alone. Plain `.html` files keep VS Code's own (`html.autoClosingTags`).
   Renaming a tag's end tag with it (linked editing) is not done.
+- CSS classes complete in a `class="…"` of a `.razor` or `.cshtml` from every stylesheet the app's pages use, each named
+  beside the class: the `<link>`s of the pages of the component's project and of the projects that reference it
+  (`App.razor`, `_Layout.cshtml`, a `wwwroot` `index.html`; `@Assets["…"]` read as its address), followed as the app
+  serves them: the CSS isolation bundle (`{Project}.styles.css`: every `*.razor.css`), `wwwroot`, a referenced project's
+  or a NuGet package's static web assets (`_content/{Id}/…`, from the package folder its restore resolved), a CDN's
+  address (fetched once and kept in the extension's storage); their `@import`s, the pages' `<style>` blocks and the
+  component's own `.razor.css`.
 
 ## Solution Explorer
 
@@ -580,7 +587,8 @@ solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.jso
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
 
-The markup checks (`test/markup-suite.js`: end tags) make a Blazor app of their own:
+The markup checks (`test/markup-suite.js`: end tags, CSS classes) make a Blazor app of their own, with a
+package of theirs and a local stand-in for a CDN:
 
 ```bash
 node test/markup-suite.js /path/to/empty/folder
