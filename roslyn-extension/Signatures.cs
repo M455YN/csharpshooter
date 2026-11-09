@@ -7,6 +7,8 @@ using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Rename;
 using Microsoft.CodeAnalysis.Text;
+using Passenger.Core;
+using Passenger.Languages.CSharp;
 
 namespace Passenger.Roslyn.Extension;
 
@@ -63,6 +65,10 @@ internal static class Signatures
             {
                 return Changes.Refused($"Unable to change signature of {Describe(member)}: it is declared as a record's or a type's parameters");
             }
+        }
+        if (await ClashAsync(before, family, change, cancel).ConfigureAwait(false) is { } clash)
+        {
+            return Changes.Refused(clash);
         }
         List<MethodId> members = [.. family.Select(m => Identify(before, m))];
         Solution solution = await RenameParametersAsync(before, members, change, cancel).ConfigureAwait(false);
@@ -161,9 +167,15 @@ internal static class Signatures
         {
             return change.Name.Trim().Length == 0 ? "Method name can not be empty" : $"'{change.Name}' is not a valid method name";
         }
-        if (method.MethodKind == MethodKind.Ordinary && !IsReturnType(change.ReturnType))
+        if (method.MethodKind == MethodKind.Ordinary)
         {
-            return "The return type is invalid";
+            switch (IsReturnType(change.ReturnType))
+            {
+                case null:
+                    return "The return type is nested too deeply to read";
+                case false:
+                    return "The return type is invalid";
+            }
         }
         HashSet<string> names = new(StringComparer.Ordinal);
         HashSet<int> kept = [];
@@ -187,17 +199,26 @@ internal static class Signatures
             {
                 return "Parameters should have different names";
             }
-            if (!IsType(parameter.Type))
+            switch (IsType(parameter.Type))
             {
-                return "A parameter has an invalid type";
+                case null:
+                    return "A parameter's type is nested too deeply to read";
+                case false:
+                    return "A parameter has an invalid type";
             }
             if (!Modifiers.Contains(Normalized(parameter.Modifier)))
             {
                 return $"'{parameter.Modifier}' is not a parameter modifier";
             }
-            if (!IsExpression(parameter.DefaultValue) || !IsExpression(parameter.CallValue))
+            foreach (string value in (string[])[parameter.DefaultValue, parameter.CallValue])
             {
-                return "Error in default value expression";
+                switch (IsExpression(value))
+                {
+                    case null:
+                        return "A parameter's value is nested too deeply to read";
+                    case false:
+                        return "Error in default value expression";
+                }
             }
             if (Normalized(parameter.Modifier) == "params" && i != change.Parameters.Count - 1)
             {
@@ -221,12 +242,14 @@ internal static class Signatures
 
     private static string Normalized(string modifier) => string.Join(" ", modifier.Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-    private static bool IsType(string text) => text.Trim().Length > 0 && !SyntaxFactory.ParseTypeName(text).ContainsDiagnostics;
+    /// <summary>Whether a text is a type; null for one nested too deeply for the parser to be given.</summary>
+    private static bool? IsType(string text) => text.Trim().Length == 0 ? false : CodeBrackets.TypeName(text) is { } type ? !type.ContainsDiagnostics : null;
 
     /// <summary>A type a method can return: any type, or void, which a type's parser takes for none.</summary>
-    private static bool IsReturnType(string text) => Normalized(text) == "void" || IsType(text);
+    private static bool? IsReturnType(string text) => Normalized(text) == "void" ? true : IsType(text);
 
-    private static bool IsExpression(string text) => text.Trim().Length == 0 || !SyntaxFactory.ParseExpression(text).ContainsDiagnostics;
+    /// <summary>Whether a text is an expression or nothing; null for one nested too deeply for the parser to be given.</summary>
+    private static bool? IsExpression(string text) => text.Trim().Length == 0 ? true : CodeBrackets.Expression(text) is { } expression ? !expression.ContainsDiagnostics : null;
 
     /// <summary>The method and every method its signature is tied to: what it overrides and implements, and what overrides
     /// and implements those, as far as they go both ways. A constructor stands alone.</summary>
@@ -276,6 +299,72 @@ internal static class Signatures
         }
         return [.. family];
     }
+
+    /// <summary>Why a method of the hierarchy cannot take the signature asked: another member of its type has the name and
+    /// parameter types it would have (a member not a method, the name alone), or has its own now, which leaves the two
+    /// apart by nothing the change could find again; null when none has.</summary>
+    private static async Task<string?> ClashAsync(Solution solution, IReadOnlyList<IMethodSymbol> family, SignatureChange change, CancellationToken cancel)
+    {
+        foreach (IMethodSymbol member in family)
+        {
+            string type = member.ContainingType.Name;
+            if (Twin(member, member.Name, [.. member.Parameters.Select(p => (p.Type, p.RefKind != RefKind.None))]) is { } now)
+            {
+                return $"{type} already has {now.ToDisplayString(Shown)} with the parameter types of {Describe(member)}: Change Signature cannot tell the two apart, so change one by hand first";
+            }
+            string name = member.MethodKind == MethodKind.Constructor ? member.Name : change.Name.Trim();
+            if (name != member.Name && member.ContainingType.GetMembers(name).FirstOrDefault(m => m is not IMethodSymbol && !m.IsImplicitlyDeclared) is { } named)
+            {
+                return $"{type} already has the {KindOf(named)} {named.ToDisplayString(Shown)}, whose name the new signature of {Describe(member)} would take";
+            }
+            BaseMethodDeclarationSyntax declaration = (await DeclarationsAsync(member, cancel).ConfigureAwait(false))[0];
+            SemanticModel model = (await solution.GetDocument(declaration.SyntaxTree)!.GetSemanticModelAsync(cancel).ConfigureAwait(false))!;
+            List<(ITypeSymbol Type, bool ByRef)> parameters = [];
+            foreach (ParameterChange parameter in change.Parameters)
+            {
+                TypeInfo bound = model.GetSpeculativeTypeInfo(declaration.ParameterList.SpanStart, CodeBrackets.TypeName(parameter.Type)!, SpeculativeBindingOption.BindAsTypeOrNamespace);
+                if (bound.Type is { TypeKind: not TypeKind.Error } found)
+                {
+                    parameters.Add((found, RefKindOf(parameter.Modifier).Length > 0));
+                }
+            }
+            if (parameters.Count == change.Parameters.Count && Twin(member, name, parameters) is { } other)
+            {
+                string what = member.MethodKind == MethodKind.Constructor ? "parameter types" : "name and parameter types";
+                return $"{type} already has {other.ToDisplayString(Shown)}, whose {what} the new signature of {Describe(member)} would take";
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Another method of a method's type (another constructor of a constructor's) of this name taking these
+    /// parameter types, each by reference or not alike, as the compiler tells overloads apart; null for none.</summary>
+    private static IMethodSymbol? Twin(IMethodSymbol method, string name, IReadOnlyList<(ITypeSymbol Type, bool ByRef)> parameters) =>
+        method.ContainingType.GetMembers(name).OfType<IMethodSymbol>().FirstOrDefault(other => other.MethodKind == method.MethodKind && !other.IsImplicitlyDeclared
+            && !SymbolEqualityComparer.Default.Equals(other.PartialDefinitionPart ?? other, method.PartialDefinitionPart ?? method)
+            && other.TypeParameters.Length == method.TypeParameters.Length && other.Parameters.Length == parameters.Count
+            && other.Parameters.Select((p, i) => SameType(p.Type, parameters[i].Type) && (p.RefKind != RefKind.None) == parameters[i].ByRef).All(same => same));
+
+    /// <summary>Whether two parameters' types are one to the compiler: a method's type parameter by its place among them.</summary>
+    private static bool SameType(ITypeSymbol one, ITypeSymbol other) => SymbolEqualityComparer.Default.Equals(one, other)
+        || (one is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } first && other is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } second
+            && first.Ordinal == second.Ordinal);
+
+    private static string KindOf(ISymbol member) => member switch
+    {
+        IFieldSymbol => "field",
+        IPropertySymbol => "property",
+        IEventSymbol => "event",
+        INamedTypeSymbol => "type",
+        _ => "member",
+    };
+
+    /// <summary>A member as a clash names it: its type's name, its own and its parameters ("Calc.Scale(int value, int factor)").</summary>
+    private static readonly SymbolDisplayFormat Shown = new(
+        memberOptions: SymbolDisplayMemberOptions.IncludeParameters | SymbolDisplayMemberOptions.IncludeContainingType,
+        parameterOptions: SymbolDisplayParameterOptions.IncludeType | SymbolDisplayParameterOptions.IncludeName | SymbolDisplayParameterOptions.IncludeModifiers,
+        genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
     /// <summary>A member found again in a later solution: its documentation comment id in the project declaring it,
     /// which renaming its parameters leaves as it was.</summary>
@@ -332,8 +421,8 @@ internal static class Signatures
     /// <summary>Every declaration's parameters and return type as asked, every call's arguments in the new order with the
     /// new parameters' values, and every cref's parameter types, each file through one editor of its own. Each use left
     /// as it was that the new signature leaves wrong is named with why, at its place in <paramref name="before"/>: a call
-    /// whose arguments do not all bind, a method group the method no longer fits or whose delegate's calls would reach
-    /// other parameters, a call made without the method's name that no longer compiles.</summary>
+    /// whose arguments do not all bind or pass as their parameters take them, a method group the method no longer fits or
+    /// whose delegate's calls would reach other parameters, a call made without the method's name that no longer compiles.</summary>
     private static async Task<(Solution Solution, IReadOnlyList<UseLeft> Left)> RestructureAsync(Solution before, Solution solution, IReadOnlyList<MethodId> members,
         MethodId main, IReadOnlyList<Parameter> original, SignatureChange change, SyntaxAnnotation marker, CancellationToken cancel)
     {
@@ -403,9 +492,14 @@ internal static class Signatures
                     }
                     else if (Called(node) is { } call)
                     {
-                        if (Plan(model, call, method, change, cancel) is { } plan)
+                        (List<Passed>? plan, string? unpassed) = Plan(model, call, method, change, cancel);
+                        if (plan is not null)
                         {
                             calls.Add((place.Document, call, plan));
+                        }
+                        else if (unpassed is not null)
+                        {
+                            left.Add(await LeftAsync(before, place.Document, at, $"a call of {Named(method, change)} {unpassed}", cancel).ConfigureAwait(false));
                         }
                         else if (!sameCalls)
                         {
@@ -455,7 +549,7 @@ internal static class Signatures
                 now = now.WithParameterList(Parameters(now.ParameterList, original, change));
                 if (now is MethodDeclarationSyntax named && Normalized(change.ReturnType) != Normalized(named.ReturnType.ToString()) && change.ReturnType.Trim().Length > 0)
                 {
-                    now = named.WithReturnType(SyntaxFactory.ParseTypeName(change.ReturnType.Trim()).WithTriviaFrom(named.ReturnType));
+                    now = named.WithReturnType(CodeBrackets.TypeName(change.ReturnType.Trim())!.WithTriviaFrom(named.ReturnType));
                 }
                 return marked ? now.WithAdditionalAnnotations(marker) : now;
             });
@@ -622,7 +716,7 @@ internal static class Signatures
     private static ParameterSyntax Parse(string modifier, string type, string name, string defaultValue)
     {
         string text = $"({Normalized(modifier)} {type.Trim()} {name}{(defaultValue.Trim().Length > 0 ? " = " + defaultValue.Trim() : string.Empty)})";
-        return SyntaxFactory.ParseParameterList(text).Parameters[0];
+        return DeepText.Read(text.Length, () => SyntaxFactory.ParseParameterList(text).Parameters[0]);
     }
 
     /// <summary>A list's commas: those it had, then new ones followed by a space.</summary>
@@ -634,15 +728,16 @@ internal static class Signatures
         }
     }
 
-    /// <summary>What a call passes in the new signature: for each place, the argument it already passes for that
-    /// parameter (by its index in the call, several for a params array or collection spread out), or the value a new
-    /// parameter is given; every argument after a parameter left to its default is named. Null for a call whose arguments
-    /// do not all bind, which is left as it is, and named where the calls change.</summary>
-    private static List<Passed>? Plan(SemanticModel model, SyntaxNode call, IMethodSymbol method, SignatureChange change, CancellationToken cancel)
+    /// <summary>What a call passes in the new signature: for each place, the argument it already passes for that parameter
+    /// (by its index in the call, several for a params array or collection spread out) with the keyword its passing now
+    /// takes, or a new parameter's value; named after a parameter left to its default, or all named in the order written
+    /// where the new one would run them otherwise (<see cref="RunsOtherwise"/>). No plan for a call whose arguments do not
+    /// all bind, nor for one passing an argument the parameter can no longer take as it is passed now, said why.</summary>
+    private static (List<Passed>? Plan, string? Unpassed) Plan(SemanticModel model, SyntaxNode call, IMethodSymbol method, SignatureChange change, CancellationToken cancel)
     {
         if (ArgumentsOf(call) is not { } list || model.GetOperation(call, cancel) is not { } operation)
         {
-            return null;
+            return (null, null);
         }
         ImmutableArray<IArgumentOperation> arguments = operation switch
         {
@@ -678,10 +773,11 @@ internal static class Signatures
         }
         if (bound.Contains(-1))
         {
-            return null;
+            return (null, null);
         }
         List<Passed> plan = [];
         bool named = false;
+        bool spreads = false;
         foreach (ParameterChange parameter in change.Parameters)
         {
             if (reduced && parameter.From == 0)
@@ -697,26 +793,150 @@ internal static class Signatures
                     continue;
                 }
                 bool spread = passed.Length > 1 || method.Parameters[parameter.From].IsParams;
+                spreads |= spread;
+                RefKind passing = RefKindNamed(parameter.Modifier);
+                string? keyword = null;
+                if (!spread && method.Parameters[parameter.From].RefKind != passing)
+                {
+                    ArgumentSyntax argument = list.Arguments[passed[0]];
+                    if (Keyword(model, argument, passing, cancel) is not { } given)
+                    {
+                        return (null, $"whose argument {argument.Expression} cannot be passed {Passing(passing)} to '{parameter.Name}'");
+                    }
+                    if (passing != RefKind.Out && method.Parameters[parameter.From].RefKind == RefKind.Out && Unassigned(model, argument.Expression, cancel))
+                    {
+                        return (null, $"whose argument {argument.Expression} may have no value yet, which '{parameter.Name}' passed {Passing(passing)} would read");
+                    }
+                    keyword = given;
+                }
                 foreach (int index in passed)
                 {
-                    plan.Add(new Passed(index, null, named && !spread ? parameter.Name : null));
+                    plan.Add(new Passed(index, null, named && !spread ? parameter.Name : null, parameter.Name, keyword));
                 }
             }
             else if (parameter.CallValue.Trim().Length > 0)
             {
-                plan.Add(new Passed(-1, parameter.CallValue.Trim(), named ? parameter.Name : null));
+                plan.Add(new Passed(-1, parameter.CallValue.Trim(), named ? parameter.Name : null, parameter.Name));
             }
             else
             {
                 named = true;
             }
         }
-        return plan;
+        // A params argument cannot be named, nor follow the others named out of place.
+        if (!spreads && RunsOtherwise(model, list, plan, cancel))
+        {
+            plan = [.. plan.Where(p => p.Index >= 0).OrderBy(p => p.Index).Concat(plan.Where(p => p.Index < 0)).Select(p => p with { Name = p.Parameter })];
+        }
+        return (plan, null);
     }
 
-    /// <summary>One argument of a call in the new signature: the one at an index of the call as it was, or a new value;
-    /// named when it must be.</summary>
-    private sealed record Passed(int Index, string? Value, string? Name);
+    /// <summary>One argument of a call in the new signature: the one at an index of the call as it was, or a new value,
+    /// for the parameter named <paramref name="Parameter"/>; named when it must be, and given the keyword its passing takes
+    /// where that changed (empty for none).</summary>
+    private sealed record Passed(int Index, string? Value, string? Name, string Parameter, string? Keyword = null);
+
+    /// <summary>Whether a plan runs a call's arguments in another order where that can change what they do: one that may
+    /// change state (<see cref="Acts"/>) moved past another that is no constant.</summary>
+    private static bool RunsOtherwise(SemanticModel model, BaseArgumentListSyntax list, List<Passed> plan, CancellationToken cancel)
+    {
+        int[] kept = [.. plan.Where(p => p.Index >= 0).Select(p => p.Index)];
+        for (int i = 0; i < kept.Length; i++)
+        {
+            for (int j = i + 1; j < kept.Length; j++)
+            {
+                if (kept[i] < kept[j])
+                {
+                    continue;
+                }
+                ExpressionSyntax first = list.Arguments[kept[j]].Expression;
+                ExpressionSyntax second = list.Arguments[kept[i]].Expression;
+                if (Acts(first) && !Inert(model, second, cancel) || Acts(second) && !Inert(model, first, cancel))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Whether evaluating an expression may change state: it calls, makes an object, assigns, increments or
+    /// decrements, awaits or throws, outside the lambdas it holds, which run only when called.</summary>
+    private static bool Acts(ExpressionSyntax expression) =>
+        expression.DescendantNodesAndSelf(node => node is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)).Any(node =>
+            node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax or AssignmentExpressionSyntax or AwaitExpressionSyntax
+                or ThrowExpressionSyntax or QueryExpressionSyntax
+            || node.IsKind(SyntaxKind.PreIncrementExpression) || node.IsKind(SyntaxKind.PreDecrementExpression)
+            || node.IsKind(SyntaxKind.PostIncrementExpression) || node.IsKind(SyntaxKind.PostDecrementExpression));
+
+    /// <summary>Whether an expression gives the same whatever runs before it: a constant, a default, a lambda, a typeof
+    /// or this.</summary>
+    private static bool Inert(SemanticModel model, ExpressionSyntax expression, CancellationToken cancel) =>
+        expression is AnonymousFunctionExpressionSyntax or TypeOfExpressionSyntax or DefaultExpressionSyntax or ThisExpressionSyntax or LiteralExpressionSyntax
+        || model.GetConstantValue(expression, cancel).HasValue;
+
+    /// <summary>How a parameter of a modifier is passed.</summary>
+    private static RefKind RefKindNamed(string modifier) => RefKindOf(modifier) switch
+    {
+        "out " => RefKind.Out,
+        "ref readonly " => RefKind.RefReadOnlyParameter,
+        "ref " => RefKind.Ref,
+        "in " => RefKind.In,
+        _ => RefKind.None,
+    };
+
+    private static string Passing(RefKind kind) => kind switch
+    {
+        RefKind.None => "by value",
+        RefKind.Out => "as out",
+        RefKind.Ref => "by ref",
+        _ => "as in",
+    };
+
+    /// <summary>The keyword an argument takes for a parameter passed anew: none by value; out, ref or in before a variable,
+    /// a value passed as in taking none; null where the argument cannot be passed so (a value by ref or as out, an out
+    /// variable or discard to anything but out).</summary>
+    private static string? Keyword(SemanticModel model, ArgumentSyntax argument, RefKind passing, CancellationToken cancel)
+    {
+        if (argument.Expression is DeclarationExpressionSyntax || model.GetOperation(argument.Expression, cancel) is IDiscardOperation)
+        {
+            return passing == RefKind.Out ? "out" : null;
+        }
+        return passing switch
+        {
+            RefKind.None => string.Empty,
+            RefKind.Out => IsVariable(model, argument.Expression, written: true, cancel) ? "out" : null,
+            RefKind.Ref => IsVariable(model, argument.Expression, written: true, cancel) ? "ref" : null,
+            _ => IsVariable(model, argument.Expression, written: false, cancel) ? "in" : string.Empty,
+        };
+    }
+
+    /// <summary>Whether an expression is a variable an argument can pass by reference: a local, a parameter, a field, an
+    /// array's element, or what a call or property returns by reference; one to be written neither readonly nor a
+    /// constant.</summary>
+    private static bool IsVariable(SemanticModel model, ExpressionSyntax expression, bool written, CancellationToken cancel) => model.GetOperation(expression, cancel) switch
+    {
+        ILocalReferenceOperation local => !local.Local.IsConst && !(written && (local.Local.IsUsing || local.Local.IsForEach || local.Local.RefKind == RefKind.RefReadOnly)),
+        IParameterReferenceOperation parameter => !(written && parameter.Parameter.RefKind is RefKind.In or RefKind.RefReadOnlyParameter),
+        IFieldReferenceOperation field => !field.Field.IsConst && !(written && field.Field.IsReadOnly),
+        IArrayElementReferenceOperation => true,
+        IInvocationOperation invocation => invocation.TargetMethod.ReturnsByRef || (!written && invocation.TargetMethod.ReturnsByRefReadonly),
+        IPropertyReferenceOperation property => property.Property.ReturnsByRef || (!written && property.Property.ReturnsByRefReadonly),
+        _ => false,
+    };
+
+    /// <summary>Whether an argument is a local or parameter not definitely assigned where the call passes it, which only an
+    /// out parameter may take.</summary>
+    private static bool Unassigned(SemanticModel model, ExpressionSyntax expression, CancellationToken cancel)
+    {
+        ISymbol? variable = model.GetOperation(expression, cancel) switch
+        {
+            ILocalReferenceOperation local => local.Local,
+            IParameterReferenceOperation parameter => parameter.Parameter,
+            _ => null,
+        };
+        return variable is not null && model.AnalyzeDataFlow(expression) is { Succeeded: true } flow && !flow.DefinitelyAssignedOnEntry.Contains(variable, SymbolEqualityComparer.Default);
+    }
 
     private static BaseArgumentListSyntax? ArgumentsOf(SyntaxNode call) => call switch
     {
@@ -734,8 +954,13 @@ internal static class Signatures
         foreach (Passed passed in plan)
         {
             ArgumentSyntax argument = passed.Value is { } value
-                ? SyntaxFactory.Argument(SyntaxFactory.ParseExpression(value))
+                ? SyntaxFactory.Argument(CodeBrackets.Expression(value)!)
                 : list.Arguments[passed.Index];
+            if (passed.Keyword is { } keyword)
+            {
+                argument = argument.WithRefKindKeyword(keyword.Length == 0 ? default : SyntaxFactory.Token(SyntaxFacts.GetKeywordKind(keyword)).WithTrailingTrivia(SyntaxFactory.Space))
+                    .WithExpression(argument.Expression.WithoutLeadingTrivia());
+            }
             if (passed.Name is { } name && argument.NameColon is null)
             {
                 argument = argument.WithNameColon(SyntaxFactory.NameColon(SyntaxFactory.IdentifierName(name)).WithTrailingTrivia(SyntaxFactory.Space))

@@ -1,5 +1,5 @@
 diff --git a/Directory.Build.props b/Directory.Build.props
-index e5b92cb..f858954 100644
+index 07546040..230b54b0 100644
 --- a/Directory.Build.props
 +++ b/Directory.Build.props
 @@ -1,7 +1,7 @@
@@ -9,13 +9,13 @@ index e5b92cb..f858954 100644
 -    <TargetFramework>net11.0</TargetFramework>
 +    <TargetFramework>net10.0</TargetFramework>
      <!-- The version, until a vX.Y.Z tag on the commit names it. -->
-     <Version>0.2.2</Version>
+     <Version>0.3.0</Version>
      <Nullable>enable</Nullable>
 diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
-index 3a4ce77..7e8127b 100644
+index e47ec805..a584307c 100644
 --- a/src/Passenger.Core/ChildProcesses.cs
 +++ b/src/Passenger.Core/ChildProcesses.cs
-@@ -552,10 +552,7 @@ public static class ChildProcesses
+@@ -865,10 +865,7 @@ public static class ChildProcesses
          start.RedirectStandardInput = true;
          start.RedirectStandardOutput = true;
          start.RedirectStandardError = true;
@@ -28,7 +28,7 @@ index 3a4ce77..7e8127b 100644
          Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory) { Start = start });
          // What it writes is nobody's: its pipes closed here, its writes to them fail, which .NET's console passes over.
 diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
-index 536142d..dfd4f6f 100644
+index c8efda8a..362a56f9 100644
 --- a/src/Passenger.Core/Lifeline.cs
 +++ b/src/Passenger.Core/Lifeline.cs
 @@ -61,18 +61,26 @@ internal static partial class Lifeline
@@ -62,7 +62,7 @@ index 536142d..dfd4f6f 100644
  
      /// <summary>Puts a process group that leads itself on the watchdog's list: a child's, or a program the terminal started
      /// in its pseudo-terminal.</summary>
-@@ -216,7 +224,6 @@ internal static partial class Lifeline
+@@ -223,7 +231,6 @@ internal static partial class Lifeline
                  UseShellExecute = false,
                  CreateNoWindow = true,
                  RedirectStandardInput = true,
@@ -70,7 +70,7 @@ index 536142d..dfd4f6f 100644
              };
              Process started = Process.Start(start) ?? throw new InvalidOperationException("The watchdog did not start");
              foreach (int group in Groups)
-@@ -275,4 +282,71 @@ internal static partial class Lifeline
+@@ -279,4 +286,71 @@ internal static partial class Lifeline
          public nuint PeakProcessMemoryUsed;
          public nuint PeakJobMemoryUsed;
      }
@@ -143,10 +143,10 @@ index 536142d..dfd4f6f 100644
 +    }
  }
 diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
-index 96e3452..ec47a91 100644
+index 9d22eb57..1bab0586 100644
 --- a/src/Passenger.DebugAdapter/DebugAdapter.cs
 +++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
-@@ -260,11 +260,13 @@ public sealed partial class DebugAdapter
+@@ -254,11 +254,13 @@ public sealed class DebugAdapter
              return Leave(() => debugger.DisconnectAsync(arguments.TerminateDebuggee ?? false,
                  arguments.LetGoWithin is int within and > 0 ? TimeSpan.FromMilliseconds(within) : null));
          }, then: RequestShutdown);
@@ -162,7 +162,7 @@ index 96e3452..ec47a91 100644
          // Not under the engine's lock: a program waiting for input may be running, and the write is all.
          connection.Handle<InputArguments>(DapCommands.Input, arguments =>
 diff --git a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
-index aaec179..ef545fe 100644
+index aaec1792..ef545fec 100644
 --- a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 +++ b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 @@ -17,7 +17,8 @@ namespace Passenger.Debugger.Interop;
@@ -176,63 +176,88 @@ index aaec179..ef545fe 100644
      /// <summary>
      /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
-index 0a706cd..a42de92 100644
+index 6852334b..13b6bb47 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
 +++ b/src/Passenger.Debugger/SuspendedLaunch.cs
-@@ -163,53 +163,99 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -166,29 +166,30 @@ public sealed partial class SuspendedLaunch : IDisposable
          }
      }
  
+-    /// <summary>On Windows the program shares the adapter's own console where it has one, set first to read and write UTF-8
+-    /// as the adapter does: a .NET program reads its redirected input and writes its output in its console's code page,
+-    /// which a console made for it alone takes from the system (437 in English).</summary>
 +    /// <summary>What .NET 11's ProcessStartInfo.StartSuspended does, for .NET 10: CreateProcess with CREATE_SUSPENDED and
-+    /// the program's standard streams on pipes, its main thread held until <see cref="Resume"/>.</summary>
++    /// the program's standard streams on pipes, its main thread held until <see cref="Resume"/>. The program shares the
++    /// adapter's own console where it has one, set first to read and write UTF-8 as the adapter does: a .NET program reads
++    /// its redirected input and writes its output in its console's code page, which a console made for it alone takes from
++    /// the system (437 in English). <paramref name="unseen"/> starts it through OwnDesktop, which makes its own CreateProcess.</summary>
      [SupportedOSPlatform("windows")]
-     private static SuspendedLaunch StartOnWindows(string program, IReadOnlyList<string> arguments, string? folder, IReadOnlyDictionary<string, string> variables)
+     private static SuspendedLaunch StartOnWindows(string program, IReadOnlyList<string> arguments, string? folder, IReadOnlyDictionary<string, string> variables, bool unseen)
      {
+         bool shared = SharedConsole.InUtf8();
 -        ProcessStartInfo start = new(program, arguments)
 -        {
 -            WorkingDirectory = folder ?? Environment.CurrentDirectory,
 -            UseShellExecute = false,
--            CreateNoWindow = true,
+-            CreateNoWindow = !shared,
 -            RedirectStandardInput = true,
 -            RedirectStandardOutput = true,
 -            RedirectStandardError = true,
 -            StartSuspended = true,
 -        };
-+        Dictionary<string, string> environment = new(StringComparer.OrdinalIgnoreCase);
-+        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
-+        {
-+            environment[(string)entry.Key] = (string?)entry.Value ?? string.Empty;
-+        }
-         foreach ((string key, string value) in variables)
-         {
+-        foreach ((string key, string value) in variables)
+-        {
 -            start.Environment[key] = value;
-+            environment[key] = value;
+-        }
+         if (unseen)
+         {
++            ProcessStartInfo start = new(program, arguments)
++            {
++                WorkingDirectory = folder ?? Environment.CurrentDirectory,
++                UseShellExecute = false,
++                CreateNoWindow = !shared,
++                RedirectStandardInput = true,
++                RedirectStandardOutput = true,
++                RedirectStandardError = true,
++            };
++            foreach ((string key, string value) in variables)
++            {
++                start.Environment[key] = value;
++            }
+             OwnDesktopStart own = OwnDesktop.Start(start, suspended: true);
+             return new SuspendedLaunch(own.Process.Id, 0, own.Process, own.Input.BaseStream, own.Output!.BaseStream, own.Error!.BaseStream)
+             {
+@@ -196,11 +197,66 @@ public sealed partial class SuspendedLaunch : IDisposable
+                 resumeOwn = own.Resume,
+             };
          }
 -        Process held = Process.Start(start) ?? throw new InvalidOperationException($"{program} did not start");
--        return new SuspendedLaunch(held.Id, 0, held, held.StandardInput.BaseStream, held.StandardOutput.BaseStream, held.StandardError.BaseStream)
-+        StringBuilder block = new();
-+        foreach ((string key, string value) in environment.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+-        return new SuspendedLaunch(held.Id, 0, held, held.StandardInput.BaseStream, ChildProcesses.OutputStream(held), ChildProcesses.ErrorStream(held))
++        Dictionary<string, string> environment = new(StringComparer.OrdinalIgnoreCase);
++        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
          {
 -            InitialThreadId = OnlyThread(held),
 -        };
--    }
++            environment[(string)entry.Key] = (string?)entry.Value ?? string.Empty;
++        }
++        foreach ((string key, string value) in variables)
++        {
++            environment[key] = value;
++        }
++        StringBuilder block = new();
++        foreach ((string key, string value) in environment.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
++        {
 +            block.Append(key).Append('=').Append(value).Append('\0');
 +        }
 +        block.Append('\0');
- 
--    /// <summary>The one thread a process started suspended has, which its Main will run on; null when the system will not
--    /// say (the process gone already).</summary>
--    [SupportedOSPlatform("windows")]
--    private static int? OnlyThread(Process held)
--    {
++
 +        // shortcut: the child's pipe ends are inheritable until CreateProcess returns, so a process another thread starts
 +        // meanwhile inherits them too (.NET's own start serializes this with a lock of its own we cannot take).
 +        (SafeFileHandle childIn, SafeFileHandle parentIn) = WindowsPipe(childReads: true);
 +        (SafeFileHandle childOut, SafeFileHandle parentOut) = WindowsPipe(childReads: false);
 +        (SafeFileHandle childErr, SafeFileHandle parentErr) = WindowsPipe(childReads: false);
-         try
-         {
--            return held.Threads.Cast<ProcessThread>().MinBy(thread => thread.StartTime)?.Id;
++        try
++        {
 +            StartupInfo startup = new()
 +            {
 +                Size = Marshal.SizeOf<StartupInfo>(),
@@ -241,8 +266,8 @@ index 0a706cd..a42de92 100644
 +                StdOutput = childOut.DangerousGetHandle(),
 +                StdError = childErr.DangerousGetHandle(),
 +            };
-+            char[] commandLine = (CommandLine(program, arguments) + '\0').ToCharArray();
-+            if (!CreateProcessW(null, commandLine, 0, 0, true, CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment,
++            char[] commandLine = (WindowsCommandLine.Of(arguments.Prepend(program)) + '\0').ToCharArray();
++            if (!CreateProcessW(null, commandLine, 0, 0, true, CreateSuspended | (shared ? 0 : CreateNoWindow) | CreateUnicodeEnvironment,
 +                block.ToString(), folder ?? Environment.CurrentDirectory, ref startup, out ProcessInformation started))
 +            {
 +                throw new Win32Exception(Marshal.GetLastPInvokeError(), $"{program} did not start");
@@ -263,14 +288,17 @@ index 0a706cd..a42de92 100644
 +            parentOut.Dispose();
 +            parentErr.Dispose();
 +            throw;
-         }
--        catch (Exception error) when (error is InvalidOperationException or Win32Exception or NotSupportedException)
++        }
 +        finally
-         {
--            return null;
++        {
 +            childIn.Dispose();
 +            childOut.Dispose();
 +            childErr.Dispose();
++        }
+     }
+ 
+     /// <summary>The one thread a process started suspended has, which its Main will run on; null when the system will not
+@@ -218,20 +274,35 @@ public sealed partial class SuspendedLaunch : IDisposable
          }
      }
  
@@ -296,15 +324,19 @@ index 0a706cd..a42de92 100644
 +            // On Windows resumeHandle is the main thread's handle, held suspended since CreateProcess.
              if (!resumed && OperatingSystem.IsWindows())
              {
--                process.SafeHandle.Resume();
-+                if (ResumeThread(resumeHandle) == uint.MaxValue)
-+                {
+                 if (resumeOwn is { } own)
+                 {
+                     own();
+                 }
+-                else
++                else if (ResumeThread(resumeHandle) == uint.MaxValue)
+                 {
+-                    process.SafeHandle.Resume();
 +                    throw new Win32Exception(Marshal.GetLastPInvokeError(), "ResumeThread failed");
-+                }
+                 }
                  resumed = true;
              }
-             return;
-@@ -390,6 +436,11 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -413,6 +484,11 @@ public sealed partial class SuspendedLaunch : IDisposable
      public void Dispose()
      {
          process?.Dispose();
@@ -316,10 +348,22 @@ index 0a706cd..a42de92 100644
          if (resumeHandle != 0)
          {
              DbgShim.CloseResumeHandle(resumeHandle);
-@@ -531,4 +582,50 @@ public sealed partial class SuspendedLaunch : IDisposable
-     [LibraryImport("kernel32", EntryPoint = "SetHandleInformation", SetLastError = true)]
-     [return: MarshalAs(UnmanagedType.Bool)]
-     private static partial bool SetHandleInformation(nint handle, uint mask, uint flags);
+@@ -498,4 +574,62 @@ public sealed partial class SuspendedLaunch : IDisposable
+ 
+     [LibraryImport("libc", EntryPoint = "ioctl", SetLastError = true)]
+     private static partial int ProcessInfoOf(int descriptor, ulong request, ref ProcessInfo info);
++
++    private const int StandardInput = -10;
++    private const int StandardOutput = -11;
++    private const int StandardError = -12;
++    private const uint HandleFlagInherit = 1;
++
++    [LibraryImport("kernel32", EntryPoint = "GetStdHandle", SetLastError = true)]
++    private static partial nint GetStdHandle(int which);
++
++    [LibraryImport("kernel32", EntryPoint = "SetHandleInformation", SetLastError = true)]
++    [return: MarshalAs(UnmanagedType.Bool)]
++    private static partial bool SetHandleInformation(nint handle, uint mask, uint flags);
 +
 +    private const int UseStdHandles = 0x100;
 +    private const uint CreateSuspended = 0x4;

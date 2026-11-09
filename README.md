@@ -2,7 +2,7 @@
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
-.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its main on the way to 0.2.3). No C# Dev Kit and no `vsdbg`,
+.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its main after 0.3.0). No C# Dev Kit and no `vsdbg`,
 so nothing here carries Visual Studio's licence terms, except the two closed Microsoft assemblies the Roslyn package
 ships (`Microsoft.VisualStudio.Telemetry`, `Microsoft.VisualStudio.Utilities.Internal`; Razor's MEF parts need them, and
 the server runs with `--telemetryLevel off`).
@@ -22,10 +22,11 @@ npm run fetch-monaco
 without its TypeScript, CSS, HTML and JSON workers (6.6 MB). `fetch-sqltools` downloads Microsoft's SQL Tools Service (below under *SQL*) into `sqltools/`, without its own copy of
 .NET, the migration tool and the texts of languages other than English and Polish (139 MB instead of 337 MB).
 
-The debugger is Passenger's, its main on the way to 0.2.3 (commit `7358d41` of 2026-10-29, which the script fetches:
-0.2.2 and the fixes since, among them pointers shown as their address and type, C# 15 unions as the value they hold,
-steps over an `await` in .NET 11's runtime-async methods, clearer word on an evaluation that does not end, with
-`PASSENGER_WAIT_SCALE` to give a slow machine longer, and Hot Reload moving running frames to the new code), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
+The debugger is Passenger's, its main after 0.3.0 (commit `9954e4b` of 2026-11-09, which the script fetches: 0.3.0's
+debugger and the fixes since, among them the value a Step Out returns, of an `async` method too, a stop on an exception
+always naming it and its inner exceptions, each row's `evaluateName` the whole expression, a breakpoint saying why it is
+not bound, Set Value on pointers, `ref`/`in` parameters and generics, an evaluation past its time offered again with
+every thread let go, and Hot Reload carrying a frame part way through a statement), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
 on the installed .NET 10 runtime (17 MB instead of 100 MB self-contained):
 
 ```bash
@@ -39,7 +40,10 @@ npm run build-testbridge
 ```
 
 CSharpShooter's extension to the C# server (`roslyn-extension/`: Passenger's handlers for *Hot Reload* and the
-*Refactorings* below), compiled against `server/`'s own assemblies, so after `npm run fetch-server`:
+*Refactorings* below), compiled against `server/`'s own assemblies, so after `npm run fetch-server`. The refactoring
+handlers (`Changes.cs`, `Interfaces.cs`, `MemberMoves.cs`, `Signatures.cs`) are Passenger's as of `9954e4b`'s parent,
+the few members they take from Passenger.Core and Passenger.Languages in `Shims.cs` and `PathNames.cs`; `HotReload.cs`
+stays as of `7358d41`, since Passenger's newer one takes a newer server's API than `roslyn-language-server` 5.11.0 has:
 
 ```bash
 npm run build-roslyn-extension
@@ -47,7 +51,7 @@ npm run build-roslyn-extension
 
 The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspended` and `SafeProcessHandle.Resume`
 (a suspended `CreateProcessW` with piped standard streams, then `ResumeThread`), `KillOnParentExit` (a kill-on-close
-Windows job), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator. Off Windows, `StartDetached` is dropped,
+Windows job; a program started on a desktop of its own goes through Passenger's `OwnDesktop` as before), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator. Off Windows, `StartDetached` is dropped,
 so children stay in the adapter's session; only Windows is tested.
 
 ## Package and install
@@ -579,7 +583,3 @@ EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/folder SUITE=test/sql-suite.
 - HTML help inside `.cshtml` (HTML element/attribute completion, HTML formatting): Razor asks the client for it, and this
   extension answers empty. Tag helpers, components and C# come from Razor itself and work.
 - A page in the browser reloaded after Hot Reload applies an edit (`dotnet watch` does it with its BrowserRefresh).
-- *Add to Watch* and *Copy as Expression* on a member deeper than the frame's own (a field of a field) give the member's
-  name alone, Passenger's `evaluateName` there, which the frame does not know. The magnifier builds the whole expression
-  itself (`variable-paths.js`); the fix is to rewrite `evaluateName` in `variables` responses with it, in the inline
-  adapter (`debug-l10n.js`).

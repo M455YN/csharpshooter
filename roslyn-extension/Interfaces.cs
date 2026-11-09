@@ -66,7 +66,7 @@ internal static class Interfaces
         }
 
         SyntaxGenerator generator = SyntaxGenerator.GetGenerator(document);
-        List<ITypeParameterSymbol> typeParameters = [.. type.TypeParameters.Where(t => members.Any(m => Uses(m, t)))];
+        List<ITypeParameterSymbol> typeParameters = Kept(type, members);
         SyntaxNode made = generator.InterfaceDeclaration(name, typeParameters.Select(t => t.Name),
             type.DeclaredAccessibility == Accessibility.Public ? Accessibility.Public : Accessibility.Internal,
             members: members.Select(m => Declare(generator, m)));
@@ -166,11 +166,12 @@ internal static class Interfaces
     /// <summary>The members an interface of a type can have: its public instance methods, properties, indexers and events,
     /// in their order.</summary>
     private static IEnumerable<ISymbol> Candidates(INamedTypeSymbol type) => type.GetMembers().Where(m =>
-        m.DeclaredAccessibility == Accessibility.Public && !m.IsStatic && !m.IsImplicitlyDeclared && m.CanBeReferencedByName
+        m.DeclaredAccessibility == Accessibility.Public && !m.IsStatic && !m.IsImplicitlyDeclared
         && m switch
         {
-            IMethodSymbol method => method.MethodKind == MethodKind.Ordinary,
-            IPropertySymbol or IEventSymbol => true,
+            IMethodSymbol method => method.MethodKind == MethodKind.Ordinary && method.CanBeReferencedByName,
+            IPropertySymbol { IsIndexer: true } => true,
+            IPropertySymbol or IEventSymbol => m.CanBeReferencedByName,
             _ => false,
         });
 
@@ -227,12 +228,32 @@ internal static class Interfaces
         declared.ReplaceNodes(declared.DescendantNodes().OfType<AccessorDeclarationSyntax>().Where(a => a.IsKind(SyntaxKind.SetAccessorDeclaration)),
             (accessor, _) => SyntaxFactory.AccessorDeclaration(SyntaxKind.InitAccessorDeclaration).WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)));
 
-    /// <summary>Whether a member's signature names one of its type's type parameters.</summary>
+    /// <summary>The type's type parameters the interface declares, in their order: those the members' signatures name, and
+    /// every one the constraints of those name, as far as they go.</summary>
+    private static List<ITypeParameterSymbol> Kept(INamedTypeSymbol type, IReadOnlyList<ISymbol> members)
+    {
+        HashSet<ITypeParameterSymbol> kept = new(type.TypeParameters.Where(t => members.Any(m => Uses(m, t))), SymbolEqualityComparer.Default);
+        Queue<ITypeParameterSymbol> next = new(kept);
+        while (next.TryDequeue(out ITypeParameterSymbol? parameter))
+        {
+            foreach (ITypeParameterSymbol named in type.TypeParameters)
+            {
+                if (parameter.ConstraintTypes.Any(c => Mentions(c, named)) && kept.Add(named))
+                {
+                    next.Enqueue(named);
+                }
+            }
+        }
+        return [.. type.TypeParameters.Where(kept.Contains)];
+    }
+
+    /// <summary>Whether a member's signature names one of its type's type parameters, a generic method's constraints
+    /// included.</summary>
     private static bool Uses(ISymbol member, ITypeParameterSymbol parameter)
     {
         IEnumerable<ITypeSymbol> types = member switch
         {
-            IMethodSymbol method => [method.ReturnType, .. method.Parameters.Select(p => p.Type)],
+            IMethodSymbol method => [method.ReturnType, .. method.Parameters.Select(p => p.Type), .. method.TypeParameters.SelectMany(t => t.ConstraintTypes)],
             IPropertySymbol property => [property.Type, .. property.Parameters.Select(p => p.Type)],
             IEventSymbol @event => [@event.Type],
             _ => [],

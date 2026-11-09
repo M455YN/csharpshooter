@@ -4,6 +4,13 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The debugger is Passenger's main after 0.3.0 (`9954e4b`): Step Out lists the value the method returned (`AddAsync() returned`, an `async` method's too, as `$ReturnValue`), a stop on an exception always names it and its inner exceptions, *Add to Watch* and *Copy as Expression* on a field of a field give its whole expression, a breakpoint that is not bound says why, Set Value reaches pointers, `ref`/`in` parameters and generic variables, an evaluation past its time says it probably needs another thread, and Hot Reload carries a frame part way through a statement into the new code.
+- Refactorings are Passenger's handlers after 0.3.0: *Ściągnij składowe aż do typu bazowego...* pulls up to a generic base as the class names it and puts an override in place of the base's abstract member, *Wypchnij składowe w dół...* adds a method to each derived class lacking that signature, *Zmień sygnaturę...* keeps the order arguments run in when parameters are reordered and gives each call the `ref`/`in`/`out` it now takes, *Wyodrębnij interfejs...* declares the type parameters its constraints name; each refuses, saying why and changing nothing, where it would leave a class without a member, a use without its target, or two members with one signature.
+
 ## [0.8.0] - 2026-11-03
 
 ### Added
