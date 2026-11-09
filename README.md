@@ -577,6 +577,26 @@ stanu*, *Czas*, *Rozmiar*, and the *Treść* (JSON indented), *Nagłówki* and *
 running has *Anuluj*. The texts are VS's own (WebTools' Rest editor). Not like VS (yet): no request list (F4), no
 Azure Key Vault or user secrets in environments.
 
+**Wygeneruj żądania z OpenAPI** (a web project's context menu in the Solution Explorer, or *HTTP: Wygeneruj żądania z
+OpenAPI* from the command palette) writes a request for each operation of the app's OpenAPI document into
+`{Project}.http` beside the project, as Passenger's Endpoints window generates them. The document is asked of the running
+app on this machine (the path its code gives `MapOpenApi`, then `/openapi/v1.json` and Swashbuckle's
+`/swagger/v1/swagger.json`, at the HTTP environment's `baseUrl` and the launch profiles' URLs; a redirect is followed only
+within the app), else read from the file its build writes (`Microsoft.Extensions.ApiDescription.Server`, in
+`OpenApiDocumentsDirectory`, else `obj/`). Each request is `# OpenAPI: operationId`, a variable for each path and required
+query parameter, the method and `{{baseUrl}}` with the route, `Accept` and each required header, and a JSON body made from
+the request schema: its example or default, an enum as its first member's number (as System.Text.Json reads an enum
+without `JsonStringEnumConverter`), read-only members left out. `{{baseUrl}}` is the HTTP environment's where
+`http-client.env.json` has one, else `@baseUrl` at the top of the file from `launchSettings.json`. Run again, it adds only
+the operations the file does not call yet.
+
+A response with a JSON body is then held to its operation's response schema (its status's, `2XX`'s or `default`'s), from
+the app's document, else the one the file was generated from, else the build's: the panel says above the tabs whether the
+body matches, and where it does not, each place as a JSON pointer: a required member missing, a value of the wrong type, a
+value not in its `enum` or not matching its `pattern`, a member a closed object does not have, an `anyOf` none of whose
+options hold, a `oneOf` matching none or more than one. Schemas that refer to themselves (a tree's `children`) are checked
+as deep as the body goes.
+
 ## SQL
 
 `.sql` files are [CSharpShooter SQL](sql/README.md)'s, an extension of its own built from `sql/` (SQL Tools Service and

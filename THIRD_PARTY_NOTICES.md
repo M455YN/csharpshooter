@@ -61,6 +61,12 @@ How an .sln's and an .slnx's configurations are read and written, ported from Mi
 `SolutionConfigurationMap`'s rules, `ProjectTypeTable.BuiltInTypes`, the .sln writer's `ProjectConfigurationPlatforms`).
 MIT License, Copyright (c) Microsoft Corporation; the licence text is the MIT one above.
 
+## The .http files' OpenAPI requests and schema check (`http-requests.js`)
+
+How an app's OpenAPI document is found, read, made into `.http` requests and held to a response, ported from Passenger's
+Endpoints window (`src/Passenger.App/Endpoints`: `OpenApiSources`, `OpenApiAddresses`, `OpenApiDocument`, `OpenApiSchemas`
+and `OpenApiRequests`, commit `9954e4b`). MIT License, Copyright (c) 2026 Ted L; the licence text is Passenger's above.
+
 ## The HTTP grammar (`syntaxes/http.tmLanguage.json`, `syntaxes/http.language-configuration.json`)
 
 REST Client's TextMate grammar and language configuration for `.http` and `.rest` files

@@ -843,5 +843,22 @@
     "Ponowne ładowanie na gorąco: zmieniono plik {1}: ponownie załadowano {0} strony.",
     "Ponowne ładowanie na gorąco: zmieniono plik {1}: ponownie załadowano {0} stron."
   ],
-  "Hot Reload: the program's update handler {0}": "Ponowne ładowanie na gorąco: procedura obsługi aktualizacji programu {0}"
+  "Hot Reload: the program's update handler {0}": "Ponowne ładowanie na gorąco: procedura obsługi aktualizacji programu {0}",
+  "Choose the web project": "Wybierz projekt internetowy",
+  "There is no web project (Microsoft.NET.Sdk.Web) in the workspace.": "W obszarze roboczym nie ma projektu internetowego (Microsoft.NET.Sdk.Web).",
+  "Reading the OpenAPI document of {0}...": "Odczytywanie dokumentu OpenAPI projektu {0}...",
+  "No OpenAPI document of {0}: run the app (MapOpenApi serves /openapi/v1.json), or have its build write one (Microsoft.Extensions.ApiDescription.Server).": "Brak dokumentu OpenAPI projektu {0}: uruchom aplikację (MapOpenApi udostępnia /openapi/v1.json) albo niech kompilacja go zapisuje (Microsoft.Extensions.ApiDescription.Server).",
+  "Every operation of the OpenAPI document of {0} already has a request in {1}.": "Każda operacja dokumentu OpenAPI projektu {0} ma już żądanie w pliku {1}.",
+  "Requests generated from the OpenAPI document ({0}): {1}, in {2}.": "Wygenerowano żądania z dokumentu OpenAPI ({0}): {1}, w pliku {2}.",
+  "The body matches the OpenAPI schema of {0}.": "Treść jest zgodna ze schematem OpenAPI operacji {0}.",
+  "The body does not match the OpenAPI schema of {0}:": "Treść nie jest zgodna ze schematem OpenAPI operacji {0}:",
+  "is missing, though its schema requires it": "brakuje go, choć schemat go wymaga",
+  "{0} was expected, not {1}": "oczekiwano typu {0}, a jest {1}",
+  "{0} is not one of {1}": "{0} nie jest żadną z wartości {1}",
+  "{0} does not match its pattern {1}": "{0} nie pasuje do wzorca {1}",
+  "is not a member its schema has": "schemat nie ma takiej składowej",
+  "nothing is allowed here": "schemat nie dopuszcza tu niczego",
+  "matches none of the {0} options of its schema's {1}": "nie pasuje do żadnej z {0} opcji {1} schematu",
+  "matches both {0} and {1} of its schema's oneOf, which allows exactly one": "pasuje zarówno do {0}, jak i do {1} z oneOf schematu, który dopuszcza dokładnie jedną",
+  "option {0}": "opcji {0}"
 }

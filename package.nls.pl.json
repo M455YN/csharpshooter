@@ -110,6 +110,7 @@
   "command.tests.goToTest": "Otwórz test",
   "command.http.send": "Wyślij żądanie",
   "command.http.environment": "Wybierz środowisko HTTP",
+  "command.http.generateFromOpenApi": "Wygeneruj żądania z OpenAPI",
   "command.refactor.changeSignature": "Zmień sygnaturę...",
   "command.refactor.extractInterface": "Wyodrębnij interfejs...",
   "command.refactor.moveTypeToFile": "Przenieś typ do innego pliku...",

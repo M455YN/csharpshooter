@@ -471,6 +471,11 @@
         "category": "HTTP"
       },
       {
+        "command": "csharpShooter.http.generateFromOpenApi",
+        "title": "%command.http.generateFromOpenApi%",
+        "category": "HTTP"
+      },
+      {
         "command": "csharpShooter.configurationManager",
         "title": "%command.configurationManager%",
         "category": "%category.Solution%"
@@ -722,7 +727,7 @@
       "view/item/context": [
         {
           "command": "csharpShooter.startup.setProject",
-          "when": "view == csharpShooter.solution && viewItem =~ /^project runnable$/",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project runnable( web)?$/",
           "group": "0_debug@0"
         },
         {
@@ -759,6 +764,11 @@
           "command": "csharpShooter.solution.editProject",
           "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
           "group": "2_edit@1"
+        },
+        {
+          "command": "csharpShooter.http.generateFromOpenApi",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project .*\\bweb\\b/",
+          "group": "2_edit@3"
         },
         {
           "command": "csharpShooter.solution.manageNuGetSolution",
