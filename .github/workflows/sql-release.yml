@@ -1,4 +1,4 @@
-# CSharpShooter SQL released from a tag (sql-v0.1.0): SQL Tools Service fetched into sql/, its bundle and
+# CSharpShooter SQL released from a tag (sql-v0.11.0): SQL Tools Service fetched into sql/, its bundle and
 # .vsix made there, published to Open VSX and the Visual Studio Marketplace, then attached to a GitHub Release with the
 # latest entry of sql/CHANGELOG.md as its notes. CSharpShooter itself is released from v* tags (release.yml).
 name: Release SQL

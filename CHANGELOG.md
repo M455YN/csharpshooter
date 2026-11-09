@@ -4,6 +4,12 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-11-09
+
+### Changed
+
+- CSharpShooter SQL 0.11.0 is CSharpShooter's add-on, released with it: T-SQL IntelliSense and syntax errors in `.sql` files with no connection to a server, and a Razor page's Tag Helper SQL (`select=@(@"...")`) opened in SQL Server Management Studio and underlined where it is wrong as you type (its own changelog, `sql/CHANGELOG.md`, has the rest). The first `.sql` file opened offers it in those words.
+
 ## [0.10.0] - 2026-11-09
 
 ### Added
