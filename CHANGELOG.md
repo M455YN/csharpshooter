@@ -4,6 +4,13 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `.http` files from OpenAPI, as Passenger 0.3.0's Endpoints window has them: *Wygeneruj żądania z OpenAPI* (a web project's context menu in the Solution Explorer, and the command palette) writes a request for each operation of the app's OpenAPI document, asked of the running app (`MapOpenApi`'s `/openapi/v1.json`, Swashbuckle's, or the path its code maps) or read from its build's document, into `{Project}.http` beside the project: the method, the route with `{{baseUrl}}` (the HTTP environment's, else `launchSettings.json`'s), a variable for each parameter, the required headers and a JSON body shaped from the schema (an enum as its first member's number). Run again, it adds only the operations not called yet.
+- A JSON response is held to its operation's response schema: the *Odpowiedź* panel says whether the body matches it, and where it does not (a required member missing, a wrong type, a value outside its `enum`, a `oneOf` matching none or more than one option), schemas that refer to themselves included.
+
 ## [0.9.0] - 2026-11-09
 
 ### Changed

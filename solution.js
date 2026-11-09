@@ -229,8 +229,9 @@ class SolutionProvider {
     const hit = f?.hits.has(file.toLowerCase());
     return new Item('project', name, f && !hit ? EXPANDED : COLLAPSED, {
       id: `proj${f ? `?${f.gen}` : ''}:${file}`, file, filter: hit ? null : f, resourceUri: vscode.Uri.file(file), tooltip: file,
-      // "project", " runnable" when it can be a startup project (an Exe or a web project, as VS has it), " startup" when it is.
-      contextValue: ['project', ...(runnable ? ['runnable'] : []), ...(startup ? ['startup'] : [])].join(' '),
+      // "project", " runnable" when it can be a startup project (an Exe or a web project, as VS has it), " web" for a web
+      // project, " startup" when it is the startup project.
+      contextValue: ['project', ...(runnable ? ['runnable'] : []), ...(sdk.endsWith('.Web') ? ['web'] : []), ...(startup ? ['startup'] : [])].join(' '),
       description: [sdk.endsWith('.Web') ? 'web' : '', startup ? t('startup project') : ''].filter(Boolean).join(' · ') || undefined,
       iconPath: sdk.endsWith('.Web') ? icon('globe', 'charts.blue') : icon('project', 'charts.green'),
     });
