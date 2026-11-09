@@ -27,6 +27,7 @@ const { readSolution } = require('./solution');
 const { TranslatingAdapter } = require('./debug-l10n');
 const { registerHotReload } = require('./hot-reload');
 const { registerRefactorings } = require('./refactorings');
+const { registerEndTags } = require('./end-tags');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
@@ -47,8 +48,10 @@ const emptyListRequests = [
   'textDocument/documentHighlight', 'textDocument/references', 'textDocument/foldingRange', 'textDocument/documentColor',
   'textDocument/colorPresentation', 'textDocument/implementation', 'textDocument/definition', 'textDocument/documentSymbol',
 ];
+// Linked editing (a tag's pair renamed with it) is the HTML server's; the end tag a start tag's '>' writes is Razor's own
+// answer, asked on typing (end-tags.js), to which the HTML half adds nothing.
 const nullRequests = ['textDocument/hover', 'textDocument/signatureHelp', 'textDocument/linkedEditingRange', 'textDocument/rename',
-  'textDocument/willSaveWaitUntil', 'completionItem/resolve', 'codeAction/resolve'];
+  'textDocument/willSaveWaitUntil', 'completionItem/resolve', 'codeAction/resolve', 'textDocument/_vs_onAutoInsert'];
 
 
 /** Says at the bottom right, and with a spinner in the status bar, that C# is not ready yet while the server starts and
@@ -388,6 +391,7 @@ async function activate(context) {
   const searchEverywhere = registerSearchEverywhere(context, solutionView);
   const dataVisualizer = registerDataVisualizer(context);
   registerRazorEnter(context);
+  registerEndTags(context, () => (client && client.state === State.Running ? { client, toServerUri } : undefined));
   // Texts already shown (trees, the status bar, open pages) keep their language until the window reloads.
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
     if (!e.affectsConfiguration('csharpShooter.uiLanguage')) return;

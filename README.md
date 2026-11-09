@@ -296,6 +296,15 @@ shows each change first in VS Code's Refactor Preview, ticked, as VS's *Podgląd
 zmian*, is empty: it only opens the panel). A file just made (by *Przenieś typ*) joins the refactorings once the server has
 loaded it into its project.
 
+## Razor and XML editing
+
+- Typing a start tag's `>` writes its end tag after the caret, as Visual Studio does: in `.razor` and `.cshtml` (Razor's
+  own answer, as VS asks it, so a void element such as `<br>`, a self-closing tag and a generic's `List<string>` in
+  `@code` get none) and in XML, `.csproj`, `.props` and `.targets` (a tag already closed by an end tag after it, or a
+  `>` in an attribute's value, gets none). However fast you type, what you type after the `>` before the end tag comes
+  stays before it; Ctrl+Z takes the end tag back alone. Plain `.html` files keep VS Code's own (`html.autoClosingTags`).
+  Renaming a tag's end tag with it (linked editing) is not done.
+
 ## Solution Explorer
 
 With a solution in the workspace the side bar opens on it, as VS opens on its Solution Explorer. Its icon comes after
@@ -570,6 +579,13 @@ EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/solution npm test
 solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.json`, ordered pairs such as
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
+
+The markup checks (`test/markup-suite.js`: end tags) make a Blazor app of their own:
+
+```bash
+node test/markup-suite.js /path/to/empty/folder
+EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/markup-suite.js node test/runTest.js
+```
 
 The `.sql` checks (`test/sql-suite.js`) need a SQL Server with a small database; the suite's header says which, e.g. on
 LocalDB:
