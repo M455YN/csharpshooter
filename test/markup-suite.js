@@ -1,6 +1,6 @@
 // The editor's help in a Blazor app's markup, in a real editor on a small app of the test's own: a start tag's '>' writes
-// its end tag (in a .razor, a .cshtml, an .xml and a .csproj), and CSS classes complete in class="…" from the stylesheets
-// the app's pages link.
+// its end tag (in a .razor, a .cshtml, an .xml and a .csproj), CSS classes complete in class="…" from the stylesheets the
+// app's pages link, and Go to Declaration on a JS interop call opens the JavaScript it calls.
 //   node test/markup-suite.js <empty folder>          (makes the app: dotnet new blazor, a package of its own, a CDN's stand-in)
 //   EDITOR_EXE=<editor exe> WORKSPACE=<that folder> SUITE=test/markup-suite.js node test/runTest.js
 const fs = require('fs');
@@ -40,14 +40,39 @@ const INTEROP_PAGE = `@page "/interop"
 }
 `;
 
+const INTEROP_JS = `// The page's own module.
+export function helper() { return 1; }
+
+export function showAlert(message) {
+  alert(message);
+}
+`;
+
+const KIT_JS = `export const unused = 0;
+export async function measure(n) {
+  return n * 2;
+}
+`;
+
+const GLOBALS_JS = `window.shopGlobals = {
+  greet: function (n) {
+    console.log(n);
+  },
+};
+
+function globalTick() {
+}
+`;
+
 if (require.main === module) {
   const folder = path.resolve(process.argv[2]);
   const { execFileSync } = require('child_process');
   const run = (...args) => execFileSync('dotnet', args, { stdio: 'inherit', cwd: folder });
   fs.mkdirSync(folder, { recursive: true });
-  // The package: a Razor class library with a stylesheet, packed into a feed of the folder's own.
+  // The package: a Razor class library with a stylesheet and a module, packed into a feed of the folder's own.
   run('new', 'razorclasslib', '-n', 'Kit', '-o', 'kit-src');
   fs.writeFileSync(path.join(folder, 'kit-src', 'wwwroot', 'kit.css'), '/* the package\'s */\n.kit-card, .kit-card:hover { padding: 1px }\n');
+  fs.writeFileSync(path.join(folder, 'kit-src', 'wwwroot', 'kit.js'), KIT_JS);
   run('pack', 'kit-src', '-o', 'feed', '-c', 'Release', '-p:PackageVersion=1.0.0');
   fs.writeFileSync(path.join(folder, 'nuget.config'), `<?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -71,9 +96,13 @@ if (require.main === module) {
     <style>
         .inline-note { color: gray; }
     </style>
+    <script src="js/globals.js"></script>
 </head>`));
   fs.writeFileSync(path.join(shop, 'Components', 'Pages', 'Interop.razor'), INTEROP_PAGE);
+  fs.writeFileSync(path.join(shop, 'Components', 'Pages', 'Interop.razor.js'), INTEROP_JS);
   fs.writeFileSync(path.join(shop, 'Components', 'Pages', 'Interop.razor.css'), '.scoped-title { font-weight: bold; }\n');
+  fs.mkdirSync(path.join(shop, 'wwwroot', 'js'), { recursive: true });
+  fs.writeFileSync(path.join(shop, 'wwwroot', 'js', 'globals.js'), GLOBALS_JS);
   fs.mkdirSync(path.join(shop, 'Pages'), { recursive: true });
   fs.writeFileSync(path.join(shop, 'Pages', 'Legacy.cshtml'), '@page\n<div>\n</div>\n');
   fs.writeFileSync(path.join(folder, 'notes.xml'), '<?xml version="1.0"?>\n<notes>\n</notes>\n');
@@ -227,6 +256,28 @@ async function run() {
     expect('the CDN\'s stylesheet is fetched once', fetched === 1, `${fetched} times`);
     const outside = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', editor.document.uri, caretAfter(editor, '<h1 '));
     expect('no classes outside class=""', !outside.items.some((c) => (c.label.label ?? c.label) === 'kit-card'), `${outside.items.length} items`);
+
+    // 3. Go to Declaration on a JS interop call's identifier.
+    const declaration = async (text, offset = 2, command = 'vscode.executeDeclarationProvider') => {
+      const where = editor.document.positionAt(editor.document.getText().indexOf(text) + offset);
+      const found = await vscode.commands.executeCommand(command, editor.document.uri, where);
+      const l = found?.find((f) => /\.js$/.test((f.targetUri ?? f.uri).fsPath));
+      if (!l) return 'none';
+      const doc = await vscode.workspace.openTextDocument(l.targetUri ?? l.uri);
+      return `${path.basename(doc.fileName)}: ${doc.lineAt((l.targetSelectionRange ?? l.targetRange ?? l.range).start.line).text.trim()}`;
+    };
+    let got = await declaration('"showAlert"');
+    expect('F12: an imported module\'s export', got === 'Interop.razor.js: export function showAlert(message) {', got);
+    got = await declaration('"measure"');
+    expect('F12: a package\'s module imported with a cancellation token', got === 'kit.js: export async function measure(n) {', got);
+    got = await declaration('"shopGlobals.greet"', 14);
+    expect('F12: a global of wwwroot', got === 'globals.js: greet: function (n) {', got);
+    got = await declaration('"globalTick"');
+    expect('F12: IJSInProcessRuntime\'s InvokeVoid', got === 'globals.js: function globalTick() {', got);
+    got = await declaration('"showAlert"', 2, 'vscode.executeDefinitionProvider');
+    expect('Go to Definition too', got === 'Interop.razor.js: export function showAlert(message) {', got);
+    got = await declaration('"./Components/Pages/Interop.razor.js"', 5);
+    expect('F12 on an import\'s path opens the module', got === 'Interop.razor.js: // The page\'s own module.', got);
   } finally {
     cdn.close();
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');

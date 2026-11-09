@@ -311,6 +311,12 @@ loaded it into its project.
   or a NuGet package's static web assets (`_content/{Id}/…`, from the package folder its restore resolved), a CDN's
   address (fetched once and kept in the extension's storage); their `@import`s, the pages' `<style>` blocks and the
   component's own `.razor.css`.
+- Go to Definition and Go to Declaration (F12) on the identifier a JS interop call gives (`IJSRuntime`'s,
+  an `IJSObjectReference`'s or `IJSInProcessRuntime`'s `InvokeAsync`, `InvokeVoidAsync`, `Invoke`…; the server's hover
+  must say it is JS interop's) open the JavaScript function: in the module the reference was imported from
+  (`InvokeAsync<IJSObjectReference>("import", "./Pages/Counter.razor.js")`, with a cancellation token or a timeout too,
+  or a `Lazy`'s `.Value`), else a global among the app's scripts in `wwwroot` (`"myLib.greet"` finds `greet`). F12 on
+  an `import`'s path opens the module.
 
 ## Solution Explorer
 
@@ -587,7 +593,7 @@ solution (`WebApp`, `Contoso.Core`, `Contoso.Lobby`, ...); `NAMES_FILE=names.jso
 `[["WebApp Development", "My Profile"], ["WebApp", "MyWeb"], ["Contoso", "MyCompany"]]`, puts your solution's names in
 their place.
 
-The markup checks (`test/markup-suite.js`: end tags, CSS classes) make a Blazor app of their own, with a
+The markup checks (`test/markup-suite.js`: end tags, CSS classes, JS interop's F12) make a Blazor app of their own, with a
 package of theirs and a local stand-in for a CDN:
 
 ```bash
