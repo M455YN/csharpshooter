@@ -442,7 +442,7 @@
   "The program ended, but its exit code is lost: {0}.": "Program zakończył się, ale jego kod zakończenia przepadł: {0}.",
   "Process {0} was not let go ({1}): a .NET program held at its start waits there until a debugger attaches to it or it is stopped.": "Proces {0} nie został zwolniony ({1}): program .NET wstrzymany na starcie czeka, aż dołączy się do niego debuger albo zostanie zatrzymany.",
   "Replace with": "Zamień na",
-  "Replace": "Zamień",
+  "Replace": "Zastąp",
   "Replace All": "Zamień wszystko",
   "Toggle Replace mode (Ctrl+Shift+H)": "Przełącz tryb zamiany (Ctrl+Shift+H)",
   "Replace all occurrences ({0}) in files ({1})?": "Zamienić wszystkie wystąpienia ({0}) w plikach ({1})?",
@@ -786,5 +786,11 @@
   "Open {0} in SQL Server Management Studio": "Otwórz {0} w SQL Server Management Studio",
   "Connection string to open the query on": "Parametry połączenia, na których otworzyć zapytanie",
   "SQL Server Management Studio was not found in Program Files.": "Nie znaleziono programu SQL Server Management Studio w Program Files.",
-  "Values the app gives this query: set them before running it.": "Wartości przekazywane przez aplikację: uzupełnij je przed uruchomieniem."
+  "Values the app gives this query: set them before running it.": "Wartości przekazywane przez aplikację: uzupełnij je przed uruchomieniem.",
+  "{0}: the query saved in SQL Server Management Studio is in the page": "{0}: zapytanie zapisane w SQL Server Management Studio jest w stronie",
+  "{0} was changed in VS Code after it was opened in SQL Server Management Studio. Replace it with the query saved there?": "{0} zmieniono w VS Code po otwarciu w SQL Server Management Studio. Zastąpić zapytaniem zapisanym w SSMS?",
+  "{0} is no longer there: the query saved in SQL Server Management Studio was not put back.": "Nie ma już {0}: zapytania zapisanego w SQL Server Management Studio nie wstawiono do strony.",
+  "{0} is an interpolated string ($@\"...\"), so the query saved in SQL Server Management Studio is not put back.": "{0} to napis interpolowany ($@\"...\"), więc zapytanie zapisane w SQL Server Management Studio nie wraca do strony.",
+  "The line ending the declares was removed in SQL Server Management Studio, so the query saved there was not put back in {0}.": "W SQL Server Management Studio usunięto linię kończącą deklaracje, więc zapisanego tam zapytania nie wstawiono do {0}.",
+  "The query saved in SQL Server Management Studio has a quote that the quotes of {0} cannot hold, so it was not put back.": "Zapytanie zapisane w SQL Server Management Studio ma cudzysłów, którego nie zmieszczą cudzysłowy {0}, więc nie wróciło do strony."
 }

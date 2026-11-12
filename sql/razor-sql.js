@@ -3,10 +3,11 @@
 // project; and its syntax errors underlined where they are in the page, from checkQuery. C# Razor Tag Helper Support
 // does the same when it is installed, and this steps aside for it, so a page never gets both.
 const vscode = require('vscode');
+const path = require('path');
 const { table, language } = require('../l10n');
 const { scanOpeningTags } = require('./razor/tags');
-const { runnableSql, checkedSql, sourceOffset } = require('./razor/sql-query');
-const { projectConnections, openInSsms } = require('./razor/ssms');
+const { runnableSql, checkedSql, sourceOffset, attributeFromSaved } = require('./razor/sql-query');
+const { projectConnections, openInSsms, watchSaved } = require('./razor/ssms');
 
 const TAG_HELPERS = 'M455YN.csharp-razor-taghelpers';
 const DEFAULT_ATTRIBUTES = ['select', 'insert', 'update', 'delete', 'move', 'lookup-sql', 'sql'];
@@ -15,6 +16,13 @@ const T = table({
   pickConnection: 'Connection string to open the query on',
   noSsms: 'SQL Server Management Studio was not found in Program Files.',
   declaresNote: 'Values the app gives this query: set them before running it.',
+  putBack: '{0}: the query saved in SQL Server Management Studio is in the page',
+  replace: 'Replace',
+  changedMeanwhile: '{0} was changed in VS Code after it was opened in SQL Server Management Studio. Replace it with the query saved there?',
+  gone: '{0} is no longer there: the query saved in SQL Server Management Studio was not put back.',
+  interpolated: '{0} is an interpolated string ($@"..."), so the query saved in SQL Server Management Studio is not put back.',
+  separatorRemoved: 'The line ending the declares was removed in SQL Server Management Studio, so the query saved there was not put back in {0}.',
+  quote: 'The query saved in SQL Server Management Studio has a quote that the quotes of {0} cannot hold, so it was not put back.',
 });
 
 const isRazor = (doc) => ['razor', 'aspnetcorerazor'].includes(doc?.languageId) || /\.(cshtml|razor)$/i.test(doc?.uri.fsPath || '');
@@ -47,9 +55,53 @@ async function openSqlInSsms(query) {
     if (!item) return undefined;
     chosen = item.c;
   }
-  const opened = openInSsms(query.text, query.name, chosen?.connectionString);
+  const opened = openInSsms(query.text, query.name, chosen?.connectionString, config({ uri: vscode.Uri.file(query.file) }).get('ssmsAuthentication', 'windows'));
   if (opened.error) vscode.window.showErrorMessage(T.noSsms);
+  else watchSsmsSaves(opened.file, query);
   return opened.file;
+}
+
+// Each save of a query in SSMS put back into its attribute (the page edited, not saved, Ctrl+Z undoing it).
+const ssmsWatches = new Map(); // .sql file -> its watch, the latest query opened in it
+function watchSsmsSaves(file, query) {
+  ssmsWatches.get(file)?.dispose();
+  const source = { ...query, current: query.original };
+  ssmsWatches.set(file, watchSaved(file, (saved) => {
+    // ssmsSyncBack read at each save, so turning it off stops the queries already open too
+    if (!config({ uri: vscode.Uri.file(source.file) }).get('ssmsSyncBack', true)) return;
+    putBackFromSsms(source, saved).catch((e) => console.error(e));
+  }));
+}
+
+/** The page's attribute the query came from: the index-th of the page's attributes of that tag and name. */
+const blockOf = (doc, source) => sqlBlocks(doc).filter((b) => b.tag === source.tag && b.attribute === source.attribute)[source.index];
+
+async function putBackFromSsms(source, saved) {
+  const uri = vscode.Uri.file(source.file);
+  const where = `${source.tag} ${source.attribute} (${path.basename(source.file)})`;
+  const back = attributeFromSaved(saved, source.original, source.opener);
+  if (back.error) {
+    vscode.window.showWarningMessage({ interpolated: T.interpolated, separator: T.separatorRemoved, quote: T.quote }[back.error](where));
+    return;
+  }
+  const doc = await vscode.workspace.openTextDocument(uri);
+  const block = blockOf(doc, source);
+  if (!block) {
+    vscode.window.showWarningMessage(T.gone(where));
+    return;
+  }
+  const now = doc.getText().slice(block.start, block.end);
+  if (now === back.text) {
+    source.current = now;
+    return;
+  }
+  if (now !== source.current && (await vscode.window.showWarningMessage(T.changedMeanwhile(where), { modal: true }, T.replace)) !== T.replace) return;
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(uri, new vscode.Range(doc.positionAt(block.start), doc.positionAt(block.end)), back.text);
+  if (!(await vscode.workspace.applyEdit(edit))) return;
+  const after = blockOf(doc, source);
+  source.current = after ? doc.getText().slice(after.start, after.end) : back.text;
+  vscode.window.setStatusBarMessage(`$(database) ${T.putBack(where)}`, 5000);
 }
 
 function registerRazorSql(context, checkQuery) {
@@ -104,11 +156,19 @@ function registerRazorSql(context, checkQuery) {
         if (!ours() || !config(doc).get('razorCodeLens', true)) return [];
         const text = doc.getText();
         const note = language() === 'pl' ? T.declaresNote : undefined;
-        return sqlBlocks(doc).map((b) => new vscode.CodeLens(doc.lineAt(doc.positionAt(b.start).line).range, {
-          title: `$(database) ${T.openInSsms(b.attribute)}`,
-          command: 'csharpShooter.sql.openInSsms',
-          arguments: [{ text: runnableSql(text.slice(b.start, b.end), `${b.tag} ${b.attribute}`, note), file: doc.uri.fsPath, name: `${b.tag}-${b.attribute}` }],
-        }));
+        const seen = new Map(); // tag + attribute -> how many of them came before, to find this one again on a save
+        return sqlBlocks(doc).map((b) => {
+          const key = `${b.tag} ${b.attribute}`;
+          const index = seen.get(key) || 0;
+          seen.set(key, index + 1);
+          const original = text.slice(b.start, b.end);
+          return new vscode.CodeLens(doc.lineAt(doc.positionAt(b.start).line).range, {
+            title: `$(database) ${T.openInSsms(b.attribute)}`,
+            command: 'csharpShooter.sql.openInSsms',
+            arguments: [{ text: runnableSql(original, key, note), file: doc.uri.fsPath, name: `${b.tag}-${b.attribute}`,
+              tag: b.tag, attribute: b.attribute, index, original, opener: text.slice(Math.max(0, b.start - 3), b.start) }],
+          });
+        });
       },
     }),
     vscode.workspace.onDidOpenTextDocument((d) => schedule(d, 0)),
@@ -122,7 +182,7 @@ function registerRazorSql(context, checkQuery) {
     vscode.extensions.onDidChange(() => (changed.fire(), all())),
   );
   all();
-  return { sqlBlocks, check };
+  return { sqlBlocks, check, watchSsmsSaves }; // watchSsmsSaves for the tests, which start no SSMS
 }
 
 module.exports = { registerRazorSql };

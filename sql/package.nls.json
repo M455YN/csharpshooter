@@ -6,5 +6,9 @@
   "command.sql.openInSsms": "Open in SQL Server Management Studio",
   "config.sql.razorAttributes": "Tag Helper attributes of .cshtml and .razor pages that hold SQL: an Open in SQL Server Management Studio lens above each, and its syntax errors underlined. C# Razor Tag Helper Support does this itself when installed, by its own sqlHighlighting.rules.",
   "config.sql.razorCodeLens": "Show Open in SQL Server Management Studio above each Tag Helper attribute holding SQL.",
-  "config.sql.razorDiagnostics": "Underline the syntax errors of the SQL in Tag Helper attributes as you type."
+  "config.sql.razorDiagnostics": "Underline the syntax errors of the SQL in Tag Helper attributes as you type.",
+  "config.sql.ssmsSyncBack": "Put a query opened with Open … in SQL Server Management Studio back into its Tag Helper attribute each time it is saved in SSMS (the page edited, not saved).",
+  "config.sql.ssmsAuthentication": "How SQL Server Management Studio logs in when it opens a Tag Helper's query.",
+  "config.sql.ssmsAuthentication.windows": "Windows authentication (NTLM/Kerberos): only the server, database and encryption are taken from the connection string.",
+  "config.sql.ssmsAuthentication.connectionString": "As the connection string says: its SQL Server login (SSMS asks for the password) or Microsoft Entra ID authentication."
 }

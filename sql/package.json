@@ -93,6 +93,24 @@
           "default": true,
           "description": "%config.sql.razorCodeLens%"
         },
+        "csharpShooter.sql.ssmsSyncBack": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.sql.ssmsSyncBack%"
+        },
+        "csharpShooter.sql.ssmsAuthentication": {
+          "type": "string",
+          "enum": [
+            "windows",
+            "connectionString"
+          ],
+          "enumDescriptions": [
+            "%config.sql.ssmsAuthentication.windows%",
+            "%config.sql.ssmsAuthentication.connectionString%"
+          ],
+          "default": "windows",
+          "description": "%config.sql.ssmsAuthentication%"
+        },
         "csharpShooter.sql.razorDiagnostics": {
           "type": "boolean",
           "default": true,

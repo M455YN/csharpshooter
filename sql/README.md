@@ -30,6 +30,11 @@ Its checks run in a real editor, with no SQL Server: `SUITE=sql/test/split-suite
     table for one read `from`), under a line naming the Tag Helper and attribute. SSMS connects with the server,
     database and login of a connection string of the nearest `appsettings*.json` above the page (asked when several;
     the password is never passed). `csharpShooter.sql.razorCodeLens` turns it off.
+  - Each save of that query in SSMS puts it back into the attribute (the declares and their values left out, the
+    `""` doubled again), the page left unsaved; it asks first if the attribute was changed in VS Code meanwhile.
+    `csharpShooter.sql.ssmsSyncBack` turns it off.
+  - SSMS logs in with Windows authentication by default; `csharpShooter.sql.ssmsAuthentication` set to
+    `connectionString` logs in as the connection string says (SQL Server login or Microsoft Entra ID).
   - Its syntax errors are underlined where they are in the page and listed in Problems, as you type.
     `csharpShooter.sql.razorDiagnostics` turns it off.
   - With [C# Razor Tag Helper Support](https://github.com/M455YN/csharp-razor-taghelpers) installed, that extension

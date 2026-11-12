@@ -73,6 +73,31 @@ async function run() {
       ssms.length === 1 && ssms[0].range.start.line === 1 && /Otwórz select w SQL Server Management Studio/.test(ssms[0].command.title)
       && /^-- Wartości przekazywane przez aplikację/.test(query.text) === false && /= "x"/.test(query.text) && query.name === 'grid-select',
       `${ssms.map((l) => `${l.range.start.line}: ${l.command.title}`).join('; ')} / ${JSON.stringify(query?.text.slice(0, 60))}`);
+    // SSMS saves the query (CRLF, a BOM): the fixed SQL comes back into the attribute, its "" doubled again, the page left unsaved.
+    const sqlFile = path.join(os.tmpdir(), 'csharpshooter-sql', 'test-grid-select.sql');
+    fs.mkdirSync(path.dirname(sqlFile), { recursive: true });
+    fs.writeFileSync(sqlFile, query.text.replace(/\r?\n/g, '\r\n'));
+    sql.exports.sql.razor.watchSsmsSaves(sqlFile, query);
+    await sleep(500);
+    fs.writeFileSync(sqlFile, String.fromCharCode(0xfeff) + query.text.replace('wherse', 'where').replace('ordser', 'order').replace(/\r?\n/g, '\r\n'));
+    const fixed = '\nselect e.Id\nfrom Employees e\nwhere e.Name = ""x""\norder by e.Id\n';
+    for (let i = 0; i < 40 && !pageDoc.getText().includes(fixed); i++) await sleep(250);
+    for (let i = 0; i < 20 && vscode.languages.getDiagnostics(pageDoc.uri).some((d) => d.source === 'SQL (grid select)'); i++) await sleep(250);
+    expect('a save in SSMS puts the query back into the attribute, its quotes doubled, unsaved, and its errors gone',
+      pageDoc.getText() === `<grid id="g"\n      select=@(@"${fixed}") />\n` && pageDoc.isDirty
+      && !vscode.languages.getDiagnostics(pageDoc.uri).some((d) => d.source === 'SQL (grid select)'),
+      `${JSON.stringify(pageDoc.getText())}, dirty ${pageDoc.isDirty}`);
+    // ssmsSyncBack off: a save in SSMS no longer reaches the page; on by default, as Windows login is
+    const settings = vscode.workspace.getConfiguration('csharpShooter.sql');
+    const defaults = `${settings.inspect('ssmsSyncBack').defaultValue}/${settings.inspect('ssmsAuthentication').defaultValue}`;
+    await settings.update('ssmsSyncBack', false, vscode.ConfigurationTarget.Global);
+    const before = pageDoc.getText();
+    fs.writeFileSync(sqlFile, query.text.replace('wherse', 'where 1 = 1 and').replace(/\r?\n/g, '\r\n'));
+    await sleep(1500);
+    expect('ssmsSyncBack (on by default, Windows login by default) off leaves the page as it is on a save in SSMS',
+      defaults === 'true/windows' && pageDoc.getText() === before, `defaults ${defaults}, page ${pageDoc.getText() === before ? 'unchanged' : 'changed'}`);
+    await settings.update('ssmsSyncBack', undefined, vscode.ConfigurationTarget.Global);
+    fs.rmSync(sqlFile, { force: true });
   } finally {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     fs.rmSync(dir, { recursive: true, force: true });

@@ -4,6 +4,17 @@ All notable changes to **CSharpShooter SQL** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Saved in SSMS, back in the page:** each save (Ctrl+S) of a query opened with *Otwórz … w SQL Server Management Studio* puts it back into its attribute: the part under the line ending the declares (so values given to them stay in SSMS), the C# string's quotes doubled again, the attribute's own blank lines kept, as an edit of the page left unsaved (Ctrl+Z undoes it). If the attribute was changed in VS Code meanwhile it asks first; an attribute gone, that line deleted, an interpolated string (`$@"..."`) or a quote the attribute cannot hold leave the page as it is and say why.
+- `csharpShooter.sql.ssmsSyncBack` (on by default) turns that off, read at each save, so queries already open in SSMS stop coming back too.
+
+### Changed
+
+- SQL Server Management Studio logs in with Windows authentication (NTLM/Kerberos) by default, taking only the server, database and encryption from the project's connection string; `csharpShooter.sql.ssmsAuthentication` set to `connectionString` logs in as the string says (its SQL Server login, whose password SSMS asks for, or Microsoft Entra ID), as before.
+
 ## [0.11.0] - 2026-11-09
 
 ### Added
