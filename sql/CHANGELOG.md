@@ -4,6 +4,12 @@ All notable changes to **CSharpShooter SQL** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-11-14
+
+### Changed
+
+- A query opened in SQL Server Management Studio from a Razor page's Tag Helper goes to an SSMS already running as a tab of its own, as a double-click on a `.sql` file hands it over (the file association's DDE), where each query started an SSMS of its own; that tab takes the running SSMS's connection. With no SSMS running, one starts connected by the project's connection string, as before.
+
 ## [0.12.0] - 2026-11-12
 
 ### Added
