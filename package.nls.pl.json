@@ -127,5 +127,14 @@
   "command.solution.delete": "Usuń",
   "command.solution.rename": "Zmień nazwę",
   "command.solution.addNewItem": "Nowy element...",
-  "command.solution.addClass": "Klasa..."
+  "command.solution.addClass": "Klasa...",
+  "config.features.inlineValues": "Podczas debugowania pokazuj za każdą linią zatrzymanej metody wartości zmiennych lokalnych i parametrów, jak Visual Studio.",
+  "config.features.dataVisualizer": "Podczas debugowania oferuj wizualizator (lupa w Zmiennych i Czujce) dla DataTable, DataSet, DataView, tablicy i kolekcji.",
+  "config.features.hotReload": "Hot Reload pod debuggerem dla kompilacji Debug, domyślnie dla każdego uruchomienia: \"hotReload\" w launch.json ma pierwszeństwo.",
+  "config.features.autoCloseTags": "Wpisanie \">\" znacznika otwierającego dopisuje znacznik zamykający w plikach .razor, .cshtml, XML i projektu, jak Visual Studio.",
+  "config.features.razorAttributesOnEnter": "Enter między atrybutami znacznika w .razor i .cshtml otwiera listę atrybutów Razora, jak spacja.",
+  "config.features.cssClassCompletion": "Uzupełniaj klasy CSS w class=\"...\" plików .razor i .cshtml ze wszystkich arkuszy stylów używanych przez strony aplikacji.",
+  "config.features.jsInteropNavigation": "Przejdź do deklaracji (F12) na identyfikatorze wywołania JS interop otwiera wywoływaną funkcję JavaScript.",
+  "config.features.httpFiles": "Pliki .http i .rest jak edytor HTTP programu Visual Studio: Wyślij żądanie nad każdym żądaniem i środowisko HTTP na pasku stanu.",
+  "config.features.openSolutionExplorer": "Otwieraj pasek boczny na Eksploratorze rozwiązań, gdy obszar roboczy ma rozwiązanie, jak Visual Studio."
 }

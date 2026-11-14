@@ -127,5 +127,14 @@
   "command.solution.delete": "Delete",
   "command.solution.rename": "Rename",
   "command.solution.addNewItem": "New Item...",
-  "command.solution.addClass": "Class..."
+  "command.solution.addClass": "Class...",
+  "config.features.inlineValues": "While debugging, show after each line of the stopped method the values of the locals and parameters it names, as Visual Studio does.",
+  "config.features.dataVisualizer": "While debugging, offer the visualizer (a magnifier in Variables and Watch) for a DataTable, DataSet, DataView, an array or a collection.",
+  "config.features.hotReload": "Hot Reload under the debugger for a Debug build, by default for every launch: a launch.json entry's \"hotReload\" still wins.",
+  "config.features.autoCloseTags": "Typing a start tag's \">\" writes its end tag, in .razor, .cshtml, XML and project files, as Visual Studio does.",
+  "config.features.razorAttributesOnEnter": "Enter among a tag's attributes in .razor and .cshtml opens Razor's list of them, as a space does.",
+  "config.features.cssClassCompletion": "Complete CSS classes in class=\"...\" of .razor and .cshtml from every stylesheet the app's pages use.",
+  "config.features.jsInteropNavigation": "Go to Declaration (F12) on a JS interop call's identifier opens the JavaScript function it calls.",
+  "config.features.httpFiles": ".http and .rest files as Visual Studio's HTTP editor: Send Request above each request and the HTTP environment in the status bar.",
+  "config.features.openSolutionExplorer": "Open the side bar on the Solution Explorer when the workspace has a solution, as Visual Studio opens on it."
 }

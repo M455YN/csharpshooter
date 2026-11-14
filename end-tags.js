@@ -7,6 +7,7 @@
 // server's HTML half has no server of its own here, so they stay unanswered (extension.js).
 // HTML files are VS Code's own HTML extension's (html.autoClosingTags).
 const vscode = require('vscode');
+const { on } = require('./features');
 
 /** Where an end tag goes in a document, carried through its changes: after the '>' at `gt` and what was typed after it
  *  since (the caret stood there). A change of the '>' itself, or over the place, loses it. */
@@ -66,6 +67,7 @@ function registerEndTags(context, server) {
   const places = new Set();
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((e) => {
     for (const place of places) if (place.document === e.document) place.carry(e.contentChanges);
+    if (!on('autoCloseTags')) return;
     const [change] = e.contentChanges;
     const editor = vscode.window.activeTextEditor;
     if (e.contentChanges.length !== 1 || change.text !== '>' || change.rangeLength !== 0 || editor?.document !== e.document

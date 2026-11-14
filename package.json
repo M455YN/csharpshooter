@@ -137,6 +137,51 @@
           "type": "boolean",
           "default": false,
           "description": "%config.previewRefactorings%"
+        },
+        "csharpShooter.features.inlineValues": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.inlineValues%"
+        },
+        "csharpShooter.features.dataVisualizer": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.dataVisualizer%"
+        },
+        "csharpShooter.features.hotReload": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.hotReload%"
+        },
+        "csharpShooter.features.autoCloseTags": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.autoCloseTags%"
+        },
+        "csharpShooter.features.razorAttributesOnEnter": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.razorAttributesOnEnter%"
+        },
+        "csharpShooter.features.cssClassCompletion": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.cssClassCompletion%"
+        },
+        "csharpShooter.features.jsInteropNavigation": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.jsInteropNavigation%"
+        },
+        "csharpShooter.features.httpFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.httpFiles%"
+        },
+        "csharpShooter.features.openSolutionExplorer": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.openSolutionExplorer%"
         }
       }
     },
@@ -1107,24 +1152,24 @@
       "debug/variables/context": [
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
+          "when": "debugType == 'csharpshooter' && config.csharpShooter.features.dataVisualizer && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "inline"
         },
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
+          "when": "debugType == 'csharpshooter' && config.csharpShooter.features.dataVisualizer && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "navigation"
         }
       ],
       "debug/watch/context": [
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
+          "when": "debugType == 'csharpshooter' && config.csharpShooter.features.dataVisualizer && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "inline"
         },
         {
           "command": "csharpShooter.visualizeData",
-          "when": "debugType == 'csharpshooter' && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
+          "when": "debugType == 'csharpshooter' && config.csharpShooter.features.dataVisualizer && variableType =~ /(^|\\.)(DataTable|DataSet|DataView)$|(^|\\.)(I?List|IEnumerable|I?ReadOnly(Collection|List)|I?Collection|ObservableCollection|HashSet|SortedSet|LinkedList|Queue|Stack|I?Dictionary|SortedDictionary|Immutable(Array|List))<.+>$|\\[\\]$/",
           "group": "navigation"
         }
       ],

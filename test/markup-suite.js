@@ -278,6 +278,26 @@ async function run() {
     expect('Go to Definition too', got === 'Interop.razor.js: export function showAlert(message) {', got);
     got = await declaration('"./Components/Pages/Interop.razor.js"', 5);
     expect('F12 on an import\'s path opens the module', got === 'Interop.razor.js: // The page\'s own module.', got);
+
+    // 4. Each of them off by its switch in Settings (csharpShooter.features), at once, with no reload; on again after.
+    const features = vscode.workspace.getConfiguration('csharpShooter.features');
+    const off = ['autoCloseTags', 'cssClassCompletion', 'jsInteropNavigation'];
+    try {
+      for (const name of off) await features.update(name, false, vscode.ConfigurationTarget.Global);
+      got = await declaration('"showAlert"');
+      labels = (await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', editor.document.uri, caretAfter(editor, '<h1 class="')))
+        .items.map((c) => (typeof c.label === 'string' ? c.label : c.label.label));
+      editor = await open(file('Shop', 'Components', 'Pages', 'Interop.razor'));
+      at = await newLine(editor, '<h1 class="">Interop</h1>');
+      await type('<aside');
+      await type('>');
+      await sleep(1500);
+      expect('switched off: no end tag, no CSS classes, no F12 to JavaScript', lineOf(editor, at) === '<aside>' && !labels.includes('kit-card') && got === 'none',
+        `${JSON.stringify(lineOf(editor, at))}, kit-card ${labels.includes('kit-card')}, F12 ${got}`);
+    } finally {
+      for (const name of off) await features.update(name, undefined, vscode.ConfigurationTarget.Global);
+    }
+    expect('switched on again: F12 to JavaScript', (await declaration('"showAlert"')) === 'Interop.razor.js: export function showAlert(message) {', 'off still');
   } finally {
     cdn.close();
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');

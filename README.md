@@ -2,7 +2,7 @@
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
-.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its main after 0.3.0). No C# Dev Kit and no `vsdbg`,
+.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its 0.3.4). No C# Dev Kit and no `vsdbg`,
 so nothing here carries Visual Studio's licence terms, except the two closed Microsoft assemblies the Roslyn package
 ships (`Microsoft.VisualStudio.Telemetry`, `Microsoft.VisualStudio.Utilities.Internal`; Razor's MEF parts need them, and
 the server runs with `--telemetryLevel off`).
@@ -19,8 +19,10 @@ npm run fetch-server
 The SQL Tools Service of `.sql` files is CSharpShooter SQL's (`sql/`, below under *SQL*), fetched there by its own
 `npm run fetch-sqltools`.
 
-The debugger is Passenger's, its main after 0.3.0 (commit `9954e4b` of 2026-11-09, which the script fetches: 0.3.0's
-debugger and the fixes since, among them the value a Step Out returns, of an `async` method too, a stop on an exception
+The debugger is Passenger 0.3.4's (commit `57899da` of 2026-11-13, which the script fetches: an exception stop on .NET
+11 showing the frame that threw, a Step Out of a static constructor or from an exception in an `async` method stopping
+where it should, a conditional breakpoint in a parallel loop holding the threads it starts, a hover asking only of the
+code that stopped, after the fixes of its main after 0.3.0: the value a Step Out returns, of an `async` method too, a stop on an exception
 always naming it and its inner exceptions, each row's `evaluateName` the whole expression, a breakpoint saying why it is
 not bound, Set Value on pointers, `ref`/`in` parameters and generics, an evaluation past its time offered again with
 every thread let go, and Hot Reload carrying a frame part way through a statement), ported to .NET 10 (`debugger-port/net10.patch`), so it builds with the .NET 10 SDK and runs
@@ -47,7 +49,9 @@ npm run build-roslyn-extension
 ```
 
 Hot Reload's startup hook that runs the program's `MetadataUpdateHandler`s after an update (`update-handlers/`,
-Passenger's `Passenger.UpdateHandlers` at `9954e4b`, for .NET 8 and later):
+Passenger's `Passenger.UpdateHandlers` as of 0.3.4, its socket a loopback TCP one, for .NET 8 and later: connected, its
+key said and its own calls made once before the program's `Main`, so a stop between updates finds its thread waiting in a
+read):
 
 ```bash
 npm run build-update-handlers
@@ -106,6 +110,9 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   On a slow machine that is where C# help, F12 and Razor are until then.
 - Debug with a `launch.json` entry of type `csharpshooter` (`program`, `args`, `cwd`, `env`, `stopAtEntry`,
   `justMyCode`, `console`; `attach` takes `processId`).
+- While debugging, each line of the stopped method up to the stop shows the values of the locals and parameters it
+  names after it, as Visual Studio does (VS Code's `debug.inlineValues`, on by default for C#; a name that is no
+  variable there, a type or a member, shows nothing).
 - While debugging, a `DataTable`, `DataSet`, `DataView`, an array or a collection (`List<T>`, `IEnumerable<T>`,
   `Dictionary<K, V>`…) has a magnifier beside it in Variables and Watch (and a *Wizualizator* entry in their context
   menu; deeper down too, a field of a field: it is read by its whole expression, the parent cast to its runtime type and
@@ -143,6 +150,26 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   messages a user sees (a launch or attach that fails, a breakpoint that will not be hit, the Debug Console's lines,
   failed evaluations, data breakpoints) follow it too: the adapter runs inline and `debug-l10n.js` matches Passenger's
   English texts as they pass; its log and the compiler's own diagnostics stay English.
+
+## Switching features off
+
+Each feature added beside the C# server and the debugger has a switch in Settings, *CSharpShooter*, on by default and
+read each time it would act, so turning it off (or on again) takes effect at once:
+
+| Setting (`csharpShooter.features.`) | What it turns off |
+|---|---|
+| `inlineValues` | values after the lines of the stopped method |
+| `dataVisualizer` | the visualizer of a DataTable, DataSet, DataView, array or collection |
+| `hotReload` | Hot Reload by default (a `launch.json` entry's `"hotReload"` still wins) |
+| `autoCloseTags` | the end tag written on a start tag's `>` |
+| `razorAttributesOnEnter` | Razor's attribute list on Enter inside a tag |
+| `cssClassCompletion` | CSS classes in `class="…"` |
+| `jsInteropNavigation` | F12 from a JS interop call to its JavaScript |
+| `httpFiles` | *Wyślij żądanie* and the HTTP environment of `.http` files |
+| `openSolutionExplorer` | the side bar opening on the Solution Explorer |
+
+Settings of their own already do this for the others: `visualStudioKeybindings`, `askToTrustDevCertificate`,
+`launchProfilesInLaunchJson`, `previewRefactorings`, `razorViewsInDesignTime` and the Task Runner's bindings.
 
 ## Startup project and active profile (as Visual Studio)
 

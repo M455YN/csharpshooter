@@ -1,5 +1,5 @@
 diff --git a/Directory.Build.props b/Directory.Build.props
-index 07546040..230b54b0 100644
+index c419be9..098343b 100644
 --- a/Directory.Build.props
 +++ b/Directory.Build.props
 @@ -1,7 +1,7 @@
@@ -9,13 +9,13 @@ index 07546040..230b54b0 100644
 -    <TargetFramework>net11.0</TargetFramework>
 +    <TargetFramework>net10.0</TargetFramework>
      <!-- The version, until a vX.Y.Z tag on the commit names it. -->
-     <Version>0.3.0</Version>
+     <Version>0.3.4</Version>
      <Nullable>enable</Nullable>
 diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
-index e47ec805..a584307c 100644
+index 8350bb4..aa5c335 100644
 --- a/src/Passenger.Core/ChildProcesses.cs
 +++ b/src/Passenger.Core/ChildProcesses.cs
-@@ -865,10 +865,7 @@ public static class ChildProcesses
+@@ -890,10 +890,7 @@ public static class ChildProcesses
          start.RedirectStandardInput = true;
          start.RedirectStandardOutput = true;
          start.RedirectStandardError = true;
@@ -28,7 +28,7 @@ index e47ec805..a584307c 100644
          Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory) { Start = start });
          // What it writes is nobody's: its pipes closed here, its writes to them fail, which .NET's console passes over.
 diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
-index c8efda8a..362a56f9 100644
+index 1afaa60..d6aee82 100644
 --- a/src/Passenger.Core/Lifeline.cs
 +++ b/src/Passenger.Core/Lifeline.cs
 @@ -61,18 +61,26 @@ internal static partial class Lifeline
@@ -62,7 +62,7 @@ index c8efda8a..362a56f9 100644
  
      /// <summary>Puts a process group that leads itself on the watchdog's list: a child's, or a program the terminal started
      /// in its pseudo-terminal.</summary>
-@@ -223,7 +231,6 @@ internal static partial class Lifeline
+@@ -229,7 +237,6 @@ internal static partial class Lifeline
                  UseShellExecute = false,
                  CreateNoWindow = true,
                  RedirectStandardInput = true,
@@ -70,7 +70,7 @@ index c8efda8a..362a56f9 100644
              };
              Process started = Process.Start(start) ?? throw new InvalidOperationException("The watchdog did not start");
              foreach (int group in Groups)
-@@ -279,4 +286,71 @@ internal static partial class Lifeline
+@@ -285,4 +292,71 @@ internal static partial class Lifeline
          public nuint PeakProcessMemoryUsed;
          public nuint PeakJobMemoryUsed;
      }
@@ -143,7 +143,7 @@ index c8efda8a..362a56f9 100644
 +    }
  }
 diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
-index 9d22eb57..1bab0586 100644
+index 9d22eb5..1bab058 100644
 --- a/src/Passenger.DebugAdapter/DebugAdapter.cs
 +++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
 @@ -254,11 +254,13 @@ public sealed class DebugAdapter
@@ -162,7 +162,7 @@ index 9d22eb57..1bab0586 100644
          // Not under the engine's lock: a program waiting for input may be running, and the write is all.
          connection.Handle<InputArguments>(DapCommands.Input, arguments =>
 diff --git a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
-index aaec1792..ef545fec 100644
+index aaec179..ef545fe 100644
 --- a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 +++ b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 @@ -17,7 +17,8 @@ namespace Passenger.Debugger.Interop;
@@ -176,7 +176,7 @@ index aaec1792..ef545fec 100644
      /// <summary>
      /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
-index 6852334b..13b6bb47 100644
+index 6852334..13b6bb4 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
 +++ b/src/Passenger.Debugger/SuspendedLaunch.cs
 @@ -166,29 +166,30 @@ public sealed partial class SuspendedLaunch : IDisposable

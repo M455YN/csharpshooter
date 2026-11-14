@@ -4,6 +4,18 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Each optional feature has a switch in Settings, on by default and taking effect at once: `csharpShooter.features.` `inlineValues`, `dataVisualizer`, `hotReload` (the default for every launch; `launch.json`'s `"hotReload"` still wins), `autoCloseTags`, `razorAttributesOnEnter`, `cssClassCompletion`, `jsInteropNavigation`, `httpFiles` and `openSolutionExplorer`.
+- Values after the lines while debugging, as Visual Studio shows them: each line of the stopped method up to the stop shows the values of the locals and parameters it names (VS Code's `debug.inlineValues`), comments, strings, keywords, members after a dot and called methods left out.
+
+### Changed
+
+- The debugger is Passenger 0.3.4's (`57899da`, `debugger-port/net10.patch` made again on it): an exception stop on .NET 11 shows the frame that threw, with its locals, and Set Next Statement there says why it cannot; a Step Out from an exception in an `async` method stops where its caller catches it, and one of a static constructor (Just My Code off) stops instead of running the program to its end; a conditional breakpoint in a parallel loop holds the threads made while it is evaluated, so it stops where it should; a hover while paused asks only of the code that stopped; a static field of a class with no static constructor reads with no evaluation.
+- Hot Reload's update handlers' hook connects and makes each of its own calls before the program's `Main`, returning once its thread waits in its first read (Passenger 0.3.4's hook, #1495), so it can no longer hold up the debugger's evaluations at a stop just after the start.
+
 ## [0.12.0] - 2026-11-12
 
 ### Changed

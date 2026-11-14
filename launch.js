@@ -3,6 +3,7 @@
 // app listens. A launch.json entry can name them too: { "type": "csharpshooter", "request": "launch",
 // "project": "${workspaceFolder}/WebApp/WebApp.csproj", "launchProfile": "WebApp Development" }.
 const vscode = require('vscode');
+const { on } = require('./features');
 const { t } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
@@ -290,7 +291,7 @@ class LaunchProfiles {
       args,
       env,
       // Hot Reload, as VS has it on for a Debug build (Edit and Continue needs its unoptimized code); hotReload: false turns it off.
-      hotReload: config.hotReload ?? /^debug$/i.test(settings.configuration),
+      hotReload: config.hotReload ?? (on('hotReload') && /^debug$/i.test(settings.configuration)),
       // The browser, as VS opens it: once the app says it listens, at the profile's launchUrl.
       __browser: profile.launchBrowser && config.launchBrowser !== false ? { base: urls[0], path: profile.launchUrl || '', portBusy } : undefined,
     };

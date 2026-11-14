@@ -6,6 +6,7 @@
 // and a response with a JSON body is held to its operation's schema, where it breaks it said in the panel (Passenger's
 // Endpoints window does both).
 const vscode = require('vscode');
+const { on } = require('./features');
 const fs = require('fs');
 const path = require('path');
 const { table } = require('./l10n');
@@ -127,7 +128,7 @@ function registerHttpFiles(context) {
   envItem.tooltip = T.environments;
   const showEnv = () => {
     const editor = vscode.window.activeTextEditor;
-    if (editor?.document.languageId !== 'http') return envItem.hide();
+    if (editor?.document.languageId !== 'http' || !on('httpFiles')) return envItem.hide();
     envItem.text = `$(globe) ${T.envFormat(chosen() || T.none)}`;
     return envItem.show();
   };
@@ -135,7 +136,7 @@ function registerHttpFiles(context) {
   showEnv();
 
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ language: 'http' }, {
-    provideCodeLenses: (document) => h.parse(document.getText()).requests.map((r) => new vscode.CodeLens(new vscode.Range(r.line, 0, r.line, 0),
+    provideCodeLenses: (document) => (!on('httpFiles') ? [] : h.parse(document.getText()).requests).map((r) => new vscode.CodeLens(new vscode.Range(r.line, 0, r.line, 0),
       { title: `$(play) ${T.send}`, command: 'csharpShooter.http.send', arguments: [document.uri, r.line] })),
   }));
 

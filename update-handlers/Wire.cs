@@ -20,4 +20,7 @@ internal static class Wire
 
     /// <summary>The hook's last line of an answer: the handlers ran.</summary>
     public const string Done = "done";
+
+    /// <summary>The name of the hook's thread in the program, as its threads list it.</summary>
+    public const string ThreadName = "CSharpShooter update handlers";
 }

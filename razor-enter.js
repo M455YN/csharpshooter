@@ -2,11 +2,13 @@
 // Razor's trigger characters, a new line is not, so VS Code waited for a letter. Razor is asked as for a space at the new
 // line; only where it answers (inside a tag, not in markup or C#, where it gives nothing) is the list opened.
 const vscode = require('vscode');
+const { on } = require('./features');
 
 const { Text, Snippet } = vscode.CompletionItemKind;
 
 function registerRazorEnter(context) {
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(async (e) => {
+    if (!on('razorAttributesOnEnter')) return;
     const editor = vscode.window.activeTextEditor;
     const [change] = e.contentChanges;
     if (e.document.languageId !== 'aspnetcorerazor' || editor?.document !== e.document || e.contentChanges.length !== 1

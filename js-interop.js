@@ -5,6 +5,7 @@
 // assets) for a global. The call is the server's to tell: its hover on the method must name JS interop's types. On the
 // path an "import" gives, the module itself opens.
 const vscode = require('vscode');
+const { on } = require('./features');
 const fs = require('fs');
 const path = require('path');
 const assets = require('./web-assets');
@@ -115,8 +116,8 @@ function registerJsInterop(context) {
   };
   const selector = [{ language: 'csharp' }, { language: 'aspnetcorerazor' }];
   context.subscriptions.push(
-    vscode.languages.registerDeclarationProvider(selector, { provideDeclaration: (d, p) => provider.provide(d, p) }),
-    vscode.languages.registerDefinitionProvider(selector, { provideDefinition: (d, p) => provider.provide(d, p) }));
+    vscode.languages.registerDeclarationProvider(selector, { provideDeclaration: (d, p) => (on('jsInteropNavigation') ? provider.provide(d, p) : undefined) }),
+    vscode.languages.registerDefinitionProvider(selector, { provideDefinition: (d, p) => (on('jsInteropNavigation') ? provider.provide(d, p) : undefined) }));
 }
 
 /** The server's hover on a method: what it says it is. */

@@ -30,6 +30,7 @@ const { registerRefactorings } = require('./refactorings');
 const { registerEndTags } = require('./end-tags');
 const { registerCssClasses } = require('./css-classes');
 const { registerJsInterop } = require('./js-interop');
+const { registerInlineValues } = require('./inline-values');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
@@ -388,7 +389,7 @@ async function activate(context) {
   const solutionView = registerSolutionView(context, findSolution);
   // With a solution in the workspace, the side bar opens on the Solution Explorer, as VS opens on it (an extension's
   // icon cannot be put above VS Code's Explorer; once dragged there, VS Code keeps it).
-  findSolution().then((solution) => solution && vscode.commands.executeCommand('workbench.view.extension.csharpShooter'));
+  findSolution().then((solution) => solution && require('./features').on('openSolutionExplorer') && vscode.commands.executeCommand('workbench.view.extension.csharpShooter'));
   solutionView.search = registerSolutionSearch(context, findSolution, solutionView);
   const searchEverywhere = registerSearchEverywhere(context, solutionView);
   const dataVisualizer = registerDataVisualizer(context);
@@ -396,6 +397,7 @@ async function activate(context) {
   registerEndTags(context, () => (client && client.state === State.Running ? { client, toServerUri } : undefined));
   registerCssClasses(context);
   registerJsInterop(context);
+  registerInlineValues(context);
   // Texts already shown (trees, the status bar, open pages) keep their language until the window reloads.
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
     if (!e.affectsConfiguration('csharpShooter.uiLanguage')) return;

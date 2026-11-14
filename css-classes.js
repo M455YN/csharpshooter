@@ -4,6 +4,7 @@
 // of the projects it takes in), wwwroot, a referenced project's or a package's static web assets (_content/<id>/…), a
 // CDN's address (fetched once, kept in the extension's storage); with their @imports, and the pages' <style> blocks.
 const vscode = require('vscode');
+const { on } = require('./features');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -152,7 +153,7 @@ function registerCssClasses(context) {
 
   context.subscriptions.push(vscode.languages.registerCompletionItemProvider({ language: 'aspnetcorerazor' }, {
     async provideCompletionItems(document, position) {
-      if (!inClassValue(document.getText(), document.offsetAt(position))) return undefined;
+      if (!on('cssClassCompletion') || !inClassValue(document.getText(), document.offsetAt(position))) return undefined;
       const { classes, waiting } = await classesFor(document);
       // A CDN's stylesheet not fetched yet: the list waits for it a moment, else says it is incomplete, to be asked again.
       const all = Promise.all(waiting);
