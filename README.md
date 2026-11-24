@@ -680,6 +680,14 @@ node test/markup-suite.js /path/to/empty/folder
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/markup-suite.js node test/runTest.js
 ```
 
+The Call Hierarchy checks (`test/call-hierarchy-suite.js`: at a use in another file, at a record's positional property)
+make a console app of their own:
+
+```bash
+node test/call-hierarchy-suite.js /path/to/empty/folder
+EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/call-hierarchy-suite.js node test/runTest.js
+```
+
 The `.sql` checks (`sql/test/split-suite.js`) need no SQL Server, only CSharpShooter SQL's `sqltools/`:
 
 ```bash

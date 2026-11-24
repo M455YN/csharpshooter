@@ -165,6 +165,26 @@ async function startServer(context) {
             return next({ uri: toServerUri(vscode.Uri.file(project)), type: 2 });
           },
         },
+        // Call Hierarchy (Shift+Alt+H) at a use of a member declared in another file: Roslyn's server makes its item only in
+        // the document asked about, and answers none there; CSharpShooter's extension makes it where the member is declared
+        // (and at a record's positional parameter takes its property), as Passenger 0.4.1 does (#1916). The server's own
+        // answer where the extension has none or is not loaded.
+        prepareCallHierarchy: async (document, position, token, next) => {
+          if (client && client === extensionIn) {
+            try {
+              const answer = await client.sendRequest('textDocument/_vs_dipatchExtensionMessage', {
+                messageName: 'Passenger.Roslyn.Extension.PrepareCallHierarchy',
+                message: JSON.stringify({ at: { line: position.line, character: position.character } }),
+                textDocument: { uri: toServerUri(document.uri) },
+              }, token);
+              const item = answer?.response && !answer.extensionException ? JSON.parse(answer.response) : null;
+              if (item) return [client.protocol2CodeConverter.asCallHierarchyItem(item)];
+            } catch (e) {
+              output.appendLine(`Call Hierarchy through the extension: ${e.message}`);
+            }
+          }
+          return next(document, position, token);
+        },
         // While the solution loads, Roslyn colours a file from what it has so far: the types of NuGet packages and other
         // projects are not resolved yet and stay plain names. VS Code asks C# by range, which the server's refresh does not
         // reach, so a file opened then kept those colours until Razor's views were ready (on a large web solution a minute) or it was
