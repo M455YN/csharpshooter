@@ -39,11 +39,13 @@ assert.deepStrictEqual([...variables.keys()], ['host', 'id']);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shooter-http-'));
 fs.mkdirSync(path.join(dir, 'api'));
 fs.writeFileSync(path.join(dir, 'http-client.env.json'), JSON.stringify({ $shared: { token: 'shared' }, dev: { port: '1' }, prod: { port: '2', token: 'prod' } }));
-fs.writeFileSync(path.join(dir, 'http-client.env.json.user'), JSON.stringify({ dev: { token: 'mine' } }));
+fs.writeFileSync(path.join(dir, 'http-client.env.json.user'), JSON.stringify({ $shared: { token: 'user-shared', user: 'me' }, dev: { token: 'mine' } }));
 const env = h.environments(path.join(dir, 'api', 'requests.http'), dir);
 assert.deepStrictEqual(Object.keys(env.all), ['dev', 'prod']);
-assert.deepStrictEqual(env.all.dev, { token: 'mine', port: '1' });
+assert.deepStrictEqual(env.all.dev, { token: 'mine', user: 'me', port: '1' });
+// An environment's own value wins over the .user file's $shared.
 assert.equal(env.all.prod.token, 'prod');
+assert.equal(env.all.prod.user, 'me');
 assert.throws(() => h.prepare(requests[0], variables, {}, error), /undefined port/);
 assert.throws(() => h.prepare({ method: 'GET', url: 'items/1', headers: [], body: '' }, new Map(), {}, error), /not absolute items\/1/);
 

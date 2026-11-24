@@ -64,7 +64,8 @@ function environments(file, root) {
       const all = {};
       for (const name of new Set([...Object.keys(shared), ...Object.keys(user)])) {
         if (name === '$schema' || name === '$shared') continue;
-        all[name] = { ...(shared.$shared || {}), ...(shared[name] || {}), ...(user.$shared || {}), ...(user[name] || {}) };
+        // An environment's own value wins over every file's $shared, as Visual Studio's documentation of .http files says.
+        all[name] = { ...(shared.$shared || {}), ...(user.$shared || {}), ...(shared[name] || {}), ...(user[name] || {}) };
       }
       return { file: env, all };
     }
