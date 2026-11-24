@@ -4,6 +4,12 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The debugger is Passenger 0.4.3's (`6ee2acd`, `debugger-port/net10.patch` made again on it, Passenger's analyzers built on the .NET 10 SDK's Roslyn 5.9): anonymous types (`new { A = 1 }`, `Select(i => new { i.Name })`), arrays of `object` or of an interface and a constructor given a lambda (`new Lazy<int>(() => 1)`) evaluate; a variable an `async` method's block captures in a lambda shows in Variables and the hover; an `async` program's unhandled exception stops where it was thrown, with that frame's locals; a step off a web request's or a click's handler lets the program run on, and a step over an `await` stops on the next line on a busy machine too; a step whose returned value cannot be boxed stops instead of running the program to its end; `ref`/`in`/`out` struct parameters and a struct's `this` show their values, and a `void` call answers "Ran, with no value"; a hit count counts only hits whose condition held; evaluations no longer stall on a garbage collection, a thread just started or .NET 11's tiered JIT; the debugger answers at once while it decompiles CoreLib, and Detach goes at once.
+
 ## [0.13.0] - 2026-11-14
 
 ### Added

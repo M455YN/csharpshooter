@@ -1,5 +1,5 @@
 diff --git a/Directory.Build.props b/Directory.Build.props
-index c419be9..098343b 100644
+index 56207fbe..ce92f86e 100644
 --- a/Directory.Build.props
 +++ b/Directory.Build.props
 @@ -1,7 +1,7 @@
@@ -9,13 +9,27 @@ index c419be9..098343b 100644
 -    <TargetFramework>net11.0</TargetFramework>
 +    <TargetFramework>net10.0</TargetFramework>
      <!-- The version, until a vX.Y.Z tag on the commit names it. -->
-     <Version>0.3.4</Version>
+     <Version>0.4.3</Version>
      <Nullable>enable</Nullable>
+diff --git a/src/Passenger.Analyzers/Passenger.Analyzers.csproj b/src/Passenger.Analyzers/Passenger.Analyzers.csproj
+index 03b3b39b..e0a6a278 100644
+--- a/src/Passenger.Analyzers/Passenger.Analyzers.csproj
++++ b/src/Passenger.Analyzers/Passenger.Analyzers.csproj
+@@ -12,7 +12,8 @@
+   </PropertyGroup>
+ 
+   <ItemGroup>
+-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
++    <!-- The .NET 10 SDK's compiler is Roslyn 5.9: an analyzer built on a newer one is refused (CS9057). -->
++    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" PrivateAssets="all" />
+     <!-- At an MIT release: netstandard2.0's library takes 1.1.0, under Microsoft's .NET Library terms, not an open licence. -->
+     <PackageReference Include="Microsoft.NETCore.Platforms" PrivateAssets="all" />
+     <AdditionalFiles Include="AnalyzerReleases.Shipped.md;AnalyzerReleases.Unshipped.md" />
 diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
-index 8350bb4..aa5c335 100644
+index 0f03beae..30cbef3f 100644
 --- a/src/Passenger.Core/ChildProcesses.cs
 +++ b/src/Passenger.Core/ChildProcesses.cs
-@@ -890,10 +890,7 @@ public static class ChildProcesses
+@@ -1052,10 +1052,7 @@ public static class ChildProcesses
          start.RedirectStandardInput = true;
          start.RedirectStandardOutput = true;
          start.RedirectStandardError = true;
@@ -24,14 +38,14 @@ index 8350bb4..aa5c335 100644
 -            start.StartDetached = true;
 -        }
 +        // shortcut: .NET 10 has no StartDetached, so off Windows it stays in our session; the debug adapter never calls this.
-         using Process process = Process.Start(start) ?? throw new InvalidOperationException($"{start.FileName} did not start");
-         Started?.Invoke(null, new ChildStart(process.Id, Display(start), start.WorkingDirectory) { Start = start });
-         // What it writes is nobody's: its pipes closed here, its writes to them fail, which .NET's console passes over.
+         string command = Display(start);
+         Action? givenBack = ThroughCmdWhereBatch(start);
+         Process? started;
 diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
-index 1afaa60..d6aee82 100644
+index f33db660..a62e55e7 100644
 --- a/src/Passenger.Core/Lifeline.cs
 +++ b/src/Passenger.Core/Lifeline.cs
-@@ -61,18 +61,26 @@ internal static partial class Lifeline
+@@ -128,10 +128,10 @@ internal static partial class Lifeline
      {
          if (OperatingSystem.IsWindows())
          {
@@ -41,9 +55,10 @@ index 1afaa60..d6aee82 100644
          }
 -        start.StartDetached = true;
 +        // shortcut: .NET 10 has no StartDetached, so a child stays in our session and group; port setsid if Unix matters.
+         start.Environment[LineageVariable] = Lineage.Value;
          lock (Gate)
          {
-             Watchdog();
+@@ -139,8 +139,16 @@ internal static partial class Lifeline
          }
      }
  
@@ -61,8 +76,8 @@ index 1afaa60..d6aee82 100644
 +    }
  
      /// <summary>Puts a process group that leads itself on the watchdog's list: a child's, or a program the terminal started
-     /// in its pseudo-terminal.</summary>
-@@ -229,7 +237,6 @@ internal static partial class Lifeline
+     /// in its pseudo-terminal. Its leader's runtime files are followed at once, not at the next look through the groups,
+@@ -524,7 +532,6 @@ internal static partial class Lifeline
                  UseShellExecute = false,
                  CreateNoWindow = true,
                  RedirectStandardInput = true,
@@ -70,7 +85,7 @@ index 1afaa60..d6aee82 100644
              };
              Process started = Process.Start(start) ?? throw new InvalidOperationException("The watchdog did not start");
              foreach (int group in Groups)
-@@ -285,4 +292,71 @@ internal static partial class Lifeline
+@@ -602,4 +609,71 @@ internal static partial class Lifeline
          public nuint PeakProcessMemoryUsed;
          public nuint PeakJobMemoryUsed;
      }
@@ -143,10 +158,10 @@ index 1afaa60..d6aee82 100644
 +    }
  }
 diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
-index 9d22eb5..1bab058 100644
+index 0e610b6e..209a09f2 100644
 --- a/src/Passenger.DebugAdapter/DebugAdapter.cs
 +++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
-@@ -254,11 +254,13 @@ public sealed class DebugAdapter
+@@ -263,11 +263,13 @@ public sealed class DebugAdapter
              return Leave(() => debugger.DisconnectAsync(arguments.TerminateDebuggee ?? false,
                  arguments.LetGoWithin is int within and > 0 ? TimeSpan.FromMilliseconds(within) : null));
          }, then: RequestShutdown);
@@ -162,7 +177,7 @@ index 9d22eb5..1bab058 100644
          // Not under the engine's lock: a program waiting for input may be running, and the write is all.
          connection.Handle<InputArguments>(DapCommands.Input, arguments =>
 diff --git a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
-index aaec179..ef545fe 100644
+index aaec1792..ef545fec 100644
 --- a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 +++ b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 @@ -17,7 +17,8 @@ namespace Passenger.Debugger.Interop;
@@ -176,10 +191,10 @@ index aaec179..ef545fe 100644
      /// <summary>
      /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
-index 6852334..13b6bb4 100644
+index da10f142..58ed88c2 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
 +++ b/src/Passenger.Debugger/SuspendedLaunch.cs
-@@ -166,29 +166,30 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -170,29 +170,30 @@ public sealed partial class SuspendedLaunch : IDisposable
          }
      }
  
@@ -227,7 +242,7 @@ index 6852334..13b6bb4 100644
              OwnDesktopStart own = OwnDesktop.Start(start, suspended: true);
              return new SuspendedLaunch(own.Process.Id, 0, own.Process, own.Input.BaseStream, own.Output!.BaseStream, own.Error!.BaseStream)
              {
-@@ -196,11 +197,66 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -200,11 +201,66 @@ public sealed partial class SuspendedLaunch : IDisposable
                  resumeOwn = own.Resume,
              };
          }
@@ -298,7 +313,7 @@ index 6852334..13b6bb4 100644
      }
  
      /// <summary>The one thread a process started suspended has, which its Main will run on; null when the system will not
-@@ -218,20 +274,35 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -222,20 +278,35 @@ public sealed partial class SuspendedLaunch : IDisposable
          }
      }
  
@@ -336,7 +351,7 @@ index 6852334..13b6bb4 100644
                  }
                  resumed = true;
              }
-@@ -413,6 +484,11 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -417,6 +488,11 @@ public sealed partial class SuspendedLaunch : IDisposable
      public void Dispose()
      {
          process?.Dispose();
@@ -348,7 +363,7 @@ index 6852334..13b6bb4 100644
          if (resumeHandle != 0)
          {
              DbgShim.CloseResumeHandle(resumeHandle);
-@@ -498,4 +574,62 @@ public sealed partial class SuspendedLaunch : IDisposable
+@@ -502,4 +578,62 @@ public sealed partial class SuspendedLaunch : IDisposable
  
      [LibraryImport("libc", EntryPoint = "ioctl", SetLastError = true)]
      private static partial int ProcessInfoOf(int descriptor, ulong request, ref ProcessInfo info);

@@ -2,7 +2,7 @@
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
-.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its 0.3.4). No C# Dev Kit and no `vsdbg`,
+.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its 0.4.3). No C# Dev Kit and no `vsdbg`,
 so nothing here carries Visual Studio's licence terms, except the two closed Microsoft assemblies the Roslyn package
 ships (`Microsoft.VisualStudio.Telemetry`, `Microsoft.VisualStudio.Utilities.Internal`; Razor's MEF parts need them, and
 the server runs with `--telemetryLevel off`).
@@ -19,7 +19,14 @@ npm run fetch-server
 The SQL Tools Service of `.sql` files is CSharpShooter SQL's (`sql/`, below under *SQL*), fetched there by its own
 `npm run fetch-sqltools`.
 
-The debugger is Passenger 0.3.4's (commit `57899da` of 2026-11-13, which the script fetches: an exception stop on .NET
+The debugger is Passenger 0.4.3's (commit `6ee2acd` of 2026-11-23, which the script fetches: anonymous types, arrays of
+`object` or of an interface and a constructor given a lambda evaluating, a variable an `async` method's block captures in
+a lambda shown, an `async` program's unhandled exception stopping where it was thrown, a step off a request's or a
+click's handler letting the program run on, a step over an `await` stopping on the next line under load, a returned
+value that cannot be boxed no longer running the program to its end, `ref`/`in`/`out` struct parameters and a struct's
+`this` shown, a `void` call answering "Ran, with no value", a hit count counting only hits whose condition held, a
+tracepoint's `{...}` read as in every Passenger debugger, evaluations no longer stalling on a collection, a new thread or
+.NET 11's tiered JIT, and the debugger answering at once while it decompiles CoreLib; after 0.3.4's: an exception stop on .NET
 11 showing the frame that threw, a Step Out of a static constructor or from an exception in an `async` method stopping
 where it should, a conditional breakpoint in a parallel loop holding the threads it starts, a hover asking only of the
 code that stopped, after the fixes of its main after 0.3.0: the value a Step Out returns, of an `async` method too, a stop on an exception
@@ -59,7 +66,8 @@ npm run build-update-handlers
 
 The port replaces the .NET 11 APIs Passenger uses: `ProcessStartInfo.StartSuspended` and `SafeProcessHandle.Resume`
 (a suspended `CreateProcessW` with piped standard streams, then `ResumeThread`), `KillOnParentExit` (a kill-on-close
-Windows job; a program started on a desktop of its own goes through Passenger's `OwnDesktop` as before), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator. Off Windows, `StartDetached` is dropped,
+Windows job; a program started on a desktop of its own goes through Passenger's `OwnDesktop` as before), and marks `IMetaDataTables2` unsafe for .NET 10's COM generator; Passenger's own analyzers are built on Roslyn 5.9, the
+.NET 10 SDK's compiler, which refuses an analyzer built on 0.4.x's 5.12 (CS9057). Off Windows, `StartDetached` is dropped,
 so children stay in the adapter's session; only Windows is tested.
 
 ## Package and install

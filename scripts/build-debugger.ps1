@@ -2,8 +2,8 @@
 # debugger-port/net10.patch, publishes.
 #   powershell -File scripts/build-debugger.ps1 [-Commit <sha>] [-Runtime win-x64]
 param(
-    # Passenger 0.3.4 (2026-11-13): the patch is made against it.
-    [string]$Commit = '57899da7dcde7a5ebd84763849d97dc8b915f1e1',
+    # Passenger 0.4.3 (2026-11-23): the patch is made against it.
+    [string]$Commit = '6ee2acdc1b77444ff057b1a9d5362abaf4f343ef',
     [string]$Runtime = 'win-x64'
 )
 $ErrorActionPreference = 'Stop'
