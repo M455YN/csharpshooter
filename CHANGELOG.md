@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - F5, Ctrl+F5 and the start button ask before starting the startup project again while it runs (under the debugger, still building, or run without it): *Zatrzymaj i uruchom ponownie*, *Zatrzymaj*, *Nie pytaj ponownie* or Cancel, as Passenger 0.4.2 asks (#2023); `csharpShooter.askBeforeRerun` turns the question off.
+- NuGet — rozwiązanie offers the fix of a vulnerable package, a transitive one too: its pane names the lowest stable version with no known vulnerability, picks it, ticks the projects that have a vulnerable version and *Zainstaluj {0}* puts it in them, as Passenger 0.4.1 does (#1793).
 - Hot Reload tells the program's `MetadataUpdateHandler`s which types each update changed (`ClearCache` and `UpdateApplication` are given them, where they were given `null`, any type), as Passenger 0.4.0 does (#1534), so a framework clears only what the edit touched.
 
 ### Changed

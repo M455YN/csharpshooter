@@ -688,6 +688,14 @@ node test/call-hierarchy-suite.js /path/to/empty/folder
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/call-hierarchy-suite.js node test/runTest.js
 ```
 
+The NuGet fix checks (`test/nuget-fix-suite.js`: a vulnerable transitive package's fixed version, offered and installed)
+make a solution of their own:
+
+```bash
+node test/nuget-fix-suite.js /path/to/empty/folder
+EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/nuget-fix-suite.js node test/runTest.js
+```
+
 The `.sql` checks (`sql/test/split-suite.js`) need no SQL Server, only CSharpShooter SQL's `sqltools/`:
 
 ```bash

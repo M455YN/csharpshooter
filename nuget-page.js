@@ -77,6 +77,9 @@ const T = table({
   dependencies: 'Dependencies',
   noDependencies: 'No dependencies',
   vulnerabilities: 'Vulnerabilities detected ({0})',
+  fixedIn: 'Version {0} has no known vulnerabilities.',
+  fixTransitive: 'Install puts it in the projects that get it through other packages, in place of the vulnerable version.',
+  installFix: 'Install {0}',
   advisory: 'Advisory ({0} severity):',
   deprecatedVersion: 'This package version is deprecated.',
   deprecatedUse: 'This package version is deprecated. Use {0} instead.',
@@ -519,6 +522,10 @@ function registerNuGetPage(context, findSolution) {
         versions: versions.map((v) => ({ value: v, label: v === versions[0] && v.includes('-') ? `${T.latestPrerelease} ${v}` : v === stable ? `${T.latestStable} ${v}` : v })),
         chosen,
         advisories: advisories.map((a) => ({ ...a, label: T.advisory(T[a.severity]) })),
+        fix: (() => {
+          const fix = fixOf(pk);
+          return fix && advisories.length ? { version: fix.version, text: T.fixedIn(fix.version), more: fix.transitive ? T.fixTransitive : '', button: T.installFix(fix.version) } : null;
+        })(),
         deprecation: deprecation ? {
           text: deprecation.alternate ? T.deprecatedUse(deprecation.alternate.id) : T.deprecatedVersion,
           reason: reasonText(deprecation.reasons || []), message: deprecation.message || '', alternate: deprecation.alternate?.id || '',
@@ -539,7 +546,22 @@ function registerNuGetPage(context, findSolution) {
         showPreview: context.globalState.get('csharpShooter.nuget.showPreview', true),
       };
     };
+    /** The fix of a package installed at a vulnerable version, as Passenger 0.4.1 offers it (#1793): the lowest stable version
+     *  above every vulnerable one installed that the source knows no advisory of, and the projects that have a vulnerable
+     *  one (whether they reference it or get it through others). Undefined for a package with none, or none known yet. */
+    const fixOf = (pk) => {
+      const bad = pk ? vulnerableVersions(pk).sort(compareVersions) : [];
+      const info = pk && infoOf(pk.id);
+      if (!bad.length || !info) return undefined;
+      const version = Object.keys(info).filter((v) => !v.includes('-') && compareVersions(v, bad.at(-1)) > 0 && !(info[v].vulnerabilities || []).length)
+        .sort(compareVersions)[0];
+      if (!version) return undefined;
+      const projects = solutionProjects().filter((f) => [pk.projects.get(keyOf(f)), pk.transitive.get(keyOf(f))].some((v) => v && bad.includes(v.resolved)));
+      return { version, projects, transitive: projects.some((f) => !pk.projects.has(keyOf(f))) };
+    };
     const defaultVersion = (pk, versions, stable) => {
+      const fix = fixOf(pk);
+      if (fix && versions.includes(fix.version)) return fix.version;
       if (pk?.projects.size && view.tab !== 'updates') return installedVersions(pk).at(-1);
       return view.prerelease ? versions[0] : stable || versions[0];
     };
@@ -679,6 +701,12 @@ function registerNuGetPage(context, findSolution) {
       view.checked = new Set(isProject ? [target] : solutionProjects().filter((f) => pk?.projects.has(keyOf(f))));
       show();
       await Promise.all([fetchMeta([id]), fetchInfo(id)]);
+      // A vulnerable package: the projects that have a vulnerable version ticked, its fixed version picked.
+      const fix = !isProject && fixOf(pk);
+      if (fix && view.selected === id) {
+        view.checked = new Set(fix.projects);
+        view.version = fix.version;
+      }
       show();
       if (view.paneTab === 'readme') await loadReadme();
     };
@@ -934,6 +962,9 @@ function registerNuGetPage(context, findSolution) {
   document.addEventListener('error', (e) => { if (e.target.tagName === 'IMG' && e.target.dataset.fallback) { e.target.dataset.fallback = ''; e.target.src = DEFAULT_ICON; } }, true);
   // Links (a package's pages, a README's) open in the browser; a deprecation's alternate package is selected.
   document.addEventListener('click', (e) => {
+    // A vulnerable package's fix: its version installed in the projects ticked (those with a vulnerable one).
+    const fix = e.target.closest('button[data-fix]');
+    if (fix) return send({ type: 'install', version: fix.dataset.fix });
     const a = e.target.closest('a');
     if (!a) return;
     e.preventDefault();
@@ -964,7 +995,9 @@ function registerNuGetPage(context, findSolution) {
     }
     if (d.advisories.length) {
       h += '<div class="box"><b>' + esc(fill(T.vulnerabilities, d.advisories.length)) + '</b>'
-        + d.advisories.map((a) => '<div>' + esc(a.version) + ' – ' + esc(a.label) + ' <a data-url="' + esc(a.url) + '">' + esc(a.url) + '</a></div>').join('') + '</div>';
+        + d.advisories.map((a) => '<div>' + esc(a.version) + ' – ' + esc(a.label) + ' <a data-url="' + esc(a.url) + '">' + esc(a.url) + '</a></div>').join('')
+        + (d.fix ? '<div>' + esc(d.fix.text) + (d.fix.more ? ' ' + esc(d.fix.more) : '') + '</div><div><button data-fix="' + esc(d.fix.version) + '">' + esc(d.fix.button) + '</button></div>' : '')
+        + '</div>';
     }
     h += '<dl>';
     if (d.description) h += '<dt>' + esc(T.description) + '</dt><dd>' + esc(d.description) + '</dd>';
