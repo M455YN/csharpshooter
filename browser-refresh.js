@@ -12,6 +12,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { t, tn } = require('./l10n');
+const { toolEnv } = require('./tool-env');
 
 const MIDDLEWARE = 'Microsoft.AspNetCore.Watch.BrowserRefresh.dll';
 const PRIVATE_KEY = 'browser-tools-key.private.json';
@@ -478,7 +479,7 @@ class BrowserRefresh {
     const properties = own ? this.build.properties : this.build.properties.filter((p) => !/^-p:TargetFramework=/i.test(p));
     return new Promise((resolve) => {
       execFile('dotnet', ['msbuild', bundled, '-nologo', '-verbosity:quiet', '-target:GenerateComputedBuildStaticWebAssets;ResolveReferencedProjectsStaticWebAssets', ...properties],
-        { cwd: path.dirname(bundled), windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
+        { cwd: path.dirname(bundled), windowsHide: true, env: toolEnv(), maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
           if (error && held) {
             try {
               fs.writeFileSync(emptied, held);

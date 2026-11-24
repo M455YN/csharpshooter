@@ -9,6 +9,7 @@ const { execFile } = require('child_process');
 const { table, language } = require('./l10n');
 const ip = require('./item-properties');
 const { writeFileWhenFree } = require('./write-file');
+const { toolEnv } = require('./tool-env');
 
 // VS's own words for these (its Properties window), in English and Polish (l10n/pl.json).
 const T = table({
@@ -44,7 +45,7 @@ function registerPropertiesWindow(context, solutionView) {
     const cached = cache.get(project);
     if (cached?.mtime === mtime) return cached.items;
     const items = new Promise((resolve) => execFile('dotnet', ['msbuild', project, ...types.map((t) => `-getItem:${t}`)],
-      { cwd: path.dirname(project), windowsHide: true, maxBuffer: 64 << 20 }, (error, stdout) => {
+      { cwd: path.dirname(project), windowsHide: true, env: toolEnv(), maxBuffer: 64 << 20 }, (error, stdout) => {
         try { resolve(JSON.parse(stdout).Items || {}); } catch { resolve({}); }
       }));
     cache.set(project, { mtime, items });

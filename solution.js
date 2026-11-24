@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const { t, tn, n_ } = require('./l10n');
 const path = require('path');
 const fs = require('fs');
+const { telemetryOff, toolEnv } = require('./tool-env');
 
 const SOLUTION_FOLDER = '2150E333-8FDC-42A3-9474-1A3956D46DE8';
 // What VS leaves out of an SDK project's tree.
@@ -354,15 +355,15 @@ function publishDir(projectFile, configuration, profile, framework) {
   return new Promise((resolve) => {
     require('child_process').execFile('dotnet', ['msbuild', projectFile, '-getProperty:PublishDir', `-p:Configuration=${configuration}`, `-p:PublishProfile=${profile}`,
       ...(framework ? [`-p:TargetFramework=${framework}`] : [])],
-      { cwd: path.dirname(projectFile), windowsHide: true }, (error, stdout) => resolve(error ? undefined : path.resolve(path.dirname(projectFile), stdout.trim())));
+      { cwd: path.dirname(projectFile), windowsHide: true, env: toolEnv() }, (error, stdout) => resolve(error ? undefined : path.resolve(path.dirname(projectFile), stdout.trim())));
   });
 }
 
 /** A dotnet command in a task (a command line, or dotnet's arguments, each quoted for the shell); resolves with its exit
  *  code once it ends. */
 async function terminalTask(name, cmd, cwd, started = () => {}) {
-  const shell = typeof cmd === 'string' ? new vscode.ShellExecution(cmd, { cwd })
-    : new vscode.ShellExecution('dotnet', cmd.map((value) => ({ value, quoting: vscode.ShellQuoting.Strong })), { cwd });
+  const shell = typeof cmd === 'string' ? new vscode.ShellExecution(cmd, { cwd, env: telemetryOff() })
+    : new vscode.ShellExecution('dotnet', cmd.map((value) => ({ value, quoting: vscode.ShellQuoting.Strong })), { cwd, env: telemetryOff() });
   const execution = await vscode.tasks.executeTask(new vscode.Task({ type: 'shell', task: name }, vscode.TaskScope.Workspace, name, 'CSharpShooter', shell));
   started(execution);
   return new Promise((resolve) => {

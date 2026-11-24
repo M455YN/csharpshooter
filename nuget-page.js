@@ -15,6 +15,7 @@ const os = require('os');
 const { spawn, execFile } = require('child_process');
 const { readSolution } = require('./solution');
 const feeds = require('./nuget-feeds');
+const { toolEnv } = require('./tool-env');
 
 // Visual Studio's own words (NuGet.PackageManagement.UI's resources).
 const T = table({
@@ -148,7 +149,7 @@ function compareVersions(a, b) {
 /** dotnet list package's JSON for a solution or project, with these options; { problem } when dotnet says no JSON. */
 function listPackages(target, options) {
   return new Promise((resolve) => {
-    const dotnet = spawn('dotnet', ['list', target, 'package', '--format', 'json', ...options], { cwd: path.dirname(target), windowsHide: true });
+    const dotnet = spawn('dotnet', ['list', target, 'package', '--format', 'json', ...options], { cwd: path.dirname(target), windowsHide: true, env: toolEnv() });
     let out = '';
     dotnet.stdout.on('data', (d) => (out += d));
     dotnet.stderr.on('data', (d) => (out += d));
@@ -277,7 +278,7 @@ function readAssets(projectFiles) {
 }
 
 /** dotnet restore of the solution, out of sight, before its assets are read. */
-const restoreQuietly = (target) => new Promise((resolve) => execFile('dotnet', ['restore', target], { cwd: path.dirname(target), windowsHide: true, maxBuffer: 16 << 20 }, resolve));
+const restoreQuietly = (target) => new Promise((resolve) => execFile('dotnet', ['restore', target], { cwd: path.dirname(target), windowsHide: true, env: toolEnv(), maxBuffer: 16 << 20 }, resolve));
 
 const LOCKED = /being used by another process|używany przez inny proces/i;
 /** dotnet with these arguments in a task of its own, its output in the task's terminal and kept: { code, said }. Run
@@ -294,7 +295,7 @@ async function dotnetTask(name, args, cwd, onRetry = () => {}) {
         onDidClose: close.event,
         open() {
           write.fire(`> dotnet ${args.map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(' ')}\r\n`);
-          const child = spawn('dotnet', args, { cwd, windowsHide: true });
+          const child = spawn('dotnet', args, { cwd, windowsHide: true, env: toolEnv() });
           const out = (d) => {
             said += d;
             write.fire(String(d).replace(/\r?\n/g, '\r\n'));

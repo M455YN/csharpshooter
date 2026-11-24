@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
+const { toolEnv } = require('./tool-env');
 
 const builds = new Map(); // key -> { reads: Map(lower path -> stamp), made: [stamp], props }
 
@@ -144,7 +145,7 @@ function inputs(project) {
 /** The SDK a build in the project's folder runs under, as its global.json picks it. */
 function sdkVersion(project) {
   return new Promise((resolve) => {
-    execFile('dotnet', ['--version'], { cwd: path.dirname(project), windowsHide: true }, (error, stdout) => resolve(error ? null : stdout.trim()));
+    execFile('dotnet', ['--version'], { cwd: path.dirname(project), windowsHide: true, env: toolEnv() }, (error, stdout) => resolve(error ? null : stdout.trim()));
   });
 }
 

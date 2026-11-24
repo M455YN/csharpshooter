@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The .NET tools CSharpShooter runs for your code (builds, Clean, Publish, restores, `dotnet msbuild`'s questions, `dotnet new`, `dev-certs`, NuGet's lists and installs, test runs and the Testing Platform's) run with each tool's telemetry off: `DOTNET_CLI_TELEMETRY_OPTOUT`, `TESTINGPLATFORM_TELEMETRY_OPTOUT`, `AVALONIA_TELEMETRY_OPTOUT`, `DOTNET_SVCUTIL_TELEMETRY_OPTOUT`, `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` and `ASPIRE_CLI_TELEMETRY_OPTOUT`, unless you set one yourself (Passenger 0.4.3, #2159). Your own programs keep your environment as it is.
+
 ### Fixed
 
 - An HTTP environment's own value in `http-client.env.json` wins over `$shared` in `http-client.env.json.user`, as Visual Studio's documentation of `.http` files says (Passenger 0.4.3, #2151), where the `.user` file's `$shared` took its place.

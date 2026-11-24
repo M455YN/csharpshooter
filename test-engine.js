@@ -11,6 +11,7 @@ const path = require('path');
 const crypto = require('crypto');
 const readline = require('readline');
 const { execFile, spawn } = require('child_process');
+const { toolEnv } = require('./tool-env');
 
 const BRIDGE_DLL = 'CSharpShooter.TestBridge.dll';
 /** The bridge as it ships (testbridge/out, scripts/build-testbridge.ps1), or as `dotnet build -c Release` leaves it. */
@@ -51,7 +52,7 @@ function isTestProject(file) {
 }
 
 const runDotnet = (args, options) => new Promise((resolve) => execFile('dotnet', args,
-  { windowsHide: true, maxBuffer: 64 << 20, ...options }, (error, stdout, stderr) => resolve({ error, stdout, stderr })));
+  { windowsHide: true, env: toolEnv(), maxBuffer: 64 << 20, ...options }, (error, stdout, stderr) => resolve({ error, stdout, stderr })));
 
 /** The built assembly of a test project for a configuration (and framework), and whether it is a Testing Platform server
  *  (its ProjectCapability TestingPlatformServer, the capability Visual Studio looks at), from MSBuild. */
@@ -72,7 +73,7 @@ async function projectInfo(project, { configuration, platform }, framework) {
  *  ends the build. */
 function buildProject(project, args, { framework, started = () => {} } = {}, onOutput = () => {}) {
   return new Promise((resolve) => {
-    const child = spawn('dotnet', ['build', project, ...args, ...(framework ? ['-f', framework] : []), '--nologo'], { cwd: path.dirname(project), windowsHide: true });
+    const child = spawn('dotnet', ['build', project, ...args, ...(framework ? ['-f', framework] : []), '--nologo'], { cwd: path.dirname(project), windowsHide: true, env: toolEnv() });
     started(() => child.exitCode === null && kill(child.pid));
     child.stdout.on('data', (d) => onOutput(d.toString()));
     child.stderr.on('data', (d) => onOutput(d.toString()));
@@ -104,7 +105,7 @@ class VsTest {
     if (this.child) return;
     const bridge = bridgePath();
     if (!bridge) throw new Error('The test bridge is not built (testbridge/out): powershell -File scripts/build-testbridge.ps1');
-    const child = spawn('dotnet', [bridge], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn('dotnet', [bridge], { windowsHide: true, env: toolEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
     this.child = child;
     child.stderr.on('data', (d) => this.log('error', d.toString()));
     readline.createInterface({ input: child.stdout }).on('line', (line) => this.receive(line));
@@ -223,7 +224,7 @@ async function mtpHost(dll, { log = () => {}, attach } = {}) {
   const server = net.createServer();
   await new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
-  const child = spawn('dotnet', ['exec', dll, '--server', '--client-host', '127.0.0.1', '--client-port', String(port)], { cwd: path.dirname(dll), windowsHide: true });
+  const child = spawn('dotnet', ['exec', dll, '--server', '--client-host', '127.0.0.1', '--client-port', String(port)], { cwd: path.dirname(dll), windowsHide: true, env: toolEnv() });
   let said = '';
   const keep = (d) => { said = (said + d.toString()).slice(-4000); };
   child.stdout.on('data', keep);

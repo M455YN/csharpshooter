@@ -10,6 +10,7 @@ const { execFile } = require('child_process');
 const { t, n_ } = require('./l10n');
 const { readProject } = require('./solution');
 const { targetOf, namespaceFor, projectStyle } = require('./add-items');
+const { toolEnv } = require('./tool-env');
 
 /** A C# file in the project's style: its usings, then the namespace (file-scoped or a block) around the body. */
 function csharp(style, ns, body, usings = []) {
@@ -117,7 +118,7 @@ function freeName(dir, name) {
 }
 
 const dotnetNew = (args, cwd) => new Promise((resolve) => {
-  execFile('dotnet', ['new', ...args], { cwd, windowsHide: true, timeout: 120000 }, (e, out, err) => resolve({ ok: !e, said: `${out}${err}`.trim() }));
+  execFile('dotnet', ['new', ...args], { cwd, windowsHide: true, env: toolEnv(), timeout: 120000 }, (e, out, err) => resolve({ ok: !e, said: `${out}${err}`.trim() }));
 });
 
 /** The project's first http URL from its launch profiles, for an .http file's host. */

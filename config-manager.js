@@ -11,6 +11,7 @@ const { table } = require('./l10n');
 const config = require('./solution-config');
 const r = require('./property-rules');
 const { writeFileWhenFree } = require('./write-file');
+const { toolEnv } = require('./tool-env');
 
 // VS's own words for these (msenvui.dll), in English and Polish (l10n/pl.json).
 const T = table({
@@ -66,7 +67,7 @@ const lower = (list) => list.map((x) => x.toLowerCase().replace(/\s/g, ''));
 /** A project's own configurations and platforms, as MSBuild has them (Configurations, Platforms). */
 function projectLists(file) {
   return new Promise((resolve) => execFile('dotnet', ['msbuild', file, '-getProperty:Configurations', '-getProperty:Platforms'],
-    { cwd: path.dirname(file), windowsHide: true }, (error, stdout) => {
+    { cwd: path.dirname(file), windowsHide: true, env: toolEnv() }, (error, stdout) => {
       let p = {};
       try { p = JSON.parse(stdout).Properties || {}; } catch { /* a project MSBuild cannot read: VS's defaults */ }
       const split = (v, d) => (v || d).split(';').map((s) => s.trim()).filter(Boolean);

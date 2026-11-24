@@ -2,10 +2,11 @@
 // (Web Tools' AspNetSSLCertificateSvc): installed when there is none, then trusted once the person says yes; the check
 // runs once a window session. No VS Code API here, so test/dev-certs.js runs it on its own.
 const { execFile } = require('child_process');
+const { toolEnv } = require('./tool-env');
 
 /** dotnet dev-certs https <args>: its exit code (0 done, -1 when dotnet could not run). */
 const devCerts = (args) => new Promise((resolve) => {
-  execFile('dotnet', ['dev-certs', 'https', ...args], { windowsHide: true, timeout: 120000 },
+  execFile('dotnet', ['dev-certs', 'https', ...args], { windowsHide: true, env: toolEnv(), timeout: 120000 },
     (e) => resolve(!e ? 0 : typeof e.code === 'number' ? e.code : -1));
 });
 

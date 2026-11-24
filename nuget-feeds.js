@@ -6,8 +6,9 @@ const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
 const { execFile } = require('child_process');
+const { toolEnv } = require('./tool-env');
 
-const dotnet = (args, cwd) => new Promise((resolve) => execFile('dotnet', args, { cwd, windowsHide: true, maxBuffer: 16 << 20 }, (error, stdout) => resolve(error ? '' : stdout)));
+const dotnet = (args, cwd) => new Promise((resolve) => execFile('dotnet', args, { cwd, windowsHide: true, env: toolEnv(), maxBuffer: 16 << 20 }, (error, stdout) => resolve(error ? '' : stdout)));
 const isFolder = (source) => !/^https?:/i.test(source);
 const sameSource = (a, b) => (isFolder(a) && isFolder(b) ? path.resolve(a).replace(/[\\/]+$/, '').toLowerCase() === path.resolve(b).replace(/[\\/]+$/, '').toLowerCase() : a === b);
 

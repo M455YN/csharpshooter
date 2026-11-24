@@ -10,6 +10,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { table, language } = require('./l10n');
 const r = require('./property-rules');
+const { toolEnv } = require('./tool-env');
 
 const T = table({
   search: 'Search properties',
@@ -48,7 +49,7 @@ function designTimeCapabilities(p) {
 function evaluate(projectFile, names, settings) {
   const args = ['msbuild', projectFile, ...names.map((n) => `-getProperty:${n}`), ...ITEMS.map((i) => `-getItem:${i}`),
     ...(settings ? [`-p:Configuration=${settings.configuration}`, `-p:Platform=${settings.platform}`] : [])];
-  return new Promise((resolve, reject) => execFile('dotnet', args, { cwd: path.dirname(projectFile), windowsHide: true, maxBuffer: 32 << 20 }, (error, stdout, stderr) => {
+  return new Promise((resolve, reject) => execFile('dotnet', args, { cwd: path.dirname(projectFile), windowsHide: true, env: toolEnv(), maxBuffer: 32 << 20 }, (error, stdout, stderr) => {
     try {
       const json = JSON.parse(stdout);
       resolve({ properties: json.Properties || {}, items: json.Items || {} });

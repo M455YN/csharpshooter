@@ -13,6 +13,7 @@ const { buildArgs } = require('./startup');
 const upToDate = require('./up-to-date');
 const iisExpress = require('./iis-express');
 const devCerts = require('./dev-certs');
+const { toolEnv, telemetryOff } = require('./tool-env');
 
 const TYPE = 'csharpshooter';
 let log = () => {}; // the CSharpShooter output
@@ -62,7 +63,7 @@ function msbuildProperties(project, settings, framework) {
     execFile('dotnet', ['msbuild', project, '-getProperty:TargetPath', '-getProperty:RunCommand', '-getProperty:IntermediateOutputPath', '-getProperty:CleanFile', '-getProperty:AspNetCoreHostingModel',
       '-getProperty:MSBuildExtensionsPath', '-getProperty:UsingMicrosoftNETSdkWeb', '-getProperty:TargetFrameworkVersion', '-getItem:ProjectReference',
       ...globalProperties(settings, framework)],
-      { cwd: path.dirname(project), windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
+      { cwd: path.dirname(project), windowsHide: true, env: toolEnv(), maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
         if (error) return reject(new Error(`dotnet msbuild ${path.basename(project)}: ${stderr || stdout || error.message}`));
         try {
           const read = JSON.parse(stdout);
@@ -117,7 +118,7 @@ async function runBuild(project, settings, framework, progress, buildBindings) {
   const log = buildLog();
   const task = new vscode.Task({ type: 'shell', task: `build ${path.basename(project)}` }, vscode.TaskScope.Workspace,
     `build ${path.basename(project, '.csproj')}`, 'CSharpShooter',
-    new vscode.ShellExecution('dotnet', ['build', project, ...buildArgs(settings), ...(framework ? ['-f', framework] : []), { value: log.arg, quoting: vscode.ShellQuoting.Strong }], { cwd: path.dirname(project) }), '$msCompile');
+    new vscode.ShellExecution('dotnet', ['build', project, ...buildArgs(settings), ...(framework ? ['-f', framework] : []), { value: log.arg, quoting: vscode.ShellQuoting.Strong }], { cwd: path.dirname(project), env: telemetryOff() }), '$msCompile');
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Silent, panel: vscode.TaskPanelKind.Dedicated, clear: true };
   const following = followBuildLog(log.file, progress.report);
   const execution = await vscode.tasks.executeTask(task);
