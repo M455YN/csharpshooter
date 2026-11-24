@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- F5, Ctrl+F5 and the start button ask before starting the startup project again while it runs (under the debugger, still building, or run without it): *Zatrzymaj i uruchom ponownie*, *Zatrzymaj*, *Nie pytaj ponownie* or Cancel, as Passenger 0.4.2 asks (#2023); `csharpShooter.askBeforeRerun` turns the question off.
+
 ### Changed
 
 - The .NET tools CSharpShooter runs for your code (builds, Clean, Publish, restores, `dotnet msbuild`'s questions, `dotnet new`, `dev-certs`, NuGet's lists and installs, test runs and the Testing Platform's) run with each tool's telemetry off: `DOTNET_CLI_TELEMETRY_OPTOUT`, `TESTINGPLATFORM_TELEMETRY_OPTOUT`, `AVALONIA_TELEMETRY_OPTOUT`, `DOTNET_SVCUTIL_TELEMETRY_OPTOUT`, `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` and `ASPIRE_CLI_TELEMETRY_OPTOUT`, unless you set one yourself (Passenger 0.4.3, #2159). Your own programs keep your environment as it is.

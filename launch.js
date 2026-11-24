@@ -301,7 +301,7 @@ class LaunchProfiles {
     // Ctrl+F5, as VS's Start Without Debugging: the program in a terminal of its own, no debugger, the browser as F5's.
     if (config.noDebug) {
       handOver();
-      await runWithoutDebugging(resolved, this.state, progress);
+      await runWithoutDebugging({ ...resolved, __key: project.toLowerCase() }, this.state, progress);
       return undefined;
     }
     // Hot Reload's update handlers' hook and, for a web app, the SDK's browser refresh, loaded into the program
@@ -372,7 +372,7 @@ class LaunchProfiles {
     this.state.programs.set(project.toLowerCase(), program);
     if (config.noDebug) {
       handOver();
-      state.lastRunWithoutDebugging = { name: label, execution };
+      state.lastRunWithoutDebugging = { name: label, execution, key: project.toLowerCase() };
       try {
         await openWhenListening(browser, execution, state, progress);
       } finally {
@@ -462,7 +462,7 @@ async function startWithoutDebugging(config, state, progress) {
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, clear: true };
   task.isBackground = true;
   const execution = await vscode.tasks.executeTask(task);
-  state.lastRunWithoutDebugging = { name: label, execution };
+  state.lastRunWithoutDebugging = { name: label, execution, key: config.__key };
   await openWhenListening(config.__browser, execution, state, progress);
 }
 
@@ -657,7 +657,36 @@ function registerLaunch(context, output) {
       return vscode.debug.startDebugging(folder, configurationFor(item.file, name ?? null));
     }),
   );
-  return { provider, state, running, onDidChangeRunning: state.changed.event, runnableProfiles, runnableProjects };
+  // The startup project's own run, for the question before starting it again (Passenger 0.4.2's #2023): a debug session
+  // of it, a start of it still building, or its run without the debugger.
+  const sameProject = (s, key) => !!s.configuration.project && path.resolve(s.configuration.project).toLowerCase() === key;
+  const runWithout = (key) => state.lastRunWithoutDebugging?.key === key && vscode.tasks.taskExecutions.includes(state.lastRunWithoutDebugging.execution);
+  const runningProject = (project) => {
+    const key = path.resolve(project).toLowerCase();
+    return [...state.sessions].some((s) => sameProject(s, key)) || !!state.starting?.has(key) || runWithout(key);
+  };
+  /** Stops the project's run: its debug sessions, a start of it still building, its run without the debugger. */
+  const stopProject = async (project) => {
+    const key = path.resolve(project).toLowerCase();
+    const run = state.starting?.get(key);
+    if (run) {
+      run.progress.cancel();
+      await run.finished;
+    }
+    for (const session of [...state.sessions].filter((s) => sameProject(s, key))) {
+      const ended = new Promise((r) => { const d = vscode.debug.onDidTerminateDebugSession((s) => s.id === session.id && (d.dispose(), r())); });
+      await vscode.debug.stopDebugging(session);
+      await Promise.race([ended, new Promise((r) => setTimeout(r, 15000))]);
+    }
+    if (runWithout(key)) {
+      const { execution } = state.lastRunWithoutDebugging;
+      const ended = new Promise((r) => { const d = vscode.tasks.onDidEndTask((e) => e.execution === execution && (d.dispose(), r())); });
+      execution.terminate();
+      await Promise.race([ended, new Promise((r) => setTimeout(r, 15000))]);
+    }
+    state.changed.fire();
+  };
+  return { provider, state, running, runningProject, stopProject, onDidChangeRunning: state.changed.event, runnableProfiles, runnableProjects };
 }
 
 /** A Build or Rebuild made outside a start (the Solution Explorer's): its projects checked before it and, once it succeeds,

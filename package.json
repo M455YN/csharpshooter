@@ -108,6 +108,11 @@
           ],
           "description": "%config.launchProfilesInLaunchJson%"
         },
+        "csharpShooter.askBeforeRerun": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.askBeforeRerun%"
+        },
         "csharpShooter.solutionSearch.fileContents": {
           "type": "boolean",
           "default": false,

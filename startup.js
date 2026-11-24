@@ -27,6 +27,10 @@ const T = table({
   restart: 'Restart',
   saveAll: 'Save All',
   configurationManager: 'Configuration Manager...',
+  alreadyRunning: '{0} is already running.',
+  stopAndRerun: 'Stop and Rerun',
+  stop: 'Stop',
+  dontAskAgain: "Don't Ask Again",
 });
 
 const projectName = (file) => path.basename(file, path.extname(file));
@@ -285,6 +289,22 @@ function registerStartup(context, findSolution, launch) {
     // F5 / Ctrl+F5 come here (VS's: the startup project, whatever Run and Debug has selected); with no .NET project to
     // start, they do what VS Code's own do.
     if (!now) return vscode.commands.executeCommand(noDebug ? 'workbench.action.debug.run' : 'workbench.action.debug.start');
+    // The startup project already running (under the debugger, still building, or run without it): asked first, as
+    // Passenger asks (Stop and Rerun, Stop, Cancel; Don't Ask Again, or csharpShooter.askBeforeRerun, turns it off).
+    if (launch.runningProject?.(now.project)) {
+      const ask = vscode.workspace.getConfiguration('csharpShooter').get('askBeforeRerun', true);
+      let choice = T.stopAndRerun;
+      if (ask) {
+        choice = await vscode.window.showWarningMessage(T.alreadyRunning.replace('{0}', projectName(now.project)), { modal: true }, T.stopAndRerun, T.stop, T.dontAskAgain);
+        if (choice === T.dontAskAgain) {
+          await vscode.workspace.getConfiguration('csharpShooter').update('askBeforeRerun', false, vscode.ConfigurationTarget.Global);
+          choice = T.stopAndRerun;
+        }
+      }
+      if (!choice) return false;
+      await launch.stopProject(now.project);
+      if (choice === T.stop) return false;
+    }
     return vscode.debug.startDebugging(folderOf(now.project), startupEntry(), { noDebug });
   };
 
