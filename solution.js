@@ -364,11 +364,11 @@ function publishDir(projectFile, configuration, profile, framework) {
 
 /** A dotnet command in a task (a command line, or dotnet's arguments, each quoted for the shell); resolves with its exit
  *  code once it ends. */
-async function terminalTask(name, cmd, cwd, started = () => {}) {
-  const shell = typeof cmd === 'string' ? new vscode.ShellExecution(cmd, { cwd, env: telemetryOff() })
-    : new vscode.ShellExecution('dotnet', cmd.map((value) => ({ value, quoting: vscode.ShellQuoting.Strong })), { cwd, env: telemetryOff() });
+async function terminalTask(name, cmd, cwd, started = () => {}, env = {}) {
+  const shell = typeof cmd === 'string' ? new vscode.ShellExecution(cmd, { cwd, env: { ...telemetryOff(), ...env } })
+    : new vscode.ShellExecution('dotnet', cmd.map((value) => ({ value, quoting: vscode.ShellQuoting.Strong })), { cwd, env: { ...telemetryOff(), ...env } });
   const execution = await vscode.tasks.executeTask(new vscode.Task({ type: 'shell', task: name }, vscode.TaskScope.Workspace, name, 'CSharpShooter', shell));
-  started(execution);
+  started?.(execution);
   return new Promise((resolve) => {
     const done = vscode.tasks.onDidEndTaskProcess((e) => e.execution === execution && (done.dispose(), resolve(e.exitCode)));
   });

@@ -15,6 +15,7 @@ const { registerPropertiesPage } = require('./properties-page');
 const { registerConfigurationManager } = require('./config-manager');
 const { registerPropertiesWindow, projectOf } = require('./properties-window');
 const { registerNuGetPage } = require('./nuget-page');
+const { registerMigrations } = require('./migrations');
 const { registerLaunch } = require('./launch');
 const { registerCompat } = require('./compat');
 const { registerTaskRunner } = require('./task-runner');
@@ -435,6 +436,7 @@ async function activate(context) {
   registerCompat(context, output, launch.provider);
   const taskRunner = registerTaskRunner(context, findSolution);
   const startup = registerStartup(context, findSolution, launch);
+  const migrations = registerMigrations(context, findSolution, startup.startup);
   const testExplorer = registerTestExplorer(context, findSolution, startup.startup);
   launch.provider.startup = startup.startup;
   // While the solution loads (its Razor views included), a start or a test run waits for it: what loads, else ''.
@@ -462,7 +464,7 @@ async function activate(context) {
   startup.startup.onDidChange(markStartup);
   markStartup();
   await startServer(context);
-  return { whenReady: () => ready, httpFiles, hotReload, refactorings, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, extensionPath: context.extensionPath };
+  return { whenReady: () => ready, httpFiles, hotReload, refactorings, loading: () => loading, solutionView, launch, taskRunner, testExplorer, startup, searchEverywhere, dataVisualizer, publishPage, propertiesPage, propertiesWindow, configurationManager, nugetPage, migrations, extensionPath: context.extensionPath };
 }
 
 async function deactivate() {

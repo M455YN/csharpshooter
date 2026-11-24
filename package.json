@@ -279,6 +279,10 @@
       {
         "id": "csharpShooter.refactor",
         "label": "%submenu.refactor%"
+      },
+      {
+        "id": "csharpShooter.ef",
+        "label": "%submenu.ef%"
       }
     ],
     "commands": [
@@ -545,6 +549,31 @@
         "command": "csharpShooter.solution.manageNuGet",
         "title": "%command.solution.manageNuGet%",
         "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.ef.addMigration",
+        "title": "%command.ef.addMigration%",
+        "category": "%category.ef%"
+      },
+      {
+        "command": "csharpShooter.ef.updateDatabase",
+        "title": "%command.ef.updateDatabase%",
+        "category": "%category.ef%"
+      },
+      {
+        "command": "csharpShooter.ef.removeMigration",
+        "title": "%command.ef.removeMigration%",
+        "category": "%category.ef%"
+      },
+      {
+        "command": "csharpShooter.ef.script",
+        "title": "%command.ef.script%",
+        "category": "%category.ef%"
+      },
+      {
+        "command": "csharpShooter.ef.environment",
+        "title": "%command.ef.environment%",
+        "category": "%category.ef%"
       },
       {
         "command": "csharpShooter.solution.manageNuGetSolution",
@@ -840,6 +869,11 @@
           "command": "csharpShooter.solution.manageNuGet",
           "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
           "group": "2_edit@2"
+        },
+        {
+          "submenu": "csharpShooter.ef",
+          "when": "view == csharpShooter.solution && viewItem =~ /^project( |$)/",
+          "group": "2_edit@3"
         },
         {
           "command": "csharpShooter.solution.openInTerminal",
@@ -1183,6 +1217,28 @@
           "submenu": "csharpShooter.refactor",
           "when": "editorLangId == csharp",
           "group": "1_modification@9"
+        }
+      ],
+      "csharpShooter.ef": [
+        {
+          "command": "csharpShooter.ef.addMigration",
+          "group": "1_migrations@1"
+        },
+        {
+          "command": "csharpShooter.ef.removeMigration",
+          "group": "1_migrations@2"
+        },
+        {
+          "command": "csharpShooter.ef.updateDatabase",
+          "group": "2_database@1"
+        },
+        {
+          "command": "csharpShooter.ef.script",
+          "group": "2_database@2"
+        },
+        {
+          "command": "csharpShooter.ef.environment",
+          "group": "3_environment@1"
         }
       ],
       "csharpShooter.refactor": [

@@ -652,6 +652,19 @@ value not in its `enum` or not matching its `pattern`, a member a closed object 
 options hold, a `oneOf` matching none or more than one. Schemas that refer to themselves (a tree's `children`) are checked
 as deep as the body goes.
 
+## Entity Framework Core migrations
+
+A project's context menu in the Solution Explorer has *Entity Framework Core* (and the command palette its commands), as
+Passenger's Migrations window has them, through the EF Core tools (`dotnet ef`, a global tool or one in the folder's tool
+manifest; missing, *Zainstaluj dotnet-ef* installs it): *Dodaj migrację...* (its name, then its folder, remembered for
+each context: `Migrations/Postgres`, `Migrations/SqlServer`), *Usuń ostatnią migrację* (undone in the database first
+where it was applied), *Aktualizuj bazę danych...* (the latest, a migration listed newest first, or `0`) and *Wygeneruj
+skrypt SQL* (idempotent, or from an empty database, which SQLite needs; opened in an editor). Each runs on a project that
+declares a `DbContext` (picked from the solution's from the palette), with the solution's startup project as the startup
+project and the context asked for where a project has several, in a terminal task, in the environment *Środowisko
+migracji...* chooses (Development, Staging, Production or your own, as `ASPNETCORE_ENVIRONMENT` and
+`DOTNET_ENVIRONMENT`).
+
 ## SQL
 
 SQL is [CSharpShooter SQL](sql/README.md)'s, CSharpShooter's add-on built from `sql/` (SQL Tools Service would double
@@ -694,6 +707,14 @@ make a solution of their own:
 ```bash
 node test/nuget-fix-suite.js /path/to/empty/folder
 EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/nuget-fix-suite.js node test/runTest.js
+```
+
+The migrations checks (`test/migrations-suite.js`) make a console app with a SQLite `DbContext` and the EF Core tools in
+its tool manifest (restoring their packages):
+
+```bash
+node test/migrations-suite.js /path/to/empty/folder
+EDITOR_EXE=/path/to/VSCodium.exe WORKSPACE=/path/to/empty/folder SUITE=test/migrations-suite.js node test/runTest.js
 ```
 
 The `.sql` checks (`sql/test/split-suite.js`) need no SQL Server, only CSharpShooter SQL's `sqltools/`:
