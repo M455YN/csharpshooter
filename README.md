@@ -58,7 +58,8 @@ npm run build-roslyn-extension
 Hot Reload's startup hook that runs the program's `MetadataUpdateHandler`s after an update (`update-handlers/`,
 Passenger's `Passenger.UpdateHandlers` as of 0.3.4, its socket a loopback TCP one, for .NET 8 and later: connected, its
 key said and its own calls made once before the program's `Main`, so a stop between updates finds its thread waiting in a
-read):
+read; with 0.4.0's changed types, #1534: each handler is given the types the update changed, named by their module and
+token before each `updated` line):
 
 ```bash
 npm run build-update-handlers

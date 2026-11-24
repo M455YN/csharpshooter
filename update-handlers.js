@@ -77,15 +77,17 @@ class UpdateHandlerHook {
     return !!this.socket;
   }
 
-  /** Tells the hook the debugger applied an update; resolves to the handlers' failures once they ran, or undefined when the
-   *  hook is not connected or did not answer within `wait` ms (a paused program runs them as it goes on). */
-  updated(wait = 2000) {
+  /** Tells the hook the debugger applied an update, first naming each type it changed ({ module, token }: its module's
+   *  identity and metadata token), which the handlers are given (none named: every type may have changed); resolves to
+   *  the handlers' failures once they ran, or undefined when the hook is not connected or did not answer within `wait`
+   *  ms (a paused program runs them as it goes on). */
+  updated(wait = 2000, types = []) {
     if (!this.socket) return Promise.resolve(undefined);
     return new Promise((resolve) => {
       const entry = { failures: [], resolve };
       this.waiting.push(entry);
       setTimeout(() => resolve(undefined), wait).unref?.();
-      this.socket.write('updated\n');
+      this.socket.write(`${types.map((t) => typeLine(t.module, t.token)).join('')}updated\n`);
     });
   }
 
@@ -96,4 +98,7 @@ class UpdateHandlerHook {
   }
 }
 
-module.exports = { prepareUpdateHandlers, hookPath };
+/** A changed type's line to the hook (Wire.TypeLine): "type <module guid> <token as 8 hex digits>". */
+const typeLine = (module, token) => `type ${String(module).toLowerCase()} ${(token >>> 0).toString(16).toUpperCase().padStart(8, '0')}\n`;
+
+module.exports = { prepareUpdateHandlers, hookPath, typeLine };

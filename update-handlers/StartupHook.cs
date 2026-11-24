@@ -17,7 +17,7 @@ internal static class StartupHook
     /// debugger holds the program counted too: past it the program goes on, the thread reaching its read on its own.</summary>
     private const long StartLimitMilliseconds = 2000;
 
-    /// <summary>The longest line read: CSharpShooter's are a word long, and a longer one is passed over.</summary>
+    /// <summary>The longest line read: each of CSharpShooter's names a type or ends an update, and a longer one is passed over.</summary>
     private const int LongestLine = 256;
 
     /// <summary>Whether the thread has come to its first read, written by it with nothing of .NET's left to run before it.</summary>
@@ -82,6 +82,7 @@ internal static class StartupHook
         using Socket open = socket;
         byte[] updated = Encoding.ASCII.GetBytes(Wire.Updated);
         byte[] buffer = new byte[LongestLine];
+        ChangedTypes changes = new();
         Ready(open, buffer, updated);
         Volatile.Write(ref reading, true);
         int kept = 0;
@@ -97,9 +98,19 @@ internal static class StartupHook
                 {
                     continue;
                 }
-                if (!passing && Says(buffer, start, end - start, updated) && !Answer(open, Handlers.Run()))
+                if (!passing)
                 {
-                    return;
+                    if (Says(buffer, start, end - start, updated))
+                    {
+                        if (!Answer(open, Handlers.Run(changes.Take(AppDomain.CurrentDomain.GetAssemblies()))))
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        changes.Add(Encoding.ASCII.GetString(buffer, start, end - start));
+                    }
                 }
                 passing = false;
                 start = end + 1;
@@ -124,7 +135,9 @@ internal static class StartupHook
         Says(updated, 0, updated.Length, updated);
         Line(Wire.Failed + "a\nb");
         Send(open, []);
-        Handlers.Run([typeof(StartupHook).Assembly]);
+        ChangedTypes changes = new();
+        changes.Add(Wire.TypeLine(typeof(StartupHook).Module.ModuleVersionId, typeof(StartupHook).MetadataToken));
+        Handlers.Run([typeof(StartupHook).Assembly], changes.Take([typeof(StartupHook).Assembly]));
         Answer(open, [], done: false);
         Array.Copy(buffer, 0, buffer, 0, 0);
     }

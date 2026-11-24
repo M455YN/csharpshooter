@@ -136,7 +136,9 @@ function registerHotReload(context, server) {
       // A view's C# is generated, in no file of its own: the files saved name what was applied.
       const files = [...new Set([...emitted.changedDocuments, ...hr.saved])];
       hr.saved.clear();
-      return { result: 'applied', said: t('Changes applied: {0}', files.map((f) => path.basename(f)).join(', ')), problems: emitted.problems, files };
+      // The types it changed, for the program's update handlers (Passenger's #1534).
+      const types = emitted.updates.flatMap((u) => (u.updatedTypes || []).map((token) => ({ module: u.module, token })));
+      return { result: 'applied', said: t('Changes applied: {0}', files.map((f) => path.basename(f)).join(', ')), problems: emitted.problems, files, types };
     } finally {
       if (state.held) await Promise.resolve(debug.customRequest('hotReloadRelease')).catch(() => {});
     }
@@ -146,7 +148,7 @@ function registerHotReload(context, server) {
    *  rendered again), then its pages are refreshed. A program paused at a breakpoint runs its handlers as it goes on. */
   async function applied(hr, outcome) {
     if (outcome.result !== 'applied') return outcome;
-    const handlers = await hr.handlers?.updated(hr.paused ? 0 : 2000);
+    const handlers = await hr.handlers?.updated(hr.paused ? 0 : 2000, outcome.types);
     const pages = hr.browser?.updated();
     return { ...outcome, handlers, pages };
   }
