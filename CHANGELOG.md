@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Delete in the Solution Explorer names the nested files that go with a file (`Form1.Designer.cs` and `Form1.resx`, `Counter.razor.cs` and `Counter.razor.css`) in its question (Passenger 0.4.3, #2144), and a form's or user control's `Form1.resx` nests under `Form1.cs` beside its `Form1.Designer.cs`, as Visual Studio nests it, so it goes with it.
 - An HTTP environment's own value in `http-client.env.json` wins over `$shared` in `http-client.env.json.user`, as Visual Studio's documentation of `.http` files says (Passenger 0.4.3, #2151), where the `.user` file's `$shared` took its place.
 
 ### Changed

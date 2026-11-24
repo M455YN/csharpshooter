@@ -650,6 +650,7 @@
   "No": "Nie",
   "\"{0}\" will be deleted.": "Element „{0}” zostanie usunięty.",
   "The selected items will be deleted.": "Wybrane elementy zostaną usunięte.",
+  "With it go its nested files: {0}.": "Razem z nim zostaną usunięte pliki zagnieżdżone: {0}.",
   "You can restore it from the Recycle Bin.": "Można go przywrócić z Kosza.",
   "Cannot move '{0}'. The destination folder is the same as the source folder.": "Nie można przenieść elementu „{0}”. Folder docelowy jest taki sam jak folder źródłowy.",
   "Cannot move '{0}'. The destination folder is a subfolder of the source folder.": "Nie można przenieść elementu „{0}”. Folder docelowy jest podfolderem folderu źródłowego.",

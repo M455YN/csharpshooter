@@ -118,8 +118,11 @@ function registerItemEditing(context, getView, reveal) {
     if (!list.length) return false;
     const ok = t('OK');
     const said = list.length === 1 ? t('"{0}" will be deleted.', path.basename(list[0].resourceUri.fsPath)) : t('The selected items will be deleted.');
+    // The files nested under a file go with it (Form1.Designer.cs and Form1.resx, Counter.razor.cs and .css), said here.
+    const nested = list.flatMap((i) => withNested(i).slice(1)).filter(exists).map((p) => path.basename(p));
+    const detail = [nested.length ? t('With it go its nested files: {0}.', nested.join(', ')) : '', t('You can restore it from the Recycle Bin.')].filter(Boolean).join('\n');
     // Into the Recycle Bin, as VS Code's Explorer deletes (VS deletes for good): a slip can be taken back.
-    if ((await vscode.window.showWarningMessage(said, { modal: true, detail: t('You can restore it from the Recycle Bin.') }, ok)) !== ok) return false;
+    if ((await vscode.window.showWarningMessage(said, { modal: true, detail }, ok)) !== ok) return false;
     for (const i of list) {
       for (const p of withNested(i)) if (exists(p)) await vscode.workspace.fs.delete(vscode.Uri.file(p), { recursive: true, useTrash: true });
     }

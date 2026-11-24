@@ -66,7 +66,8 @@ function readProject(file) {
 }
 
 /** Which file each file nests under, as VS nests them: Foo.cshtml.cs under Foo.cshtml, appsettings.Development.json
- *  under appsettings.json, jquery.min.js under jquery.js, Resources.Designer.cs under Resources.resx. */
+ *  under appsettings.json, jquery.min.js under jquery.js, Resources.Designer.cs under Resources.resx, Form1.Designer.cs
+ *  and Form1.resx under Form1.cs. */
 function nestingParents(names) {
   const set = new Set(names.map((n) => n.toLowerCase()));
   const byLower = new Map(names.map((n) => [n.toLowerCase(), n]));
@@ -78,6 +79,8 @@ function nestingParents(names) {
       lower.slice(0, -ext.length), // Foo.cshtml.cs -> Foo.cshtml, site.css.map -> site.css
       lower.replace(/\.[^.]+(\.[^.]+)$/, '$1'), // appsettings.Development.json -> appsettings.json, x.min.js -> x.js
       lower.replace(/\.designer\.cs$/, '.resx'),
+      // A form's or a user control's Form1.resx under Form1.cs, beside its Form1.Designer.cs, as VS nests it.
+      set.has(lower.replace(/\.resx$/, '.designer.cs')) ? lower.replace(/\.resx$/, '.cs') : lower,
     ];
     const parent = candidates.find((c) => c !== lower && path.extname(c) && set.has(c));
     if (parent) parents.set(name, byLower.get(parent));
