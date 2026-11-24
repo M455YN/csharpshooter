@@ -1884,6 +1884,9 @@
         "*.cshtml": "aspnetcorerazor",
         "*.razor": "aspnetcorerazor"
       },
+      "[csharp]": {
+        "editor.formatOnType": true
+      },
       "[aspnetcorerazor]": {
         "editor.quickSuggestions": {
           "other": "on",

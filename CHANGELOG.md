@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- C# formats as you type: the `;` that ends a statement and the `}` that closes a block lay out what they end, your `.editorconfig` included, as Passenger 0.4.1 does (#1987); `editor.formatOnType` is on for `[csharp]` by default, and one Ctrl+Z takes a layout back. Turn it off under `[csharp]` in your settings.
 - The .NET tools CSharpShooter runs for your code (builds, Clean, Publish, restores, `dotnet msbuild`'s questions, `dotnet new`, `dev-certs`, NuGet's lists and installs, test runs and the Testing Platform's) run with each tool's telemetry off: `DOTNET_CLI_TELEMETRY_OPTOUT`, `TESTINGPLATFORM_TELEMETRY_OPTOUT`, `AVALONIA_TELEMETRY_OPTOUT`, `DOTNET_SVCUTIL_TELEMETRY_OPTOUT`, `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` and `ASPIRE_CLI_TELEMETRY_OPTOUT`, unless you set one yourself (Passenger 0.4.3, #2159). Your own programs keep your environment as it is.
 
 ### Fixed
