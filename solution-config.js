@@ -49,11 +49,20 @@ function expected(solution, project) {
   return cells;
 }
 
+// A .slnf's JSON, the byte order mark Visual Studio writes left out.
+const readFilter = (file) => JSON.parse(fs.readFileSync(file, 'utf8').trim()); // trim() takes U+FEFF too
+
+/** The solution a solution filter (.slnf) is of, as its "solution.path" names it; any other file is itself. */
+function baseSolution(file) {
+  if (!/\.slnf$/i.test(file)) return file;
+  return path.resolve(path.dirname(file), readFilter(file).solution.path);
+}
+
 /** The solution's model: its file, format, build types and platforms in their order, and each configurable project with
  *  its cells (key(buildType, platform) -> { buildType, platform, build, deploy }). */
 function read(of) {
   // a solution filter (.slnf) builds with its solution's configurations, kept in that file
-  const file = require('./solution').baseSolution(of);
+  const file = baseSolution(of);
   const text = fs.readFileSync(file, 'utf8');
   const dir = path.dirname(file);
   if (/\.slnx$/i.test(file)) {
@@ -332,4 +341,4 @@ function conditionedGroups(text, dimension, from, to, mode) {
   });
 }
 
-module.exports = { read, write, rulesOf, expected, addSolution, removeSolution, renameSolution, renameProject, conditionedGroups, canonical, samePlatform, key };
+module.exports = { read, write, readFilter, baseSolution, rulesOf, expected, addSolution, removeSolution, renameSolution, renameProject, conditionedGroups, canonical, samePlatform, key };

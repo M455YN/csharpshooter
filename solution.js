@@ -10,14 +10,7 @@ const SOLUTION_FOLDER = '2150E333-8FDC-42A3-9474-1A3956D46DE8';
 // What VS leaves out of an SDK project's tree.
 const HIDDEN_DIRS = new Set(['bin', 'obj', 'node_modules', '.vs', '.git']);
 const isHiddenFile = (name) => name.endsWith('.user') || name.startsWith('.');
-// A .slnf's JSON, the byte order mark Visual Studio writes left out.
-const readFilter = (file) => JSON.parse(fs.readFileSync(file, 'utf8').trim()); // trim() takes U+FEFF too
-
-/** The solution a solution filter (.slnf) is of, as its "solution.path" names it; any other file is itself. */
-function baseSolution(file) {
-  if (!/\.slnf$/i.test(file)) return file;
-  return path.resolve(path.dirname(file), readFilter(file).solution.path);
-}
+const { readFilter, baseSolution } = require('./solution-config');
 
 /** Projects and solution folders of a .sln or .slnx, as a tree: { name, folders: [...], projects: [path] }. A solution
  *  filter (.slnf) gives its solution's tree with only the projects it lists, as Visual Studio loads it. */

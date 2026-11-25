@@ -39,7 +39,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 /** The project VS has as startup in its .suo: the GUID after "StartupProject=" (UTF-16 in the binary), matched to the
  *  .sln's project of that GUID. Null when there is no .suo, no such entry or no .sln line for it (an .slnx has no GUIDs). */
 function startupFromSuo(of) {
-  const solution = require('./solution').baseSolution(of); // a filter's startup project is its solution's
+  const solution = require('./solution-config').baseSolution(of); // a filter's startup project is its solution's
   const name = path.basename(solution, path.extname(solution));
   const vsDir = path.join(path.dirname(solution), '.vs', name);
   let suo;
