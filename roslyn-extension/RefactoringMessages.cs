@@ -130,6 +130,29 @@ public sealed record Hierarchy(
     [property: JsonPropertyName("bases")] IReadOnlyList<Member> Bases,
     [property: JsonPropertyName("derived")] IReadOnlyList<Member> Derived);
 
+/// <summary>The member of a class whose name the caret is on, by its name, and the interfaces in the solution the class
+/// implements that could declare it but do not, which Pull Members Up could declare it in; no member where the caret is on
+/// none.</summary>
+public sealed record MemberPull(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("member")] Member? Member,
+    [property: JsonPropertyName("interfaces")] IReadOnlyList<Member> Interfaces)
+{
+    public static readonly MemberPull None = new(string.Empty, string.Empty, null, []);
+}
+
+/// <summary>What Safe Delete would take out for the symbol at the caret (its declaration or a use of it): its name and
+/// kind ("method", "field"), the file and the one edit that deletes it, and the uses of it elsewhere it would leave broken.
+/// A problem instead when nothing here can be deleted alone.</summary>
+public sealed record SafeDeletion(
+    [property: JsonPropertyName("problem")] string? Problem,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("path")] string Path,
+    [property: JsonPropertyName("edit")] Edit? Edit,
+    [property: JsonPropertyName("uses")] IReadOnlyList<UseLeft> Uses);
+
 /// <summary>Pull Members Up's or Push Members Down's request: these members of the class at the caret moved into the base
 /// type named by its id (up), or into each derived class whose id is a line of the target (down); those listed as abstract
 /// made abstract where they stay.</summary>

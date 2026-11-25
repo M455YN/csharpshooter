@@ -1,5 +1,6 @@
 // The refactorings that ask their options, as Visual Studio 2026 has them (Change Signature, Extract Interface, Move Type
-// to File and Move to Namespace, Pull Members Up) and Passenger adds (Push Members Down): Passenger's handlers in the C#
+// to File and Move to Namespace, Pull Members Up, Ctrl+.'s Pull 'X' up to 'IFoo') and Passenger adds (Push Members Down,
+// Safe Delete): Passenger's handlers in the C#
 // server (roslyn-extension/) say what is at the caret and make the change; VS Code's input boxes and lists ask what VS's
 // dialogs do, and the change is one workspace edit, which Undo takes back. Ctrl+. offers them where they apply.
 const vscode = require('vscode');
@@ -174,6 +175,38 @@ function registerRefactorings(context, ask) {
 
   const pullUp = moveMembers(true);
   const pushDown = moveMembers(false);
+
+  // Ctrl+.'s Pull 'X' up to 'IFoo': the member at the caret declared in an interface its class implements, no questions.
+  const pullInto = run(t('Pull Members Up'), async (editor, target, member, name, into) => {
+    const made = await ask(editor.document)('PullMembersUp', { at: at(editor), target, members: [member], abstract: [] });
+    return apply(made, t("Pulled '{0}' up to '{1}'", name, into));
+  });
+
+  // Safe Delete, as Passenger has it: the declaration at the caret (or the one a use there names) deleted, its doc comment
+  // and its lines with it; when anything else uses it, those uses are said first, and it goes only on Delete Anyway.
+  const safeDelete = run(t('Safe Delete'), async (editor) => {
+    const doomed = await describe(editor, 'DescribeSafeDelete');
+    if (doomed.problem) return void vscode.window.showWarningMessage(doomed.problem);
+    const kinds = {
+      method: t('method'), property: t('property'), event: t('event'), constructor: t('constructor'), field: t('field'), constant: t('constant'),
+      'local variable': t('local variable'), 'local function': t('local function'), 'enum member': t('enum member'), delegate: t('delegate'),
+      interface: t('interface'), struct: t('struct'), record: t('record'), enum: t('enum'), class: t('class'),
+    };
+    const what = t("{0} '{1}'", kinds[doomed.kind] || doomed.kind, doomed.name);
+    if (doomed.uses.length) {
+      const anyway = t('Delete Anyway');
+      const show = t('Show Usages');
+      const chosen = await vscode.window.showWarningMessage(t('{0} is used {1} times: deleting it leaves them broken.', what, doomed.uses.length),
+        { modal: true, detail: doomed.uses.slice(0, 10).map((u) => `${vscode.workspace.asRelativePath(u.path)}:${u.at.line + 1}  ${u.why}`).join('\n') }, anyway, show);
+      if (chosen === show) {
+        const locations = doomed.uses.map((u) => new vscode.Location(vscode.Uri.file(u.path), new vscode.Position(u.at.line, u.at.character)));
+        await vscode.commands.executeCommand('editor.action.showReferences', editor.document.uri, editor.selection.active, locations);
+        return false;
+      }
+      if (chosen !== anyway) return false;
+    }
+    return apply({ changes: [{ path: doomed.path, created: false, edits: [doomed.edit] }] }, t('Deleted {0}', what));
+  });
   context.subscriptions.push(
     vscode.commands.registerCommand('csharpShooter.refactor.changeSignature', (e) => changeSignature(e)),
     vscode.commands.registerCommand('csharpShooter.refactor.extractInterface', (e) => extractInterface(e)),
@@ -181,6 +214,8 @@ function registerRefactorings(context, ask) {
     vscode.commands.registerCommand('csharpShooter.refactor.moveToNamespace', (e) => moveType(e, false)),
     vscode.commands.registerCommand('csharpShooter.refactor.pullMembersUp', (e) => pullUp(e)),
     vscode.commands.registerCommand('csharpShooter.refactor.pushMembersDown', (e) => pushDown(e)),
+    vscode.commands.registerCommand('csharpShooter.refactor.safeDelete', (e) => safeDelete(e)),
+    vscode.commands.registerCommand('csharpShooter.refactor.pullInto', (...args) => pullInto(undefined, ...args)),
     // Ctrl+. (asked for, not each caret move): those that apply at the caret, as VS's Quick Actions list them.
     vscode.languages.registerCodeActionsProvider({ language: 'csharp', scheme: 'file' }, {
       async provideCodeActions(document, range, codeContext) {
@@ -188,9 +223,12 @@ function registerRefactorings(context, ask) {
         const editor = vscode.window.activeTextEditor;
         if (editor?.document !== document) return [];
         const quiet = (name) => describe(editor, name).catch(() => ({ problem: 'unavailable' }));
-        const [signature, source, type, hierarchy] = await Promise.all(['DescribeSignature', 'DescribeInterface', 'DescribeType', 'DescribeHierarchy'].map(quiet));
-        const action = (title, command) => Object.assign(new vscode.CodeAction(title, vscode.CodeActionKind.Refactor), { command: { title, command } });
+        const [signature, source, type, hierarchy, lacking, doomed] = await Promise.all(['DescribeSignature', 'DescribeInterface', 'DescribeType', 'DescribeHierarchy', 'InterfacesLacking', 'DescribeSafeDelete'].map(quiet));
+        const action = (title, command, args) => Object.assign(new vscode.CodeAction(title, vscode.CodeActionKind.Refactor), { command: { title, command, arguments: args } });
         const out = [];
+        for (const into of (lacking.member && lacking.interfaces) || []) {
+          out.push(action(t("Pull '{0}' up to '{1}'", lacking.name, into.text), 'csharpShooter.refactor.pullInto', [into.id, lacking.member.id, lacking.name, into.text]));
+        }
         if (!signature.problem) out.push(action(t('Change signature...'), 'csharpShooter.refactor.changeSignature'));
         if (!source.problem && source.members?.length) out.push(action(t('Extract interface...'), 'csharpShooter.refactor.extractInterface'));
         if (!type.problem) {
@@ -201,10 +239,11 @@ function registerRefactorings(context, ask) {
           if (hierarchy.bases?.length) out.push(action(t('Pull members up to base type...'), 'csharpShooter.refactor.pullMembersUp'));
           if (hierarchy.derived?.length) out.push(action(t('Push members down to derived types...'), 'csharpShooter.refactor.pushMembersDown'));
         }
+        if (!doomed.problem) out.push(action(t("Safe delete '{0}'", doomed.name), 'csharpShooter.refactor.safeDelete'));
         return out;
       },
     }, { providedCodeActionKinds: [vscode.CodeActionKind.Refactor] }));
-  return { changeSignature, extractInterface, moveType, pullUp, pushDown };
+  return { changeSignature, extractInterface, moveType, pullUp, pushDown, safeDelete, pullInto };
 }
 
 module.exports = { registerRefactorings };

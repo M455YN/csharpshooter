@@ -38,7 +38,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
 /** The project VS has as startup in its .suo: the GUID after "StartupProject=" (UTF-16 in the binary), matched to the
  *  .sln's project of that GUID. Null when there is no .suo, no such entry or no .sln line for it (an .slnx has no GUIDs). */
-function startupFromSuo(solution) {
+function startupFromSuo(of) {
+  const solution = require('./solution').baseSolution(of); // a filter's startup project is its solution's
   const name = path.basename(solution, path.extname(solution));
   const vsDir = path.join(path.dirname(solution), '.vs', name);
   let suo;
@@ -203,7 +204,7 @@ class Startup {
   /** What a build of the solution, or of one of its projects, is given: the solution's choice, mapped for a project. */
   async buildSettings(target) {
     const { solution, configuration, platform } = await this.solutionSettings();
-    return /\.slnx?$/i.test(target) ? { configuration, platform } : projectConfiguration(solution, target, configuration, platform);
+    return /\.sln[xf]?$/i.test(target) ? { configuration, platform } : projectConfiguration(solution, target, configuration, platform);
   }
 
   /** What F5 on the startup entry runs now. */

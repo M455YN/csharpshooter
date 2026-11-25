@@ -298,6 +298,39 @@ async function run() {
       for (const name of off) await features.update(name, undefined, vscode.ConfigurationTarget.Global);
     }
     expect('switched on again: F12 to JavaScript', (await declaration('"showAlert"')) === 'Interop.razor.js: export function showAlert(message) {', 'off still');
+
+    // 5. "///" above a method of a .cs writes its doc comment, the C# server's template; Enter inside it carries "///" on.
+    const cs = file('Shop', 'Calculator.cs');
+    fs.writeFileSync(cs, 'namespace Shop;\n\npublic class Calculator\n{\n    public int Add(int a, int b) => a + b;\n}\n');
+    editor = await open(cs);
+    at = await newLine(editor, '{');
+    for (const ch of '///') await type(ch);
+    await settle(editor, (e) => e.document.getText().includes('<returns>'), 20000);
+    const written = editor.document.getText();
+    // 6. Run Code Cleanup on the project: a file no editor shows has its unused using taken out, the others sorted, its
+    // code formatted, and is saved.
+    const messy = file('Shop', 'Messy.cs');
+    fs.writeFileSync(messy, 'using System.Text.Json;\nusing System.Text;\nusing System.Diagnostics;\n\nnamespace Shop;\n\npublic class Messy\n{\npublic string Count(int[] items){Debug.Assert(items!=null);return JsonSerializer.Serialize(items);}\n}\n');
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    // once the server has it in the project: JsonSerializer resolves (till then it finds every using unnecessary)
+    const resolved = async () => ((await vscode.commands.executeCommand('vscode.executeHoverProvider', vscode.Uri.file(messy), new vscode.Position(8, 70))) || []).length > 0;
+    for (let i = 0; i < 60 && !(await resolved()); i++) await sleep(500);
+    await vscode.commands.executeCommand('csharpShooter.codeCleanup', { contextValue: 'project', file: file('Shop', 'Shop.csproj') });
+    const cleaned = fs.readFileSync(messy, 'utf8').replace(/\r\n/g, '\n');
+    expect('Code Cleanup on the project: unused using out, the rest sorted, formatted, saved',
+      !cleaned.includes('using System.Text;') && cleaned.startsWith('using System.Diagnostics;\nusing System.Text.Json;\n') && /\n    public string Count\(int\[\] items\) \{ Debug\.Assert\(items != null\); return JsonSerializer\.Serialize\(items\); \}/.test(cleaned),
+      JSON.stringify(cleaned));
+    fs.rmSync(messy, { force: true });
+    // a .cs in no project: formatted, its usings left, as nothing in it resolves
+    const loose = path.join(root, 'Loose.cs');
+    fs.writeFileSync(loose, 'using System.Text;\n\nclass Loose\n{\nint A(){return 1;}\n}\n');
+    await vscode.commands.executeCommand('csharpShooter.codeCleanup', { contextValue: 'file', resourceUri: vscode.Uri.file(loose) });
+    const looseText = fs.readFileSync(loose, 'utf8').replace(/\r\n/g, '\n');
+    expect('Code Cleanup on a file in no project: its usings kept', looseText.startsWith('using System.Text;\n'), JSON.stringify(looseText));
+    fs.rmSync(loose, { force: true });
+
+    expect('///: the method\'s doc comment, summary, each parameter and its returns', /\/\/\/ <summary>[\s\S]*\/\/\/ <param name="a"><\/param>[\s\S]*\/\/\/ <param name="b"><\/param>[\s\S]*\/\/\/ <returns><\/returns>/.test(written),
+      JSON.stringify(written.slice(written.indexOf('{'), written.indexOf('public int'))));
   } finally {
     cdn.close();
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');

@@ -1,5 +1,5 @@
 diff --git a/Directory.Build.props b/Directory.Build.props
-index 56207fbe..ce92f86e 100644
+index 3e6fd6c..61de7e9 100644
 --- a/Directory.Build.props
 +++ b/Directory.Build.props
 @@ -1,7 +1,7 @@
@@ -9,10 +9,10 @@ index 56207fbe..ce92f86e 100644
 -    <TargetFramework>net11.0</TargetFramework>
 +    <TargetFramework>net10.0</TargetFramework>
      <!-- The version, until a vX.Y.Z tag on the commit names it. -->
-     <Version>0.4.3</Version>
+     <Version>0.4.5</Version>
      <Nullable>enable</Nullable>
 diff --git a/src/Passenger.Analyzers/Passenger.Analyzers.csproj b/src/Passenger.Analyzers/Passenger.Analyzers.csproj
-index 03b3b39b..e0a6a278 100644
+index 03b3b39..e0a6a27 100644
 --- a/src/Passenger.Analyzers/Passenger.Analyzers.csproj
 +++ b/src/Passenger.Analyzers/Passenger.Analyzers.csproj
 @@ -12,7 +12,8 @@
@@ -26,7 +26,7 @@ index 03b3b39b..e0a6a278 100644
      <PackageReference Include="Microsoft.NETCore.Platforms" PrivateAssets="all" />
      <AdditionalFiles Include="AnalyzerReleases.Shipped.md;AnalyzerReleases.Unshipped.md" />
 diff --git a/src/Passenger.Core/ChildProcesses.cs b/src/Passenger.Core/ChildProcesses.cs
-index 0f03beae..30cbef3f 100644
+index 0f03bea..30cbef3 100644
 --- a/src/Passenger.Core/ChildProcesses.cs
 +++ b/src/Passenger.Core/ChildProcesses.cs
 @@ -1052,10 +1052,7 @@ public static class ChildProcesses
@@ -42,7 +42,7 @@ index 0f03beae..30cbef3f 100644
          Action? givenBack = ThroughCmdWhereBatch(start);
          Process? started;
 diff --git a/src/Passenger.Core/Lifeline.cs b/src/Passenger.Core/Lifeline.cs
-index f33db660..a62e55e7 100644
+index f33db66..a62e55e 100644
 --- a/src/Passenger.Core/Lifeline.cs
 +++ b/src/Passenger.Core/Lifeline.cs
 @@ -128,10 +128,10 @@ internal static partial class Lifeline
@@ -158,7 +158,7 @@ index f33db660..a62e55e7 100644
 +    }
  }
 diff --git a/src/Passenger.DebugAdapter/DebugAdapter.cs b/src/Passenger.DebugAdapter/DebugAdapter.cs
-index 0e610b6e..209a09f2 100644
+index 0e610b6..209a09f 100644
 --- a/src/Passenger.DebugAdapter/DebugAdapter.cs
 +++ b/src/Passenger.DebugAdapter/DebugAdapter.cs
 @@ -263,11 +263,13 @@ public sealed class DebugAdapter
@@ -177,7 +177,7 @@ index 0e610b6e..209a09f2 100644
          // Not under the engine's lock: a program waiting for input may be running, and the write is all.
          connection.Handle<InputArguments>(DapCommands.Input, arguments =>
 diff --git a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
-index aaec1792..ef545fec 100644
+index aaec179..ef545fe 100644
 --- a/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 +++ b/src/Passenger.Debugger.Interop/IMetaDataTables2.cs
 @@ -17,7 +17,8 @@ namespace Passenger.Debugger.Interop;
@@ -191,7 +191,7 @@ index aaec1792..ef545fec 100644
      /// <summary>
      /// <para>Gets the size and contents of the metadata stored in the specified section.</para>
 diff --git a/src/Passenger.Debugger/SuspendedLaunch.cs b/src/Passenger.Debugger/SuspendedLaunch.cs
-index da10f142..58ed88c2 100644
+index da10f14..58ed88c 100644
 --- a/src/Passenger.Debugger/SuspendedLaunch.cs
 +++ b/src/Passenger.Debugger/SuspendedLaunch.cs
 @@ -170,29 +170,30 @@ public sealed partial class SuspendedLaunch : IDisposable

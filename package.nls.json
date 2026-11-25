@@ -60,7 +60,7 @@
   "view.taskRunnerConsole": "Bindings and Output",
   "submenu.solution.add": "Add",
   "submenu.taskRunner.bindings": "Bindings",
-  "config.solution": "Solution (.sln/.slnx) to load. Empty: the first one found in the workspace.",
+  "config.solution": "Solution (.sln/.slnx), or a solution filter (.slnf) for only the projects it lists, to load. Empty: the first solution found in the workspace.",
   "config.serverPath": "Path to Microsoft.CodeAnalysis.LanguageServer.dll. Empty: the one under the extension's server/ folder.",
   "config.debuggerPath": "Path to the debug adapter (Passenger.DebugAdapter(.exe)). Empty: the one under the extension's debugger/ folder.",
   "config.razorViewsInDesignTime": "Give the language server's Razor every .cshtml even when a project sets RazorCompileOnBuild=false (only the server's design-time builds change; your builds don't).",
@@ -127,6 +127,7 @@
   "command.refactor.moveToNamespace": "Move to Namespace...",
   "command.refactor.pullMembersUp": "Pull Members Up to Base Type...",
   "command.refactor.pushMembersDown": "Push Members Down to Derived Types...",
+  "command.refactor.safeDelete": "Safe Delete...",
   "submenu.refactor": "Refactor",
   "config.previewRefactorings": "Show a refactoring's changes in VS Code's Refactor Preview before they are applied, each one to tick, as Visual Studio's Preview changes box (Change Signature, Extract Interface, Move, Pull Members Up, Push Members Down).",
   "command.solution.cut": "Cut",
@@ -144,5 +145,7 @@
   "config.features.cssClassCompletion": "Complete CSS classes in class=\"...\" of .razor and .cshtml from every stylesheet the app's pages use.",
   "config.features.jsInteropNavigation": "Go to Declaration (F12) on a JS interop call's identifier opens the JavaScript function it calls.",
   "config.features.httpFiles": ".http and .rest files as Visual Studio's HTTP editor: Send Request above each request and the HTTP environment in the status bar.",
-  "config.features.openSolutionExplorer": "Open the side bar on the Solution Explorer when the workspace has a solution, as Visual Studio opens on it."
+  "config.features.openSolutionExplorer": "Open the side bar on the Solution Explorer when the workspace has a solution, as Visual Studio opens on it.",
+  "config.features.docComments": "Typing \"///\" above a member writes its doc comment (summary, parameters, returns), and Enter inside one carries \"///\" on, as Visual Studio does.",
+  "command.codeCleanup": "Run Code Cleanup (Profile 1)"
 }

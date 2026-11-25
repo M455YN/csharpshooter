@@ -10,9 +10,28 @@ const SOLUTION_FOLDER = '2150E333-8FDC-42A3-9474-1A3956D46DE8';
 // What VS leaves out of an SDK project's tree.
 const HIDDEN_DIRS = new Set(['bin', 'obj', 'node_modules', '.vs', '.git']);
 const isHiddenFile = (name) => name.endsWith('.user') || name.startsWith('.');
+// A .slnf's JSON, the byte order mark Visual Studio writes left out.
+const readFilter = (file) => JSON.parse(fs.readFileSync(file, 'utf8').trim()); // trim() takes U+FEFF too
 
-/** Projects and solution folders of a .sln or .slnx, as a tree: { name, folders: [...], projects: [path] }. */
+/** The solution a solution filter (.slnf) is of, as its "solution.path" names it; any other file is itself. */
+function baseSolution(file) {
+  if (!/\.slnf$/i.test(file)) return file;
+  return path.resolve(path.dirname(file), readFilter(file).solution.path);
+}
+
+/** Projects and solution folders of a .sln or .slnx, as a tree: { name, folders: [...], projects: [path] }. A solution
+ *  filter (.slnf) gives its solution's tree with only the projects it lists, as Visual Studio loads it. */
 function readSolution(file) {
+  if (/\.slnf$/i.test(file)) {
+    const base = baseSolution(file);
+    const listed = new Set(readFilter(file).solution.projects
+      .map((p) => path.resolve(path.dirname(base), p.replace(/[\\/]/g, path.sep)).toLowerCase()));
+    const keep = (node) => {
+      const folders = node.folders.map(keep).filter((f) => f.projects.length || f.folders.length);
+      return { ...node, folders, projects: node.projects.filter((p) => listed.has(p.toLowerCase())) };
+    };
+    return { ...keep(readSolution(base)), name: path.basename(file, path.extname(file)) };
+  }
   const dir = path.dirname(file);
   const text = fs.readFileSync(file, 'utf8');
   const root = { name: path.basename(file, path.extname(file)), folders: [], projects: [] };
@@ -390,7 +409,7 @@ function registerSolutionView(context, findSolution) {
   const relevant = (uri) => !/[\\/](bin|obj|node_modules|\.git|\.vs)[\\/]/i.test(uri.fsPath);
   watcher.onDidCreate((u) => relevant(u) && refreshSoon());
   watcher.onDidDelete((u) => relevant(u) && refreshSoon());
-  watcher.onDidChange((u) => /\.(csproj|sln|slnx)$/i.test(u.fsPath) && refreshSoon());
+  watcher.onDidChange((u) => /\.(csproj|sln|slnx|slnf)$/i.test(u.fsPath) && refreshSoon());
   context.subscriptions.push(watcher);
   // A build in a task, what it does said at the bottom right as F5's build says it, and its outcome in the status bar as VS's.
   const { launchProgress, buildLog, followBuildLog } = require('./build-progress');
@@ -513,4 +532,4 @@ function registerSolutionView(context, findSolution) {
   return { provider, view, editing, findItem: (p) => findItem(provider, p) };
 }
 
-module.exports = { registerSolutionView, readSolution, readProject, nestingParents, newPublishProfile, terminalTask };
+module.exports = { registerSolutionView, readSolution, baseSolution, readProject, nestingParents, newPublishProfile, terminalTask };

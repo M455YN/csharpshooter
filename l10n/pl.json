@@ -826,5 +826,21 @@
   "Idempotent": "Idempotentny",
   "runs on a database at any migration": "działa na bazie danych po dowolnej migracji",
   "From an empty database": "Od pustej bazy danych",
-  "every migration, in order": "wszystkie migracje po kolei"
+  "every migration, in order": "wszystkie migracje po kolei",
+  "No C# files to clean up.": "Brak plików C# do oczyszczenia.",
+  "Code Cleanup": "Oczyszczanie kodu",
+  "Code Cleanup: {0} of {1} C# files changed.": "Oczyszczanie kodu: zmieniono {0} z {1} plików C#.",
+  "Safe Delete": "Bezpieczne usuwanie",
+  "Safe delete '{0}'": "Bezpieczne usuwanie „{0}”",
+  "Delete Anyway": "Usuń mimo to",
+  "Show Usages": "Pokaż użycia",
+  "{0} is used {1} times: deleting it leaves them broken.": "{0}: liczba użyć {1}. Po usunięciu będą błędne.",
+  "Deleted {0}": "Usunięto: {0}",
+  "{0} '{1}'": "{0} „{1}”",
+  "Pull '{0}' up to '{1}'": "Ściągnij „{0}” aż do „{1}”",
+  "Pulled '{0}' up to '{1}'": "Ściągnięto „{0}” aż do „{1}”",
+  "local variable": "zmienna lokalna",
+  "local function": "funkcja lokalna",
+  "delegate": "delegat",
+  "record": "rekord"
 }

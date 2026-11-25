@@ -51,7 +51,9 @@ function expected(solution, project) {
 
 /** The solution's model: its file, format, build types and platforms in their order, and each configurable project with
  *  its cells (key(buildType, platform) -> { buildType, platform, build, deploy }). */
-function read(file) {
+function read(of) {
+  // a solution filter (.slnf) builds with its solution's configurations, kept in that file
+  const file = require('./solution').baseSolution(of);
   const text = fs.readFileSync(file, 'utf8');
   const dir = path.dirname(file);
   if (/\.slnx$/i.test(file)) {

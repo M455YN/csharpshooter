@@ -187,6 +187,11 @@
           "type": "boolean",
           "default": true,
           "description": "%config.features.openSolutionExplorer%"
+        },
+        "csharpShooter.features.docComments": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.features.docComments%"
         }
       }
     },
@@ -706,6 +711,12 @@
         "enablement": "editorLangId == csharp"
       },
       {
+        "command": "csharpShooter.refactor.safeDelete",
+        "title": "%command.refactor.safeDelete%",
+        "category": "%category.CSharpShooter%",
+        "enablement": "editorLangId == csharp"
+      },
+      {
         "command": "csharpShooter.solution.cut",
         "title": "%command.solution.cut%",
         "category": "%category.Solution%"
@@ -739,6 +750,12 @@
         "command": "csharpShooter.solution.addClass",
         "title": "%command.solution.addClass%",
         "category": "%category.Solution%"
+      },
+      {
+        "command": "csharpShooter.codeCleanup",
+        "title": "%command.codeCleanup%",
+        "category": "%category.CSharpShooter%",
+        "icon": "$(sparkle)"
       }
     ],
     "menus": {
@@ -1004,6 +1021,11 @@
           "command": "csharpShooter.solution.rename",
           "when": "view == csharpShooter.solution && viewItem =~ /^(folder|file)( |$)/",
           "group": "6_modify@2"
+        },
+        {
+          "command": "csharpShooter.codeCleanup",
+          "when": "view == csharpShooter.solution && viewItem =~ /^(solution|project|folder|file)( |$)/",
+          "group": "1_build@9"
         }
       ],
       "csharpShooter.solution.add": [
@@ -1156,6 +1178,10 @@
         {
           "command": "csharpShooter.solution.addClass",
           "when": "false"
+        },
+        {
+          "command": "csharpShooter.codeCleanup",
+          "when": "editorLangId == csharp"
         }
       ],
       "csharpShooter.taskRunner.bindings": [
@@ -1265,6 +1291,10 @@
         {
           "command": "csharpShooter.refactor.pushMembersDown",
           "group": "refactor@5"
+        },
+        {
+          "command": "csharpShooter.refactor.safeDelete",
+          "group": "refactor@6"
         }
       ]
     },
@@ -1445,6 +1475,11 @@
         "key": "ctrl+f10",
         "command": "editor.debug.action.runToCursor",
         "when": "config.csharpShooter.visualStudioKeybindings && inDebugMode"
+      },
+      {
+        "key": "shift+alt+f11",
+        "command": "editor.debug.action.stepIntoTargets",
+        "when": "config.csharpShooter.visualStudioKeybindings && inDebugMode && debugState == 'stopped'"
       },
       {
         "key": "ctrl+k ctrl+d",

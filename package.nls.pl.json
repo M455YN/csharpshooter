@@ -60,7 +60,7 @@
   "view.taskRunnerConsole": "Powiązania i dane wyjściowe",
   "submenu.solution.add": "Dodaj",
   "submenu.taskRunner.bindings": "Powiązania",
-  "config.solution": "Rozwiązanie (.sln/.slnx) do wczytania. Puste: pierwsze znalezione w obszarze roboczym.",
+  "config.solution": "Rozwiązanie (.sln/.slnx) albo filtr rozwiązania (.slnf), tylko z wymienionymi w nim projektami, do wczytania. Puste: pierwsze rozwiązanie znalezione w obszarze roboczym.",
   "config.serverPath": "Ścieżka do Microsoft.CodeAnalysis.LanguageServer.dll. Puste: ten z folderu server/ rozszerzenia.",
   "config.debuggerPath": "Ścieżka do adaptera debugowania (Passenger.DebugAdapter(.exe)). Puste: ten z folderu debugger/ rozszerzenia.",
   "config.razorViewsInDesignTime": "Przekazuj Razorowi serwera języka każdy plik .cshtml, także gdy projekt ustawia RazorCompileOnBuild=false (zmieniają się tylko kompilacje czasu projektowania serwera, Twoje kompilacje nie).",
@@ -127,6 +127,7 @@
   "command.refactor.moveToNamespace": "Przenieś do przestrzeni nazw...",
   "command.refactor.pullMembersUp": "Ściągnij składowe aż do typu bazowego...",
   "command.refactor.pushMembersDown": "Wypchnij składowe w dół do typów pochodnych...",
+  "command.refactor.safeDelete": "Bezpieczne usuwanie...",
   "submenu.refactor": "Refaktoryzuj",
   "config.previewRefactorings": "Pokazuj zmiany refaktoryzacji w podglądzie refaktoryzacji VS Code przed ich zastosowaniem, każdą do zaznaczenia, jak pole Wyświetl podgląd zmian w Visual Studio (Zmień sygnaturę, Wyodrębnij interfejs, Przenieś, Ściągnij i Wypchnij składowe).",
   "command.solution.cut": "Wytnij",
@@ -144,5 +145,7 @@
   "config.features.cssClassCompletion": "Uzupełniaj klasy CSS w class=\"...\" plików .razor i .cshtml ze wszystkich arkuszy stylów używanych przez strony aplikacji.",
   "config.features.jsInteropNavigation": "Przejdź do deklaracji (F12) na identyfikatorze wywołania JS interop otwiera wywoływaną funkcję JavaScript.",
   "config.features.httpFiles": "Pliki .http i .rest jak edytor HTTP programu Visual Studio: Wyślij żądanie nad każdym żądaniem i środowisko HTTP na pasku stanu.",
-  "config.features.openSolutionExplorer": "Otwieraj pasek boczny na Eksploratorze rozwiązań, gdy obszar roboczy ma rozwiązanie, jak Visual Studio."
+  "config.features.openSolutionExplorer": "Otwieraj pasek boczny na Eksploratorze rozwiązań, gdy obszar roboczy ma rozwiązanie, jak Visual Studio.",
+  "config.features.docComments": "Wpisanie \"///\" nad składową dopisuje jej komentarz dokumentujący (opis, parametry, wartość zwracana), a Enter w nim kontynuuje \"///\", jak Visual Studio.",
+  "command.codeCleanup": "Uruchom oczyszczanie kodu (profil 1)"
 }

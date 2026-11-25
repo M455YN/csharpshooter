@@ -32,6 +32,8 @@ const { registerEndTags } = require('./end-tags');
 const { registerCssClasses } = require('./css-classes');
 const { registerJsInterop } = require('./js-interop');
 const { registerInlineValues } = require('./inline-values');
+const { registerDocComments } = require('./doc-comments');
+const { registerCodeCleanup } = require('./code-cleanup');
 
 // VS Code writes file URIs as file:///d%3A/...; Roslyn's Razor cannot read an escaped drive colon, so files go as Node
 // writes them (file:///D:/.../C%23/...), which escapes only what a URI must (# in "C#" folders, spaces).
@@ -266,7 +268,9 @@ async function startServer(context) {
     const count = projectFiles.length;
     loading.stage(count ? tn(count, 'Loading solution {1} (1 project)…', 'Loading solution {1} ({0} projects)…', solutionName) : t('Loading solution {0}…', solutionName));
     output.appendLine(`Opening ${solution}`);
-    await client.sendNotification('solution/open', { solution: toServerUri(vscode.Uri.file(solution)) });
+    // a solution filter (.slnf): only the projects it lists are loaded, as Visual Studio loads them
+    if (/\.slnf$/i.test(solution)) await client.sendNotification('project/open', { projects: projectFiles.map((p) => toServerUri(vscode.Uri.file(p))) });
+    else await client.sendNotification('solution/open', { solution: toServerUri(vscode.Uri.file(solution)) });
   } else {
     loading.stage(t('Loading projects…'));
     const projects = await vscode.workspace.findFiles('**/*.csproj', '**/{node_modules,bin,obj}/**');
@@ -408,6 +412,7 @@ async function activate(context) {
     await startServer(context);
   }));
   const solutionView = registerSolutionView(context, findSolution);
+  registerCodeCleanup(context, require('./solution').readSolution, () => (client && client.state === State.Running ? { client, toServerUri } : undefined));
   // With a solution in the workspace, the side bar opens on the Solution Explorer, as VS opens on it (an extension's
   // icon cannot be put above VS Code's Explorer; once dragged there, VS Code keeps it).
   findSolution().then((solution) => solution && require('./features').on('openSolutionExplorer') && vscode.commands.executeCommand('workbench.view.extension.csharpShooter'));
@@ -416,6 +421,7 @@ async function activate(context) {
   const dataVisualizer = registerDataVisualizer(context);
   registerRazorEnter(context);
   registerEndTags(context, () => (client && client.state === State.Running ? { client, toServerUri } : undefined));
+  registerDocComments(context, () => (client && client.state === State.Running ? { client, toServerUri } : undefined));
   registerCssClasses(context);
   registerJsInterop(context);
   registerInlineValues(context);

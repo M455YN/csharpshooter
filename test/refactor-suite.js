@@ -26,9 +26,23 @@ public class Circle : Shape
 public class Square : Shape
 {
 }
+
+public interface ILabel
+{
+}
+
+public class Label : ILabel
+{
+    public string Text() => "label";
+
+    private int unused;
+
+    public int Used() => 1;
+}
 `;
 const PROGRAM = `var circle = new Contoso.Shapes.Circle { Radius = 2 };
 System.Console.WriteLine(circle.Area(1));
+System.Console.WriteLine(new Contoso.Shapes.Label().Used());
 `;
 
 if (require.main === module) {
@@ -128,6 +142,31 @@ async function run() {
     expect('Push Members Down, Make abstract: an override in each derived class, abstract in Shape',
       (text.match(/override string Describe\(\)/g) || []).length === 2 && /abstract class Shape/.test(text) && /abstract string Describe\(\);/.test(text),
       `${(text.match(/override string Describe\(\)/g) || []).length} overrides; Shape abstract ${/abstract class Shape/.test(text)}`);
+
+    // Ctrl+. on a public method of a class: Pull 'Text' up to 'ILabel', the interface it implements that lacks it, at once.
+    editor = await caretAt('Shapes.cs', 'Text()', 1);
+    actions = await vscode.commands.executeCommand('vscode.executeCodeActionProvider', editor.document.uri, editor.selection, vscode.CodeActionKind.Refactor.value, 10);
+    const into = actions.find((a) => a.command?.command === 'csharpShooter.refactor.pullInto');
+    if (into) await vscode.commands.executeCommand(into.command.command, ...into.command.arguments);
+    text = editor.document.getText();
+    expect('Ctrl+. Pull \'Text\' up to \'ILabel\': ILabel declares it', /interface ILabel\s*\{\s*string Text\(\);\s*\}/.test(text),
+      `${into?.title ?? 'not offered'}; ${/interface ILabel[\s\S]*?\}/.exec(text)?.[0].replace(/\s+/g, ' ')}`);
+    expect('Ctrl+. offers Safe Delete on a method', actions.some((a) => a.command?.command === 'csharpShooter.refactor.safeDelete'),
+      actions.map((a) => a.title).join(', '));
+
+    // Safe Delete of a field nothing uses: gone at once, its line with it.
+    editor = await caretAt('Shapes.cs', 'unused', 1);
+    await vscode.commands.executeCommand('csharpShooter.refactor.safeDelete');
+    text = editor.document.getText();
+    expect('Safe Delete of an unused field: deleted, no blank line doubled', !/unused/.test(text) && /"label";\r?\n\r?\n    public int Used/.test(text),
+      JSON.stringify(/class Label[\s\S]*?\n\}/.exec(text)?.[0]));
+
+    // Safe Delete of a method Program.cs calls: its use said, and left as it is when Delete Anyway is not chosen.
+    said.length = 0;
+    editor = await caretAt('Shapes.cs', 'Used()', 1);
+    await vscode.commands.executeCommand('csharpShooter.refactor.safeDelete');
+    expect('Safe Delete of a used method: its use said, nothing deleted without Delete Anyway', /Used\(\) => 1/.test(editor.document.getText()) && said.some((m) => /1/.test(m) && /Used/.test(m)),
+      said.join(' | ') || 'nothing said');
 
     // Move Type to File: Square into Square.cs.
     editor = await caretAt('Shapes.cs', 'class Square', 6);

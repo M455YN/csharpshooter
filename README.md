@@ -2,7 +2,7 @@
 
 A prototype extension: C# and Razor (`.cs`, `.cshtml`, `.razor`) from Microsoft's
 [`roslyn-language-server`](https://www.nuget.org/packages?q=roslyn-language-server) (MIT), debugging with the
-.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its 0.4.3). No C# Dev Kit and no `vsdbg`,
+.NET debug adapter of [Passenger](https://github.com/Zaneris/passenger) (MIT, its 0.4.5). No C# Dev Kit and no `vsdbg`,
 so nothing here carries Visual Studio's licence terms, except the two closed Microsoft assemblies the Roslyn package
 ships (`Microsoft.VisualStudio.Telemetry`, `Microsoft.VisualStudio.Utilities.Internal`; Razor's MEF parts need them, and
 the server runs with `--telemetryLevel off`).
@@ -19,7 +19,9 @@ npm run fetch-server
 The SQL Tools Service of `.sql` files is CSharpShooter SQL's (`sql/`, below under *SQL*), fetched there by its own
 `npm run fetch-sqltools`.
 
-The debugger is Passenger 0.4.3's (commit `6ee2acd` of 2026-11-23, which the script fetches: anonymous types, arrays of
+The debugger is Passenger 0.4.5's (commit `f002c54` of 2026-11-25, which the script fetches: an `async` method's
+unhandled exception from a task started on another thread and not yet awaited stopping where it is awaited, an
+evaluation no longer waiting for good on a thread the runtime has just started; after 0.4.3's: anonymous types, arrays of
 `object` or of an interface and a constructor given a lambda evaluating, a variable an `async` method's block captures in
 a lambda shown, an `async` program's unhandled exception stopping where it was thrown, a step off a request's or a
 click's handler letting the program run on, a step over an `await` stopping on the next line under load, a returned
@@ -112,7 +114,9 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
 
 ## Use
 
-- The first `.sln`/`.slnx` in the workspace loads (or set `csharpShooter.solution`).
+- The first `.sln`/`.slnx` in the workspace loads (or set `csharpShooter.solution`). A solution filter (`.slnf`) set
+  there loads only the projects it lists, as Visual Studio opens one: the Solution Explorer, Search, builds, tests and
+  NuGet see those, with its solution's configurations and startup project.
 - While the server starts and loads it, a notification at the bottom right and a spinner in the status bar say so
   (*Uruchamianie serwera C#…*, *Wczytywanie rozwiązania X (5 projektów)… 12 s*), as VS says it is loading the solution;
   once the projects are loaded the status bar says *Rozwiązanie X wczytane w N s: podpowiedzi C#, F12 i Razor gotowe*.
@@ -150,7 +154,7 @@ files answer twice and clash: Microsoft's C# (`ms-dotnettools.csharp`) and C# De
   Ctrl+Shift+F9, Ctrl+F10, Ctrl+K Ctrl+D, Ctrl+R Ctrl+R, Ctrl+L, Ctrl+Shift+L, Ctrl+-, Ctrl+Shift+-, Ctrl+W, Ctrl+Shift+S,
   Shift+Alt+arrows for a column selection...), with VS's *Go To All* (Ctrl+, and Ctrl+T) on CSharpShooter's Search, Find in
   Files (Ctrl+Shift+F) on its own and *Solution Explorer* (Ctrl+Alt+L) on its tree. Ctrl+Shift+F5 in a CSharpShooter
-  session is its own Restart, not VS Code's. A person's own keybindings.json still wins over all of these.
+  session is its own Restart, not VS Code's, and Shift+Alt+F11 is VS's *Step Into Specific* (VS Code's Step Into Target). A person's own keybindings.json still wins over all of these.
 - English and Polish: `csharpShooter.uiLanguage` (`auto`, `en`, `pl`) sets the language of CSharpShooter's own texts
   (notifications, status bar, Solution Explorer, Search, Publish, the visualizer, Task Runner Explorer), the Polish ones
   being Visual Studio's own Polish words; `auto` follows VS Code's display language. Command titles, view names and the
@@ -176,6 +180,7 @@ read each time it would act, so turning it off (or on again) takes effect at onc
 | `jsInteropNavigation` | F12 from a JS interop call to its JavaScript |
 | `httpFiles` | *Wyślij żądanie* and the HTTP environment of `.http` files |
 | `openSolutionExplorer` | the side bar opening on the Solution Explorer |
+| `docComments` | `///` writing a member's doc comment, and Enter in one carrying `///` on |
 
 Settings of their own already do this for the others: `visualStudioKeybindings`, `askToTrustDevCertificate`,
 `launchProfilesInLaunchJson`, `previewRefactorings`, `razorViewsInDesignTime` and the Task Runner's bindings.
@@ -345,7 +350,21 @@ server (`roslyn-extension/`): Ctrl+. offers those that apply at the caret, the e
 - *Przenieś typ do {plik}.cs* and *Przenieś do przestrzeni nazw...*: the type into a new file, or into another
   namespace with its users following.
 - *Ściągnij składowe aż do typu bazowego...* and, as Passenger has it, *Wypchnij składowe w dół do typów
-  pochodnych...*: the members chosen into the base type, or into each derived class chosen.
+  pochodnych...*: the members chosen into the base type, or into each derived class chosen. On a public method,
+  property or event, Ctrl+. offers *Ściągnij „X” aż do „IFoo”* for each interface its class implements that lacks it,
+  which declares it there at once.
+- *Bezpieczne usuwanie* (Ctrl+. on a name, or *Refaktoryzuj*), as Passenger has it: the type, member or local at the
+  caret, or the one a use there names, deleted with its doc comment and the lines it had to itself. When anything else
+  uses it, those uses are listed first (*Pokaż użycia*), and it goes only on *Usuń mimo to*; a parameter is left to
+  *Zmień sygnaturę...*.
+
+## Code Cleanup
+
+*Uruchom oczyszczanie kodu (profil 1)* on the solution, a project, a folder or a file in the Solution Explorer (or on
+the open file from the command palette), as Visual Studio's Profile 1: each C# file under it has its unnecessary usings
+removed and the rest sorted, the server's own fixes, then is formatted as Format Document does, by its `.editorconfig`.
+A file open in a tab keeps its changes for Ctrl+Z; one that was not is saved. A file the server has in no project (not
+loaded yet, or in none) is only formatted, as nothing in it resolves and every using would look unnecessary.
 
 VS Code's input boxes and lists stand for VS's dialogs. Moving members asks VS's *Ustaw jako abstrakcyjny* for each: pulled
 up into a class, abstract there and an `override` here; pushed down, left abstract here. As in VS, a file the change

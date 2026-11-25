@@ -61,6 +61,18 @@ public sealed class PullMembersUp : IExtensionDocumentMessageHandler<MembersMove
         MemberMoves.PullUpAsync(document, message, cancellationToken);
 }
 
+public sealed class InterfacesLacking : IExtensionDocumentMessageHandler<Caret, MemberPull>
+{
+    public Task<MemberPull> ExecuteAsync(Caret message, ExtensionMessageContext context, Document document, CancellationToken cancellationToken) =>
+        MemberMoves.LackingAsync(document, message.At, cancellationToken);
+}
+
+public sealed class DescribeSafeDelete : IExtensionDocumentMessageHandler<Caret, SafeDeletion>
+{
+    public Task<SafeDeletion> ExecuteAsync(Caret message, ExtensionMessageContext context, Document document, CancellationToken cancellationToken) =>
+        SafeDeletes.DescribeAsync(document, message.At, cancellationToken);
+}
+
 public sealed class PushMembersDown : IExtensionDocumentMessageHandler<MembersMove, Refactored>
 {
     public Task<Refactored> ExecuteAsync(MembersMove message, ExtensionMessageContext context, Document document, CancellationToken cancellationToken) =>

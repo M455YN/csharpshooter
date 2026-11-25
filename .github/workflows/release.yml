@@ -70,6 +70,9 @@ jobs:
       - name: Inline values (the names a stopped line shows values of)
         run: node test/inline-values.js
 
+      - name: Solution filter (.slnf, only the projects it lists)
+        run: node test/solution-filter.js
+
       - name: Server (roslyn-language-server, win-x64)
         run: node scripts/fetch-server.js 5.11.0 win-x64
 

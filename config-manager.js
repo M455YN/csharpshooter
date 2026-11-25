@@ -243,7 +243,7 @@ function registerConfigurationManager(context, findSolution, startup) {
   context.subscriptions.push(vscode.commands.registerCommand('csharpShooter.configurationManager', open));
   // The page follows the status bar's choice and the solution's file changing on disk.
   context.subscriptions.push(startup.onDidChange(() => panel?.request({ type: 'ready' })));
-  const watcher = vscode.workspace.createFileSystemWatcher('**/*.{sln,slnx}');
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*.{sln,slnx,slnf}');
   watcher.onDidChange(() => panel?.request({ type: 'ready' }));
   context.subscriptions.push(watcher);
 

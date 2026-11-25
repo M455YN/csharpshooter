@@ -290,7 +290,7 @@ function registerSolutionSearch(context, findSolution, solutionView) {
   const relevant = (uri) => !/[\\/](bin|obj|node_modules|\.git|\.vs)[\\/]/i.test(uri.fsPath);
   watcher.onDidCreate((u) => relevant(u) && changed((i) => i.add?.(u.fsPath)));
   watcher.onDidDelete((u) => relevant(u) && changed((i) => i.remove?.(u.fsPath)));
-  watcher.onDidChange((u) => /\.(csproj|sln|slnx)$/i.test(u.fsPath) && changed(() => (index = undefined)));
+  watcher.onDidChange((u) => /\.(csproj|sln|slnx|slnf)$/i.test(u.fsPath) && changed(() => (index = undefined)));
   context.subscriptions.push(watcher);
 
   // ⤢: the same query in the full-screen search, on Tekst when the box looks in the files' contents.
