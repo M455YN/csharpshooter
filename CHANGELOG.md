@@ -4,7 +4,7 @@ All notable changes to **CSharpShooter** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.0] - 2026-11-26
 
 ### Added
 
@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The debugger is Passenger 0.4.5's (`f002c54`, `debugger-port/net10.patch` made again on it, Passenger's analyzers built on the .NET 10 SDK's Roslyn 5.9): an `async` method's unhandled exception from a task started on another thread, not yet awaited, stops where it is awaited, and an evaluation no longer waits for good on a thread the runtime has just started; from 0.4.3: anonymous types (`new { A = 1 }`, `Select(i => new { i.Name })`), arrays of `object` or of an interface and a constructor given a lambda (`new Lazy<int>(() => 1)`) evaluate; a variable an `async` method's block captures in a lambda shows in Variables and the hover; an `async` program's unhandled exception stops where it was thrown, with that frame's locals; a step off a web request's or a click's handler lets the program run on, and a step over an `await` stops on the next line on a busy machine too; a step whose returned value cannot be boxed stops instead of running the program to its end; `ref`/`in`/`out` struct parameters and a struct's `this` show their values, and a `void` call answers "Ran, with no value"; a hit count counts only hits whose condition held; evaluations no longer stall on a garbage collection, a thread just started or .NET 11's tiered JIT; the debugger answers at once while it decompiles CoreLib, and Detach goes at once.
 - C# formats as you type: the `;` that ends a statement and the `}` that closes a block lay out what they end, your `.editorconfig` included, as Passenger 0.4.1 does (#1987); `editor.formatOnType` is on for `[csharp]` by default, and one Ctrl+Z takes a layout back. Turn it off under `[csharp]` in your settings.
 - The .NET tools CSharpShooter runs for your code (builds, Clean, Publish, restores, `dotnet msbuild`'s questions, `dotnet new`, `dev-certs`, NuGet's lists and installs, test runs and the Testing Platform's) run with each tool's telemetry off: `DOTNET_CLI_TELEMETRY_OPTOUT`, `TESTINGPLATFORM_TELEMETRY_OPTOUT`, `AVALONIA_TELEMETRY_OPTOUT`, `DOTNET_SVCUTIL_TELEMETRY_OPTOUT`, `FUNCTIONS_CORE_TOOLS_TELEMETRY_OPTOUT` and `ASPIRE_CLI_TELEMETRY_OPTOUT`, unless you set one yourself (Passenger 0.4.3, #2159). Your own programs keep your environment as it is.
 
@@ -29,10 +30,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Call Hierarchy (Shift+Alt+H) at a use of a method, property or event declared in another file shows it and its callers, where Roslyn's server answered nothing there, and at a record's positional property, from a use or at its declaration, shows the property and what reads it: CSharpShooter's extension to the server makes the item where the member is declared, as Passenger 0.4.1 does (#1916).
 - Delete in the Solution Explorer names the nested files that go with a file (`Form1.Designer.cs` and `Form1.resx`, `Counter.razor.cs` and `Counter.razor.css`) in its question (Passenger 0.4.3, #2144), and a form's or user control's `Form1.resx` nests under `Form1.cs` beside its `Form1.Designer.cs`, as Visual Studio nests it, so it goes with it.
 - An HTTP environment's own value in `http-client.env.json` wins over `$shared` in `http-client.env.json.user`, as Visual Studio's documentation of `.http` files says (Passenger 0.4.3, #2151), where the `.user` file's `$shared` took its place.
-
-### Changed
-
-- The debugger is Passenger 0.4.5's (`f002c54`, `debugger-port/net10.patch` made again on it, Passenger's analyzers built on the .NET 10 SDK's Roslyn 5.9): an `async` method's unhandled exception from a task started on another thread, not yet awaited, stops where it is awaited, and an evaluation no longer waits for good on a thread the runtime has just started; from 0.4.3: anonymous types (`new { A = 1 }`, `Select(i => new { i.Name })`), arrays of `object` or of an interface and a constructor given a lambda (`new Lazy<int>(() => 1)`) evaluate; a variable an `async` method's block captures in a lambda shows in Variables and the hover; an `async` program's unhandled exception stops where it was thrown, with that frame's locals; a step off a web request's or a click's handler lets the program run on, and a step over an `await` stops on the next line on a busy machine too; a step whose returned value cannot be boxed stops instead of running the program to its end; `ref`/`in`/`out` struct parameters and a struct's `this` show their values, and a `void` call answers "Ran, with no value"; a hit count counts only hits whose condition held; evaluations no longer stall on a garbage collection, a thread just started or .NET 11's tiered JIT; the debugger answers at once while it decompiles CoreLib, and Detach goes at once.
 
 ## [0.13.0] - 2026-11-14
 
